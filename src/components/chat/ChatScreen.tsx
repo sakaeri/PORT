@@ -234,6 +234,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
         <PayDialog
           price={payTargetBundle.request.amount}
           needsProfile={needsProfile}
+          hasGuestActivity={messages.length > 0}
           confirming={busy}
           onClose={() => setPayTargetId(null)}
           onConfirm={handlePayConfirm}
@@ -248,6 +249,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
           customerName={ctx.customerName}
           currentEmail={ctx.email}
           vault={initialVault}
+          hasGuestActivity={messages.length > 0}
           isDark={isDark}
           onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}

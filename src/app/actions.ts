@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getCustomerContext, getRefundPolicies } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
@@ -8,6 +9,25 @@ async function requireContext() {
   const ctx = await getCustomerContext();
   if (!ctx) throw new Error("認証されていません");
   return ctx;
+}
+
+// 既存アカウントへのログイン（マジックリンク）。今の匿名セッションのトーク内容は
+// 引き継がれない — 呼び出し側（UI）で事前に確認を取ってから呼ぶこと。
+export async function requestMagicLink(email: string) {
+  const trimmed = email.trim();
+  if (!trimmed) throw new Error("メールアドレスをご入力ください");
+  const supabase = await createClient();
+  const h = await headers();
+  const host = h.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  const { error } = await supabase.auth.signInWithOtp({
+    email: trimmed,
+    // 既存アカウントへのログイン専用。true にすると初見のメールアドレスでも
+    // 新規ユーザーが作られてしまい、customers 行を持たない空アカウントに
+    // なってしまう（新規登録は決済画面の別フローで行う）。
+    options: { emailRedirectTo: `${protocol}://${host}/auth/confirm`, shouldCreateUser: false },
+  });
+  if (error) throw new Error("このメールアドレスのご登録が見つかりませんでした。初めてのご利用の場合は、決済の画面から新規登録してください。");
 }
 
 export async function sendMessage(text: string, attachments: { path: string; name: string; mime: string; bytes: number }[]) {

@@ -9,6 +9,7 @@ import { computeRefund, type RefundResult } from "@/lib/refund";
 import type { MenuRow } from "@/lib/chat-types";
 import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
+import LoginPanel from "@/components/chat/LoginPanel";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 
@@ -115,12 +116,14 @@ export function ProgressPanel({ bundles, onClose, onCancel }: { bundles: Request
 export function PayDialog({
   price,
   needsProfile,
+  hasGuestActivity,
   onClose,
   onConfirm,
   confirming,
 }: {
   price: number;
   needsProfile: boolean;
+  hasGuestActivity: boolean;
   onClose: () => void;
   onConfirm: (profile?: { name: string; email: string; phone: string }) => void;
   confirming: boolean;
@@ -138,6 +141,7 @@ export function PayDialog({
           <div style={{ fontSize: 14, opacity: 0.85, lineHeight: 1.6 }}>
             お名前は書類の宛名、メールアドレスは領収書と完了報告の送信先に使います。この見積もりのお支払いに進むために一度だけご登録ください。
           </div>
+          <LoginPanel hasGuestActivity={hasGuestActivity} />
           <div>
             <label style={{ display: "block", fontSize: 12, marginBottom: 5, color: "var(--color-neutral-500)" }}>お名前</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" className="vid-input" style={{ width: "100%", height: 36, padding: "6px 10px", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }} />

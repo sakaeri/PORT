@@ -5,6 +5,7 @@ import { X, CheckCircle, Gift, CaretDown, CaretRight, ChatsCircle, Receipt, User
 import type { VaultRow } from "@/lib/chat-types";
 import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
+import LoginPanel from "@/components/chat/LoginPanel";
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 60 };
 const dialogBox: React.CSSProperties = {
@@ -33,6 +34,7 @@ export default function MyPageDialog({
   customerName,
   currentEmail,
   vault,
+  hasGuestActivity,
   isDark,
   onToggleTheme,
   onClose,
@@ -41,6 +43,7 @@ export default function MyPageDialog({
   customerName: string;
   currentEmail: string | null;
   vault: VaultRow[];
+  hasGuestActivity: boolean;
   isDark: boolean;
   onToggleTheme: () => void;
   onClose: () => void;
@@ -151,6 +154,8 @@ export default function MyPageDialog({
               <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>会員番号</span>
               <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>{memberNo ?? "—"}</span>
             </div>
+
+            <LoginPanel hasGuestActivity={hasGuestActivity} />
 
             {/* 画面の色合い */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
