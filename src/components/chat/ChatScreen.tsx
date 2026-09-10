@@ -250,7 +250,6 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
           customerName={ctx.customerName}
           currentEmail={ctx.email}
           vault={initialVault}
-          receptionName={ctx.receptionName}
           onClose={() => setShowMyPage(false)}
         />
       )}

@@ -3,7 +3,6 @@
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getCustomerContext, getRefundPolicies } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
-import { revalidatePath } from "next/cache";
 
 async function requireContext() {
   const ctx = await getCustomerContext();
@@ -34,7 +33,6 @@ export async function sendMessage(text: string, attachments: { path: string; nam
       .insert({ thread_id: ctx.threadId, sender_id: ctx.userId, sender_role: "client", kind: "text", body: trimmed });
     if (error) throw error;
   }
-  revalidatePath("/");
 }
 
 export async function submitMenuInquiry(
@@ -55,18 +53,33 @@ export async function submitMenuInquiry(
     payload: { menuId, menuLabel, menuIcon, rows: filled, note: note.trim() },
   });
   if (error) throw error;
-  revalidatePath("/");
 }
 
-export async function saveVaultItem(id: string | null, label: string, value: string) {
+// id が null（または DB にまだ存在しない一時ID）なら新規作成として扱い、
+// 実際の行IDを返す。呼び出し側はローカルの仮IDをこれで置き換える。
+export async function saveVaultItem(id: string | null, label: string, value: string): Promise<string> {
   const ctx = await requireContext();
   const supabase = await createClient();
-  if (id) {
+  const isNew = !id || id.startsWith("temp-");
+  if (!isNew) {
     await supabase.from("customer_vault_items").update({ label, value, updated_at: new Date().toISOString() }).eq("id", id);
-  } else {
-    await supabase.from("customer_vault_items").insert({ customer_id: ctx.customerId, label, value });
+    return id as string;
   }
-  revalidatePath("/");
+  const { data, error } = await supabase
+    .from("customer_vault_items")
+    .insert({ customer_id: ctx.customerId, label, value })
+    .select("id")
+    .single();
+  if (error || !data) throw error ?? new Error("保存できませんでした");
+  return data.id;
+}
+
+export async function deleteVaultItem(id: string) {
+  if (id.startsWith("temp-")) return; // まだDBに存在しない行はローカルで消すだけでよい
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("customer_vault_items").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export async function submitInfoRequestAnswer(messageId: string, fields: { key: string; value: string }[]) {
@@ -105,7 +118,6 @@ export async function submitInfoRequestAnswer(messageId: string, fields: { key: 
     kind: "notice",
     body: `${filled.map((f) => f.key).join("・")}を登録しました（トークには残りません）`,
   });
-  revalidatePath("/");
 }
 
 // 受付への依頼として本人発言のまま投稿する（自動応答は作らない — 実際の返信は
@@ -124,7 +136,6 @@ export async function requestNameChange(newName: string, reason: string) {
     body: `お名前の変更をお願いします。新しいお名前：${trimmed}／理由：${reason}`,
   });
   if (error) throw error;
-  revalidatePath("/");
 }
 
 // 決済前の初回登録のみ。以降の変更は requestNameChange（受付経由）に切り替わる
@@ -153,7 +164,6 @@ export async function setInitialProfile(name: string, email: string, phone: stri
     if (existing) await supabase.from("customer_vault_items").update({ value: phone.trim() }).eq("id", existing.id);
     else await supabase.from("customer_vault_items").insert({ customer_id: ctx.customerId, label: "電話番号", value: phone.trim() });
   }
-  revalidatePath("/");
 }
 
 // マイページから名前だけ先に決めたい場合用（決済フローとは独立）。
@@ -166,7 +176,6 @@ export async function setInitialName(name: string) {
   // RLS が拒否すると対象行が0件のまま成功扱いになるため、更新後の行の有無で判定する。
   const { data, error } = await supabase.from("customers").update({ name: trimmed }).eq("id", ctx.customerId).select("id");
   if (error || !data?.length) throw new Error("お名前は既に登録済みです。変更は「変更を依頼」からお願いします。");
-  revalidatePath("/");
 }
 
 export async function changeEmail(newEmail: string) {
@@ -182,7 +191,6 @@ export async function submitRating(requestId: string, stars: number, comment: st
     .from("ratings")
     .insert({ request_id: requestId, customer_id: ctx.customerId, stars, comment: comment.trim() || null, skipped: false });
   if (error) throw error;
-  revalidatePath("/");
 }
 
 export async function skipRating(requestId: string) {
@@ -192,7 +200,6 @@ export async function skipRating(requestId: string) {
     .from("ratings")
     .insert({ request_id: requestId, customer_id: ctx.customerId, stars: null, skipped: true });
   if (error) throw error;
-  revalidatePath("/");
 }
 
 // 決済・返金は customer 自身の RLS 権限では requests を更新できない設計（意図的）。
@@ -228,7 +235,6 @@ export async function payRequest(requestId: string) {
       body: `${r.amount.toLocaleString("ja-JP")}円の決済が完了しました。進捗はカードでご確認いただけます`,
     });
   }
-  revalidatePath("/");
 }
 
 export async function sendHandlerChangeRequest() {
@@ -242,7 +248,6 @@ export async function sendHandlerChangeRequest() {
     body: "担当の変更について相談したいです。",
   });
   if (error) throw error;
-  revalidatePath("/");
 }
 
 export async function cancelRequest(requestId: string) {
@@ -270,5 +275,4 @@ export async function cancelRequest(requestId: string) {
     .update({ phase: nextPhase, cancelled_at: now, refund_pct: refund.pct, refunded_amount: refund.amount })
     .eq("id", requestId);
 
-  revalidatePath("/");
 }

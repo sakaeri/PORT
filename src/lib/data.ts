@@ -29,14 +29,6 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     .maybeSingle();
   if (!thread) return null;
 
-  const { data: reception } = await supabase
-    .from("profiles")
-    .select("display_name")
-    .eq("org_id", customer.org_id)
-    .eq("role", "reception")
-    .limit(1)
-    .maybeSingle();
-
   const { data: org } = await supabase
     .from("organizations")
     .select("display_name")
@@ -52,7 +44,6 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     memberNo: customer.member_no,
     threadId: thread.id,
     email: auth.user.email ?? null,
-    receptionName: reception?.display_name ?? "受付",
   };
 });
 

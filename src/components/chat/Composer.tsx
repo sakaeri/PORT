@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ListDashes, Paperclip, ArrowUUpLeft, X, PaperPlaneTilt } from "@phosphor-icons/react";
+import { ListDashes, Paperclip, ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 
 export interface PendingAttachment {
@@ -164,8 +164,8 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
             </button>
           </div>
         </div>
-        <button onClick={handleSend} disabled={sendDisabled} aria-label="送信" style={{ width: 40, height: 40, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: sendDisabled ? "default" : "pointer", opacity: sendDisabled ? 0.5 : 1, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-          <PaperPlaneTilt size={16} />
+        <button onClick={handleSend} disabled={sendDisabled} aria-label="送信" aria-busy={sending} style={{ width: 40, height: 40, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: sendDisabled ? "default" : "pointer", opacity: sendDisabled ? 0.5 : 1, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+          {sending ? <CircleNotch size={16} style={{ animation: "vid-spin 0.7s linear infinite" }} /> : <PaperPlaneTilt size={16} />}
         </button>
       </div>
     </div>

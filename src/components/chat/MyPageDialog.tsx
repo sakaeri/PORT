@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, CheckCircle, Gift, CaretDown, CaretRight, ChatsCircle, Receipt, UsersThree, LockSimple } from "@phosphor-icons/react";
+import { X, CheckCircle, Gift, CaretDown, CaretRight, ChatsCircle, Receipt, UsersThree } from "@phosphor-icons/react";
 import type { VaultRow } from "@/lib/chat-types";
-import { saveVaultItem, setInitialName, changeEmail, requestNameChange, sendHandlerChangeRequest } from "@/app/actions";
+import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, sendHandlerChangeRequest } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 60 };
@@ -33,14 +33,12 @@ export default function MyPageDialog({
   customerName,
   currentEmail,
   vault,
-  receptionName,
   onClose,
 }: {
   memberNo: string | null;
   customerName: string;
   currentEmail: string | null;
   vault: VaultRow[];
-  receptionName: string;
   onClose: () => void;
 }) {
   const [name, setName] = useState(customerName);
@@ -121,12 +119,21 @@ export default function MyPageDialog({
 
   async function commitVault(id: string) {
     const row = vaultRows.find((r) => r.id === id);
-    if (row) await saveVaultItem(id, row.label, row.value);
+    if (!row || (!row.label.trim() && !row.value.trim())) return;
+    const savedId = await saveVaultItem(id, row.label, row.value);
+    if (savedId !== id) {
+      setVaultRows((rows) => rows.map((r) => (r.id === id ? { ...r, id: savedId } : r)));
+    }
   }
 
   async function addVaultRow() {
     const tempId = `temp-${Date.now()}`;
     setVaultRows((rows) => [...rows, { id: tempId, customer_id: "", label: "", value: "", sort: rows.length, updated_at: new Date().toISOString() }]);
+  }
+
+  async function removeVaultRow(id: string) {
+    setVaultRows((rows) => rows.filter((r) => r.id !== id));
+    await deleteVaultItem(id);
   }
 
   return (
@@ -283,21 +290,31 @@ export default function MyPageDialog({
                     className="vid-input"
                     style={{ minWidth: 0, flex: 1, height: 32, padding: "5px 9px", fontSize: 12.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
                   />
+                  <button
+                    onClick={() => removeVaultRow(v.id)}
+                    aria-label="削除"
+                    style={{ flex: "none", width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               ))}
             </div>
 
             {/* PORT referral block */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>この進め方について</div>
+            <div style={{ paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-                <div style={{ fontFamily: "var(--font-heading)", fontSize: 14, lineHeight: 1.5 }}>同じ受付のしかたを、自社の窓口にも</div>
+                <div style={{ fontFamily: "var(--font-heading)", fontSize: 14, lineHeight: 1.5 }}>この窓口のしくみを、自社でも</div>
                 <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.65 }}>
-                  お使いいただいているこの画面は PORT というしくみです。依頼を受ける側として使うこともできます。月額 ¥4,800 ＋ スタッフ連携機能1人あたり ¥1,500。
+                  この画面は PORT という受付のしくみです。同じやり方で、自社の依頼受付にもお使いいただけます。月額 ¥4,800 ＋ 制作者1人あたり ¥1,500〜。
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: "var(--color-accent-200)" }}>
                   <Gift size={14} />
-                  <span>{refStarted ? "ご案内をメールでお送りしました（紹介経由のため基本料3ヶ月無料）" : "担当者からの紹介経由なので、基本料が3ヶ月無料になります"}</span>
+                  <span>
+                    {refStarted
+                      ? "ご案内をメールでお送りしました。30日間のお試し後、紹介経由のため基本料が3ヶ月無料になります。"
+                      : "30日間ためせます。紹介経由なので、その後の基本料が3ヶ月無料になります。"}
+                  </span>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                   <button onClick={() => setRefStarted(true)} style={{ height: 34, padding: "0 14px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
@@ -314,7 +331,6 @@ export default function MyPageDialog({
                       { icon: <ChatsCircle size={13} />, text: "依頼はトーク1本。フォームも管理表も作らずに受け付けられます" },
                       { icon: <Receipt size={13} />, text: "見積・決済・完了報告・領収書までこの画面の中で完結します" },
                       { icon: <UsersThree size={13} />, text: "外注先や社内スタッフへの割り振りと報酬の集計まで含まれます" },
-                      { icon: <LockSimple size={13} />, text: "PORT が見るのは件数だけ。案件の中身・金額・お客様の情報は見られません" },
                     ].map((p, i) => (
                       <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 11.5, color: "var(--color-neutral-400)", lineHeight: 1.6 }}>
                         <span style={{ flex: "none", marginTop: 2, color: "var(--color-accent)" }}>{p.icon}</span>
@@ -322,7 +338,7 @@ export default function MyPageDialog({
                       </div>
                     ))}
                     <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6, marginTop: 2 }}>
-                      30日おためしのあと、基本料 ¥4,800 が3ヶ月無料。制作者の席は1人目（ご本人）が基本料に含まれ、2人目から ¥1,500/月です。
+                      30日間のお試し後、基本料 ¥4,800 が3ヶ月無料になります。制作者の席は1人目（ご本人）が基本料に含まれ、2人目から ¥1,500/月です。
                     </div>
                   </div>
                 )}
@@ -335,8 +351,8 @@ export default function MyPageDialog({
       {secretaryOpen && (
         <div style={{ ...scrim, zIndex: 61, display: "grid", placeItems: "center", padding: "var(--space-4)" }} onClick={() => setSecretaryOpen(false)}>
           <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ width: "min(420px, 100%)", display: "flex", flexDirection: "column", gap: 12, padding: 20, borderRadius: "var(--radius-lg)", background: "var(--color-surface)", boxShadow: "var(--shadow-lg)" }}>
-            <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>受付 {receptionName}</div>
-            <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.85 }}>ご依頼の窓口は{receptionName}です。制作する実務担当の手配と進行はこちらで行います。</div>
+            <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>担当の変更について</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.85 }}>制作を担当するスタッフの変更をご希望の場合は、受付にご相談ください。ご要望を伺ったうえで対応します。</div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
               <button onClick={() => setSecretaryOpen(false)} style={{ height: 36, padding: "0 14px", cursor: "pointer", color: "var(--color-text)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
                 閉じる
@@ -348,7 +364,7 @@ export default function MyPageDialog({
                 }}
                 style={{ height: 36, padding: "0 14px", cursor: "pointer", whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
               >
-                進行について相談
+                受付に相談する
               </button>
             </div>
           </div>
