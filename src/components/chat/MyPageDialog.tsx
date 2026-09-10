@@ -24,7 +24,7 @@ const dialogBox: React.CSSProperties = {
   boxShadow: "var(--shadow-lg)",
 };
 const fieldLabel: React.CSSProperties = { display: "block", fontSize: 12, color: "var(--color-neutral-500)" };
-const rowBox: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" };
+const rowBox: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10 };
 const smallBtn: React.CSSProperties = { flex: "none", height: 36, padding: "0 12px", cursor: "pointer", fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
 const input: React.CSSProperties = { width: "100%", height: 36, padding: "6px 10px", fontSize: 13.5, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" };
 
@@ -175,13 +175,15 @@ export default function MyPageDialog({
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>マイページ</div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-              <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>お問い合わせ番号</span>
-              <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>{memberNo ?? "—"}</span>
-            </div>
+            {isAnonymous && (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>お問い合わせ番号</span>
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>{memberNo ?? "—"}</span>
+              </div>
+            )}
 
             {/* 画面の色合い */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ flex: 1, fontSize: 13.5 }}>画面の色合い</span>
               <button
                 onClick={onToggleTheme}
@@ -209,30 +211,31 @@ export default function MyPageDialog({
               </div>
             ) : (
               <>
-            {/* プロフィール画像 */}
-            <AvatarPicker userId={userId} customerName={customerName} avatarUrl={avatarUrl} onChange={onAvatarChange} />
-
-            {/* お名前 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              <label style={fieldLabel}>お名前</label>
-              {nameIsPlaceholder ? (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input value={name === NAME_PLACEHOLDER ? "" : name} placeholder="山田 太郎" onChange={(e) => setName(e.target.value)} className="vid-input" style={{ ...input, flex: 1 }} />
-                  <button onClick={saveSelfName} disabled={nameSelfSaving || !name.trim()} style={smallBtn}>
-                    保存
-                  </button>
-                </div>
-              ) : (
-                <div style={rowBox}>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-                  <button onClick={() => setNameOpen((v) => !v)} style={{ ...smallBtn, color: "var(--color-neutral-300)", borderColor: "var(--color-divider)" }}>
-                    変更を依頼
-                  </button>
-                </div>
-              )}
-              <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>契約書・見積書・請求書の宛名に使うため、受付が確認して変更します</span>
-              {nameOpen && (
+            {/* プロフィール画像＋お名前 */}
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <AvatarPicker userId={userId} customerName={customerName} avatarUrl={avatarUrl} onChange={onAvatarChange} />
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 7 }}>
+                <label style={fieldLabel}>お名前</label>
+                {nameIsPlaceholder ? (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input value={name === NAME_PLACEHOLDER ? "" : name} placeholder="山田 太郎" onChange={(e) => setName(e.target.value)} className="vid-input" style={{ ...input, flex: 1 }} />
+                    <button onClick={saveSelfName} disabled={nameSelfSaving || !name.trim()} style={smallBtn}>
+                      保存
+                    </button>
+                  </div>
+                ) : (
+                  <div style={rowBox}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                    <button onClick={() => setNameOpen((v) => !v)} style={{ ...smallBtn, color: "var(--color-neutral-300)", borderColor: "var(--color-divider)" }}>
+                      変更を依頼
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            {nameOpen && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
+                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>契約書・見積書・請求書の宛名に使うため、受付が確認して変更します</span>
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>新しいお名前</span>
                     <input value={nameNext} onChange={(e) => setNameNext(e.target.value)} placeholder="例）山田 太郎" className="vid-input" style={input} />
@@ -276,7 +279,6 @@ export default function MyPageDialog({
                   <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>発行済みの書類は差し替えが必要な場合があります。受付が確認のうえご連絡します。</span>
                 </div>
               )}
-            </div>
 
             {/* メールアドレス */}
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -306,7 +308,7 @@ export default function MyPageDialog({
                       キャンセル
                     </button>
                   </div>
-                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>保存すると新しいアドレスに確認メールをお送りします。受付や担当者への通知は行われません。</span>
+                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>保存すると新しいアドレスに確認メールをお送りします。</span>
                 </div>
               )}
               {emDone && (

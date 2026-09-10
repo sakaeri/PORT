@@ -7,6 +7,17 @@ import { updateAvatar, removeAvatar } from "@/app/actions";
 
 const NAME_PLACEHOLDER = "未登録の依頼主";
 
+const menuItemStyle: React.CSSProperties = {
+  textAlign: "left",
+  padding: "9px 14px",
+  fontSize: 12.5,
+  whiteSpace: "nowrap",
+  cursor: "pointer",
+  color: "var(--color-text)",
+  background: "transparent",
+  border: "none",
+};
+
 export function avatarInitial(customerName: string): string {
   return customerName && customerName !== NAME_PLACEHOLDER ? customerName.trim().charAt(0) : "";
 }
@@ -41,6 +52,7 @@ export function Avatar({ url, initial, size }: { url: string | null; initial: st
 
 // ログイン中であることが一目でわかるよう、プロフィール画像（なければ名前の頭文字）を
 // ヘッダーのマイページボタンにも表示する。実際の画像はここから設定する。
+// 画像そのものをタップするとメニューが開く方式（外に変更/削除ボタンを常設しない）。
 export default function AvatarPicker({
   userId,
   customerName,
@@ -52,6 +64,7 @@ export default function AvatarPicker({
   avatarUrl: string | null;
   onChange: (url: string | null) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,6 +91,7 @@ export default function AvatarPicker({
   }
 
   async function handleRemove() {
+    setMenuOpen(false);
     setUploading(true);
     setError("");
     try {
@@ -91,31 +105,62 @@ export default function AvatarPicker({
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <Avatar url={avatarUrl} initial={avatarInitial(customerName)} size={52} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePick} style={{ display: "none" }} />
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+    <div style={{ position: "relative", flex: "none" }}>
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePick} style={{ display: "none" }} />
+      <button
+        onClick={() => setMenuOpen((v) => !v)}
+        disabled={uploading}
+        aria-label="プロフィール画像を変更"
+        style={{ position: "relative", padding: 0, border: "none", background: "transparent", borderRadius: "50%", cursor: uploading ? "wait" : "pointer" }}
+      >
+        <Avatar url={avatarUrl} initial={avatarInitial(customerName)} size={52} />
+        {uploading && (
+          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.4)", borderRadius: "50%" }}>
+            <CircleNotch size={18} color="#fff" style={{ animation: "vid-spin 0.7s linear infinite" }} />
+          </span>
+        )}
+      </button>
+
+      {menuOpen && (
+        <>
+          <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1 }} />
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              marginTop: 6,
+              zIndex: 2,
+              display: "flex",
+              flexDirection: "column",
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-divider)",
+              boxShadow: "var(--shadow-lg)",
+              overflow: "hidden",
+            }}
           >
-            {uploading && <CircleNotch size={13} style={{ animation: "vid-spin 0.7s linear infinite" }} />}
-            {avatarUrl ? "変更する" : "画像を選ぶ"}
-          </button>
-          {avatarUrl && (
             <button
-              onClick={handleRemove}
-              disabled={uploading}
-              style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+              onClick={() => {
+                setMenuOpen(false);
+                fileInputRef.current?.click();
+              }}
+              style={menuItemStyle}
             >
-              削除
+              {avatarUrl ? "画像を変更" : "画像を選ぶ"}
             </button>
-          )}
-        </div>
-        {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
-      </div>
+            {avatarUrl && (
+              <button onClick={handleRemove} style={{ ...menuItemStyle, color: "var(--color-accent-200)" }}>
+                画像を削除
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {error && (
+        <span style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, fontSize: 10.5, whiteSpace: "nowrap", color: "var(--color-accent-200)" }}>{error}</span>
+      )}
     </div>
   );
 }
