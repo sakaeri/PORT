@@ -302,3 +302,17 @@ export async function cancelRequest(requestId: string) {
     .eq("id", requestId);
 
 }
+
+// マイページの「自社でも」→「3ヶ月無料で始める」用。まだ自動返信メールの仕組みは
+// ないため、ここでは申し込みの記録だけ行う（PORT運営がSupabase側で確認して連絡する）。
+export async function startReferral() {
+  const ctx = await requireContext();
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("referral_leads").insert({
+    org_id: ctx.orgId,
+    customer_id: ctx.customerId,
+    customer_name: ctx.customerName,
+    customer_email: ctx.email,
+  });
+  if (error) throw error;
+}

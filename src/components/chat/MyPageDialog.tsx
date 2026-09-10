@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, CheckCircle, Gift, CaretDown, CaretRight, ChatsCircle, Receipt, UsersThree, Sun, MoonStars } from "@phosphor-icons/react";
 import type { VaultRow } from "@/lib/chat-types";
-import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange } from "@/app/actions";
+import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, startReferral } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 import LoginPanel from "@/components/chat/LoginPanel";
 import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
@@ -23,7 +23,6 @@ const dialogBox: React.CSSProperties = {
   background: "var(--color-surface)",
   boxShadow: "var(--shadow-lg)",
 };
-const fieldLabel: React.CSSProperties = { display: "block", fontSize: 12, color: "var(--color-neutral-500)" };
 const rowBox: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10 };
 const smallBtn: React.CSSProperties = { flex: "none", height: 36, padding: "0 12px", cursor: "pointer", fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
 const input: React.CSSProperties = { width: "100%", height: 36, padding: "6px 10px", fontSize: 13.5, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" };
@@ -93,6 +92,22 @@ export default function MyPageDialog({
 
   const [refOpen, setRefOpen] = useState(false);
   const [refStarted, setRefStarted] = useState(false);
+  const [refSending, setRefSending] = useState(false);
+  const [refError, setRefError] = useState("");
+
+  async function handleStartReferral() {
+    if (refSending || refStarted) return;
+    setRefSending(true);
+    setRefError("");
+    try {
+      await startReferral();
+      setRefStarted(true);
+    } catch (e) {
+      setRefError(e instanceof Error ? e.message : "送信できませんでした");
+    } finally {
+      setRefSending(false);
+    }
+  }
 
   const [authView, setAuthView] = useState<"none" | "login" | "create">("none");
 
@@ -215,7 +230,6 @@ export default function MyPageDialog({
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
               <AvatarPicker userId={userId} customerName={customerName} avatarUrl={avatarUrl} onChange={onAvatarChange} />
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 7 }}>
-                <label style={fieldLabel}>お名前</label>
                 {nameIsPlaceholder ? (
                   <div style={{ display: "flex", gap: 8 }}>
                     <input value={name === NAME_PLACEHOLDER ? "" : name} placeholder="山田 太郎" onChange={(e) => setName(e.target.value)} className="vid-input" style={{ ...input, flex: 1 }} />
@@ -282,7 +296,6 @@ export default function MyPageDialog({
 
             {/* メールアドレス */}
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              <label style={fieldLabel}>メールアドレス</label>
               <div style={rowBox}>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email || "未登録"}</span>
                 <button onClick={() => setEmOpen((v) => !v)} style={smallBtn}>
@@ -370,14 +383,17 @@ export default function MyPageDialog({
                   <Gift size={14} />
                   <span>
                     {refStarted
-                      ? "ご案内をメールでお送りしました。紹介経由のため、基本料が3ヶ月無料になります。"
+                      ? "お申し込みを受け付けました。担当より追ってご連絡いたします。"
                       : "紹介経由なので、基本料が3ヶ月無料になります。"}
                   </span>
                 </div>
+                {refError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{refError}</span>}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                  <button onClick={() => setRefStarted(true)} style={{ height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-                    3ヶ月無料で始める
-                  </button>
+                  {!refStarted && (
+                    <button onClick={handleStartReferral} disabled={refSending} style={{ height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+                      {refSending ? "送信中…" : "3ヶ月無料で始める"}
+                    </button>
+                  )}
                   <button onClick={() => setRefOpen((v) => !v)} style={{ height: 34, padding: "0 12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
                     {refOpen ? <CaretDown size={13} /> : <CaretRight size={13} />}
                     できること

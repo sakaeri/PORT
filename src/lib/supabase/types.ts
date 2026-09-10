@@ -302,6 +302,19 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["app_config"]["Row"]>;
         Relationships: [];
       };
+      referral_leads: {
+        Row: {
+          id: string;
+          org_id: string;
+          customer_id: string;
+          customer_name: string;
+          customer_email: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["referral_leads"]["Row"]> & { org_id: string; customer_id: string; customer_name: string };
+        Update: Partial<Database["public"]["Tables"]["referral_leads"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
