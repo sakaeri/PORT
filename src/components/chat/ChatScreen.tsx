@@ -184,8 +184,6 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
         onOpenProgress={() => setShowProgress(true)}
         onOpenReports={() => setShowReports(true)}
         onOpenMyPage={() => setShowMyPage(true)}
-        isDark={isDark}
-        onToggleTheme={toggleTheme}
       />
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "var(--space-6) var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
@@ -250,6 +248,8 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
           customerName={ctx.customerName}
           currentEmail={ctx.email}
           vault={initialVault}
+          isDark={isDark}
+          onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}
         />
       )}

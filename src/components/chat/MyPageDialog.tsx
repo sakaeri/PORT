@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, CheckCircle, Gift, CaretDown, CaretRight, ChatsCircle, Receipt, UsersThree } from "@phosphor-icons/react";
+import { X, CheckCircle, Gift, CaretDown, CaretRight, ChatsCircle, Receipt, UsersThree, Sun, MoonStars } from "@phosphor-icons/react";
 import type { VaultRow } from "@/lib/chat-types";
 import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
@@ -33,12 +33,16 @@ export default function MyPageDialog({
   customerName,
   currentEmail,
   vault,
+  isDark,
+  onToggleTheme,
   onClose,
 }: {
   memberNo: string | null;
   customerName: string;
   currentEmail: string | null;
   vault: VaultRow[];
+  isDark: boolean;
+  onToggleTheme: () => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(customerName);
@@ -146,6 +150,18 @@ export default function MyPageDialog({
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
               <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>会員番号</span>
               <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>{memberNo ?? "—"}</span>
+            </div>
+
+            {/* 画面の色合い */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+              <span style={{ flex: 1, fontSize: 13.5 }}>画面の色合い</span>
+              <button
+                onClick={onToggleTheme}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 30, padding: "0 12px", cursor: "pointer", fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+              >
+                {isDark ? <Sun size={14} /> : <MoonStars size={14} />}
+                {isDark ? "ライトに切替" : "ダークに切替"}
+              </button>
             </div>
 
             {/* お名前 */}

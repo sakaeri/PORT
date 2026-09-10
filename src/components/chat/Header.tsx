@@ -1,6 +1,6 @@
 "use client";
 
-import { MagnifyingGlass, ListChecks, ClipboardText, UserCircle, Headset, Sun, MoonStars } from "@phosphor-icons/react";
+import { MagnifyingGlass, ListChecks, ClipboardText, UserCircle, Headset } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 
 interface Props {
@@ -13,8 +13,6 @@ interface Props {
   onOpenProgress: () => void;
   onOpenReports: () => void;
   onOpenMyPage: () => void;
-  isDark: boolean;
-  onToggleTheme: () => void;
 }
 
 const iconBtn: React.CSSProperties = {
@@ -43,8 +41,6 @@ export default function Header({
   onOpenProgress,
   onOpenReports,
   onOpenMyPage,
-  isDark,
-  onToggleTheme,
 }: Props) {
   return (
     <div
@@ -104,10 +100,6 @@ export default function Header({
       </div>
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-        <button onClick={onToggleTheme} aria-label="テーマ切替" title={isDark ? "ライトに切替" : "ダークに切替"} style={iconBtn}>
-          {isDark ? <Sun size={15} /> : <MoonStars size={15} />}
-          {isDark ? "ライト" : "ダーク"}
-        </button>
         <button onClick={onOpenProgress} style={iconBtn}>
           <ListChecks size={15} />
           進捗状況{activeCount ? `（${activeCount}）` : ""}
