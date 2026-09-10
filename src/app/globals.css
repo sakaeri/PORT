@@ -37,6 +37,13 @@
   --stb-scrim: rgba(4, 12, 9, 0.62);
   --stb-stage: #08110e;
 
+  /* チャット吹き出し: 自分の発言と相手の発言を色で見分けられるようにする。
+     自分＝白地の塗り、相手＝サーフェス色の塗り（枠線つき）。 */
+  --color-bubble-self-bg: #ffffff;
+  --color-bubble-self-text: #182420;
+  --color-bubble-other-bg: var(--color-surface);
+  --color-bubble-other-text: var(--color-text);
+
   --font-heading: var(--font-inter), var(--font-noto-jp), system-ui, sans-serif;
   --font-heading-weight: 500;
   --font-body: var(--font-inter), var(--font-noto-jp), system-ui, sans-serif;
@@ -87,6 +94,11 @@ html[data-vid-theme="light"] {
   --color-section-ghost: #8fd4b8;
   --stb-stage: #dde9e4;
   --stb-scrim: rgba(16, 35, 29, 0.34);
+
+  --color-bubble-self-bg: var(--color-accent);
+  --color-bubble-self-text: #ffffff;
+  --color-bubble-other-bg: var(--color-surface);
+  --color-bubble-other-text: var(--color-text);
   --shadow-sm: 0 0 0 1px color-mix(in srgb, #10231d 10%, transparent);
   --shadow-md: 0 0 0 1px color-mix(in srgb, #10231d 10%, transparent), 0 4px 14px rgba(16, 35, 29, 0.1);
   --shadow-lg: 0 0 0 1px color-mix(in srgb, #10231d 12%, transparent), 0 14px 38px rgba(16, 35, 29, 0.16);

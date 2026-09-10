@@ -51,9 +51,9 @@ export function TextBubble({ msg, highlight }: { msg: MessageWithExtras; highlig
         style={{
           width: "max-content",
           maxWidth: "100%",
-          background: isSelf ? "transparent" : "var(--color-surface)",
-          color: "var(--color-text)",
-          border: isSelf ? "1px solid var(--color-accent)" : "none",
+          background: isSelf ? "var(--color-bubble-self-bg)" : "var(--color-bubble-other-bg)",
+          color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-bubble-other-text)",
+          border: isSelf ? "none" : "1px solid var(--color-divider)",
           padding: "10px 14px",
           borderRadius: "var(--radius-lg)",
           fontSize: 14,
@@ -80,15 +80,15 @@ export function FilesBubble({ msg, highlight }: { msg: MessageWithExtras; highli
           gap: 6,
           padding: 10,
           borderRadius: "var(--radius-md)",
-          background: isSelf ? "transparent" : "var(--color-surface)",
-          border: isSelf ? "1px solid var(--color-accent)" : "1px solid var(--color-divider)",
+          background: isSelf ? "var(--color-bubble-self-bg)" : "var(--color-bubble-other-bg)",
+          border: isSelf ? "none" : "1px solid var(--color-divider)",
         }}
       >
         {msg.attachments.map((f: AttachmentRow) => (
-          <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, padding: "6px 8px", borderRadius: "var(--radius-md)", background: "var(--color-bg)" }}>
-            <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 17, color: "var(--color-accent)" }} />
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5 }}>{f.file_name}</span>
-            <span style={{ flex: "none", fontSize: 10, color: "var(--color-neutral-500)" }}>{fileSizeLabel(f.bytes)}</span>
+          <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, padding: "6px 8px", borderRadius: "var(--radius-md)", background: isSelf ? "color-mix(in srgb, var(--color-bubble-self-text) 6%, transparent)" : "var(--color-bg)" }}>
+            <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 17, color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-accent)" }} />
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5, color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-text)" }}>{f.file_name}</span>
+            <span style={{ flex: "none", fontSize: 10, color: isSelf ? "color-mix(in srgb, var(--color-bubble-self-text) 60%, transparent)" : "var(--color-neutral-500)" }}>{fileSizeLabel(f.bytes)}</span>
           </div>
         ))}
       </div>

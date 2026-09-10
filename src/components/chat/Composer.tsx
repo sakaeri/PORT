@@ -150,19 +150,21 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
               }
             }}
             ref={textareaRef}
-            placeholder="作りたい動画のことを入力…"
+            placeholder="ご相談内容を入力…"
             rows={1}
             className="vid-textarea"
-            style={{ width: "100%", resize: "none", maxHeight: 170, minHeight: 38, padding: "8px 64px 8px 10px", font: "inherit", fontSize: 14, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", overflowY: "auto", outline: "none" }}
+            style={{ width: "100%", resize: "none", maxHeight: 170, minHeight: 38, padding: draft || history.length > 0 ? "8px 64px 8px 10px" : "8px 10px", font: "inherit", fontSize: 14, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", overflowY: "auto", outline: "none" }}
           />
-          <div style={{ position: "absolute", top: 5, right: 5, display: "flex", gap: 2, width: 79, height: 30 }}>
-            <button onClick={undoClear} disabled={!history.length} aria-label="元に戻す" style={{ width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: history.length ? "pointer" : "default", opacity: history.length ? 1 : 0.4, color: "var(--color-neutral-600)", background: "transparent", border: "none", borderRadius: "var(--radius-md)" }}>
-              <ArrowUUpLeft size={16} />
-            </button>
-            <button onClick={clearDraft} disabled={!draft} aria-label="入力を消す" style={{ width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: draft ? "pointer" : "default", opacity: draft ? 1 : 0.4, color: "var(--color-neutral-600)", background: "transparent", border: "none", borderRadius: "var(--radius-md)" }}>
-              <X size={16} />
-            </button>
-          </div>
+          {(!!draft || history.length > 0) && (
+            <div style={{ position: "absolute", top: 5, right: 5, display: "flex", gap: 2, width: 79, height: 30 }}>
+              <button onClick={undoClear} disabled={!history.length} aria-label="元に戻す" style={{ width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: history.length ? "pointer" : "default", opacity: history.length ? 1 : 0.4, color: "var(--color-neutral-600)", background: "transparent", border: "none", borderRadius: "var(--radius-md)" }}>
+                <ArrowUUpLeft size={16} />
+              </button>
+              <button onClick={clearDraft} disabled={!draft} aria-label="入力を消す" style={{ width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: draft ? "pointer" : "default", opacity: draft ? 1 : 0.4, color: "var(--color-neutral-600)", background: "transparent", border: "none", borderRadius: "var(--radius-md)" }}>
+                <X size={16} />
+              </button>
+            </div>
+          )}
         </div>
         <button onClick={handleSend} disabled={sendDisabled} aria-label="送信" aria-busy={sending} style={{ width: 40, height: 40, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: sendDisabled ? "default" : "pointer", opacity: sendDisabled ? 0.5 : 1, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
           {sending ? <CircleNotch size={16} style={{ animation: "vid-spin 0.7s linear infinite" }} /> : <PaperPlaneTilt size={16} />}
