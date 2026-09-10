@@ -250,6 +250,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
           currentEmail={ctx.email}
           vault={initialVault}
           hasGuestActivity={messages.length > 0}
+          isAnonymous={ctx.isAnonymous}
           isDark={isDark}
           onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}

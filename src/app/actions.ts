@@ -172,7 +172,12 @@ export async function setInitialProfile(name: string, email: string, phone: stri
   await supabase.from("customers").update({ name: trimmedName }).eq("id", ctx.customerId).select("id");
 
   const { error: emailErr } = await supabase.auth.updateUser({ email: trimmedEmail });
-  if (emailErr) throw emailErr;
+  if (emailErr) {
+    if (emailErr.code === "email_exists") {
+      throw new Error("このメールアドレスは既に登録されています。すでにご利用の方は「ログイン」をお試しください。");
+    }
+    throw emailErr;
+  }
 
   if (phone.trim()) {
     const { data: existing } = await supabase

@@ -5,7 +5,8 @@ import { requestMagicLink } from "@/app/actions";
 
 // 既存アカウントへのログイン導線。今のトークに何かやり取りがある状態でログイン
 // しようとした場合だけ、送信前に「引き継がれません」の確認を挟む。
-export default function LoginPanel({ hasGuestActivity }: { hasGuestActivity: boolean }) {
+// asButton: マイページの「ログイン」「アカウント作成」ボタン横並び用の見た目。
+export default function LoginPanel({ hasGuestActivity, asButton }: { hasGuestActivity: boolean; asButton?: boolean }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -45,7 +46,14 @@ export default function LoginPanel({ hasGuestActivity }: { hasGuestActivity: boo
   }
 
   if (!open) {
-    return (
+    return asButton ? (
+      <button
+        onClick={() => setOpen(true)}
+        style={{ flex: 1, height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+      >
+        ログイン
+      </button>
+    ) : (
       <button
         onClick={() => setOpen(true)}
         style={{ alignSelf: "flex-start", padding: 0, cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", textDecoration: "underline" }}
@@ -56,7 +64,7 @@ export default function LoginPanel({ hasGuestActivity }: { hasGuestActivity: boo
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+    <div style={{ flex: asButton ? 1 : undefined, display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
       {!confirming ? (
         <>
           <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>登録済みのメールアドレス</span>

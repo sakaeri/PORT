@@ -6,6 +6,7 @@ import type { VaultRow } from "@/lib/chat-types";
 import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 import LoginPanel from "@/components/chat/LoginPanel";
+import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 60 };
 const dialogBox: React.CSSProperties = {
@@ -35,6 +36,7 @@ export default function MyPageDialog({
   currentEmail,
   vault,
   hasGuestActivity,
+  isAnonymous,
   isDark,
   onToggleTheme,
   onClose,
@@ -44,6 +46,7 @@ export default function MyPageDialog({
   currentEmail: string | null;
   vault: VaultRow[];
   hasGuestActivity: boolean;
+  isAnonymous: boolean;
   isDark: boolean;
   onToggleTheme: () => void;
   onClose: () => void;
@@ -151,11 +154,9 @@ export default function MyPageDialog({
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-              <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>会員番号</span>
+              <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>お問い合わせ番号</span>
               <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>{memberNo ?? "—"}</span>
             </div>
-
-            <LoginPanel hasGuestActivity={hasGuestActivity} />
 
             {/* 画面の色合い */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
@@ -169,6 +170,13 @@ export default function MyPageDialog({
               </button>
             </div>
 
+            {isAnonymous ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <LoginPanel hasGuestActivity={hasGuestActivity} asButton />
+                <AccountCreatePanel />
+              </div>
+            ) : (
+              <>
             {/* お名前 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               <label style={fieldLabel}>お名前</label>
@@ -311,6 +319,8 @@ export default function MyPageDialog({
                 </div>
               ))}
             </div>
+              </>
+            )}
 
             {/* PORT referral block */}
             <div style={{ paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>

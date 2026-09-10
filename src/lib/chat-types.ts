@@ -57,4 +57,5 @@ export interface CustomerContext {
   memberNo: string | null;
   threadId: string;
   email: string | null;
+  isAnonymous: boolean;
 }
