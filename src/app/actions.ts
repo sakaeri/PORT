@@ -237,19 +237,6 @@ export async function payRequest(requestId: string) {
   }
 }
 
-export async function sendHandlerChangeRequest() {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const { error } = await supabase.from("messages").insert({
-    thread_id: ctx.threadId,
-    sender_id: ctx.userId,
-    sender_role: "client",
-    kind: "text",
-    body: "担当の変更について相談したいです。",
-  });
-  if (error) throw error;
-}
-
 export async function cancelRequest(requestId: string) {
   const ctx = await requireContext();
   const admin = createServiceRoleClient();

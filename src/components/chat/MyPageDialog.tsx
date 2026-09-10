@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, CheckCircle, Gift, CaretDown, CaretRight, ChatsCircle, Receipt, UsersThree } from "@phosphor-icons/react";
 import type { VaultRow } from "@/lib/chat-types";
-import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, sendHandlerChangeRequest } from "@/app/actions";
+import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 60 };
@@ -60,8 +60,6 @@ export default function MyPageDialog({
   const [emSaving, setEmSaving] = useState(false);
 
   const [vaultRows, setVaultRows] = useState(vault.map((v) => ({ ...v })));
-
-  const [secretaryOpen, setSecretaryOpen] = useState(false);
 
   const [refOpen, setRefOpen] = useState(false);
   const [refStarted, setRefStarted] = useState(false);
@@ -137,7 +135,6 @@ export default function MyPageDialog({
   }
 
   return (
-    <>
     <div style={{ ...scrim, display: "grid", placeItems: "center", padding: "var(--space-4)" }} onClick={onClose}>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={dialogBox}>
           <button onClick={onClose} aria-label="閉じる" style={{ position: "absolute", top: 14, right: 14, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
@@ -256,13 +253,6 @@ export default function MyPageDialog({
               )}
             </div>
 
-            {/* 担当交代の申し出 */}
-            <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 12 }}>
-              <button onClick={() => setSecretaryOpen(true)} style={{ width: "100%", height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-text)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                担当交代を申し出る
-              </button>
-            </div>
-
             {/* よく使う情報（vault） */}
             <div style={{ display: "flex", flexDirection: "column", gap: 9, paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -312,13 +302,13 @@ export default function MyPageDialog({
                   <Gift size={14} />
                   <span>
                     {refStarted
-                      ? "ご案内をメールでお送りしました。30日間のお試し後、紹介経由のため基本料が3ヶ月無料になります。"
-                      : "30日間ためせます。紹介経由なので、その後の基本料が3ヶ月無料になります。"}
+                      ? "ご案内をメールでお送りしました。紹介経由のため、基本料が3ヶ月無料になります。"
+                      : "紹介経由なので、基本料が3ヶ月無料になります。"}
                   </span>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                   <button onClick={() => setRefStarted(true)} style={{ height: 34, padding: "0 14px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-                    30日ためしてみる
+                    3ヶ月無料で始める
                   </button>
                   <button onClick={() => setRefOpen((v) => !v)} style={{ height: 34, padding: "0 12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
                     {refOpen ? <CaretDown size={13} /> : <CaretRight size={13} />}
@@ -338,7 +328,7 @@ export default function MyPageDialog({
                       </div>
                     ))}
                     <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6, marginTop: 2 }}>
-                      30日間のお試し後、基本料 ¥4,800 が3ヶ月無料になります。制作者の席は1人目（ご本人）が基本料に含まれ、2人目から ¥1,500/月です。
+                      基本料 ¥4,800 が3ヶ月無料になります。制作者の席は1人目（ご本人）が基本料に含まれ、2人目から ¥1,500/月です。
                     </div>
                   </div>
                 )}
@@ -347,29 +337,5 @@ export default function MyPageDialog({
           </div>
         </div>
       </div>
-
-      {secretaryOpen && (
-        <div style={{ ...scrim, zIndex: 61, display: "grid", placeItems: "center", padding: "var(--space-4)" }} onClick={() => setSecretaryOpen(false)}>
-          <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ width: "min(420px, 100%)", display: "flex", flexDirection: "column", gap: 12, padding: 20, borderRadius: "var(--radius-lg)", background: "var(--color-surface)", boxShadow: "var(--shadow-lg)" }}>
-            <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>担当の変更について</div>
-            <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.85 }}>制作を担当するスタッフの変更をご希望の場合は、受付にご相談ください。ご要望を伺ったうえで対応します。</div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
-              <button onClick={() => setSecretaryOpen(false)} style={{ height: 36, padding: "0 14px", cursor: "pointer", color: "var(--color-text)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                閉じる
-              </button>
-              <button
-                onClick={async () => {
-                  await sendHandlerChangeRequest();
-                  setSecretaryOpen(false);
-                }}
-                style={{ height: 36, padding: "0 14px", cursor: "pointer", whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
-              >
-                受付に相談する
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
   );
 }
