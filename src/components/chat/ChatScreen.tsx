@@ -27,6 +27,7 @@ interface Props {
   menus: MenuRow[];
   refundPolicies: RefundPolicyRow[];
   initialVault: VaultRow[];
+  companies: { org_id: string; display_name: string; domain: string | null }[];
 }
 
 const ACKED_KEY = "VID_acked_reports";
@@ -47,7 +48,7 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies, initialVault }: Props) {
+export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies, initialVault, companies }: Props) {
   const [messages, setMessages] = useState(initialMessages);
   const [searchQuery, setSearchQuery] = useState("");
   const [showProgress, setShowProgress] = useState(false);
@@ -67,17 +68,17 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
   }, [messages]);
 
   const refresh = useCallback(async () => {
-    const supabase = createClient();
+    const supabase = createClient(ctx.orgId);
     const { data } = await supabase
       .from("messages")
       .select("*, message_attachments(*), requests(*, request_items(*), completion_reports(*), ratings(*))")
       .eq("thread_id", ctx.threadId)
       .order("sent_at", { ascending: true });
     if (data) setMessages((data as RawMessageRow[]).map(mapMessageRow));
-  }, [ctx.threadId]);
+  }, [ctx.threadId, ctx.orgId]);
 
   useEffect(() => {
-    const supabase = createClient();
+    const supabase = createClient(ctx.orgId);
     const channel = supabase
       .channel(`thread-${ctx.threadId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `thread_id=eq.${ctx.threadId}` }, refresh)
@@ -88,7 +89,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [ctx.threadId, ctx.customerId, refresh]);
+  }, [ctx.threadId, ctx.customerId, ctx.orgId, refresh]);
 
   function toggleTheme() {
     const next = isDark ? "light" : "dark";
@@ -198,7 +199,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
             case "text":
               return <TextBubble key={m.id} msg={m} highlight={highlight} />;
             case "files":
-              return <FilesBubble key={m.id} msg={m} highlight={highlight} />;
+              return <FilesBubble key={m.id} msg={m} highlight={highlight} orgId={ctx.orgId} />;
             case "notice":
             case "system":
               return <NoticeBubble key={m.id} msg={m} />;
@@ -229,7 +230,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
         })}
       </div>
 
-      <Composer threadId={ctx.threadId} onSend={handleSend} onOpenMenuSheet={() => setShowMenuSheet(true)} />
+      <Composer threadId={ctx.threadId} orgId={ctx.orgId} onSend={handleSend} onOpenMenuSheet={() => setShowMenuSheet(true)} />
 
       {showProgress && <ProgressPanel bundles={bundles} onClose={() => setShowProgress(false)} onCancel={(id) => { setShowProgress(false); setCancelTargetId(id); }} />}
       {showReports && <ReportsDialog bundles={bundles} ackedIds={ackedIds} onAck={ackReport} onClose={() => setShowReports(false)} />}
@@ -258,6 +259,8 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
           isAnonymous={ctx.isAnonymous}
           avatarUrl={avatarUrl}
           onAvatarChange={setAvatarUrl}
+          orgId={ctx.orgId}
+          companies={companies}
           isDark={isDark}
           onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}

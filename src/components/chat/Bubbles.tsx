@@ -69,7 +69,7 @@ export function TextBubble({ msg, highlight }: { msg: MessageWithExtras; highlig
   );
 }
 
-export function FilesBubble({ msg, highlight }: { msg: MessageWithExtras; highlight: boolean }) {
+export function FilesBubble({ msg, highlight, orgId }: { msg: MessageWithExtras; highlight: boolean; orgId: string }) {
   const isSelf = msg.sender_role === "client";
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
@@ -79,7 +79,7 @@ export function FilesBubble({ msg, highlight }: { msg: MessageWithExtras; highli
     setOpeningId(f.id);
     setErrorId(null);
     try {
-      const supabase = createClient();
+      const supabase = createClient(orgId);
       const { data, error } = await supabase.storage.from("attachments").createSignedUrl(f.file_path, 60);
       if (error || !data?.signedUrl) throw error ?? new Error("URLを発行できませんでした");
       window.open(data.signedUrl, "_blank", "noopener,noreferrer");

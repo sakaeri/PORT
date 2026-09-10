@@ -79,6 +79,7 @@ export interface Database {
           referred_by_user_id: string | null;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
+          domain: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["organizations"]["Row"]>;
@@ -320,6 +321,12 @@ export interface Database {
     Functions: {
       my_customer_id: { Args: Record<string, never>; Returns: string };
       auth_org: { Args: Record<string, never>; Returns: string };
+      org_id_by_domain: { Args: { p_domain: string }; Returns: string };
+      ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
+      my_companies: {
+        Args: Record<string, never>;
+        Returns: { org_id: string; display_name: string; domain: string | null }[];
+      };
     };
     Enums: {
       app_role: AppRole;

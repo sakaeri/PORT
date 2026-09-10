@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCustomerContext, getMenus, getRefundPolicies, getThreadMessages, getVaultItems } from "@/lib/data";
+import { getCustomerContext, getMenus, getMyCompanies, getRefundPolicies, getThreadMessages, getVaultItems } from "@/lib/data";
 import ChatScreen from "@/components/chat/ChatScreen";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -37,11 +37,12 @@ export default async function Home() {
     );
   }
 
-  const [messages, menus, refundPolicies, vault] = await Promise.all([
+  const [messages, menus, refundPolicies, vault, companies] = await Promise.all([
     getThreadMessages(ctx.threadId),
     getMenus(ctx.orgId),
     getRefundPolicies(ctx.orgId),
     getVaultItems(ctx.customerId),
+    ctx.isAnonymous ? Promise.resolve([]) : getMyCompanies(),
   ]);
 
   return (
@@ -51,6 +52,7 @@ export default async function Home() {
       menus={menus}
       refundPolicies={refundPolicies}
       initialVault={vault}
+      companies={companies}
     />
   );
 }

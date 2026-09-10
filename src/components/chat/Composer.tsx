@@ -14,6 +14,7 @@ export interface PendingAttachment {
 
 interface Props {
   threadId: string;
+  orgId: string;
   onSend: (text: string, attachments: PendingAttachment[]) => Promise<void>;
   onOpenMenuSheet: () => void;
 }
@@ -39,7 +40,7 @@ function sizeMbLabel(bytes: number): string {
   return (bytes / 1048576).toFixed(1);
 }
 
-export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
+export default function Composer({ threadId, orgId, onSend, onOpenMenuSheet }: Props) {
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
@@ -82,7 +83,7 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
 
   // 成功なら null、失敗ならエラーメッセージを返す
   async function uploadFile(file: File): Promise<string | null> {
-    const supabase = createClient();
+    const supabase = createClient(orgId);
     const path = `${threadId}/${crypto.randomUUID()}-${file.name}`;
     const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
     if (error) return error.message;

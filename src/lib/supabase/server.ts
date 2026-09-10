@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
@@ -7,11 +7,17 @@ import type { Database } from "@/lib/supabase/types";
 // Component / Route Handler / Server Action) — do not cache the client.
 export async function createClient() {
   const cookieStore = await cookies();
+  // proxy.ts resolves the org from the request's domain and forwards it as
+  // this header; auth_org() reads it to scope a multi-org customer's data to
+  // whichever org's site they're currently on. See 20260910000003_multi_org_customers.sql.
+  const h = await headers();
+  const orgId = h.get("x-vid-org");
 
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: orgId ? { headers: { "x-vid-org": orgId } } : undefined,
       cookies: {
         getAll() {
           return cookieStore.getAll();

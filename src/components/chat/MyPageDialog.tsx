@@ -53,6 +53,8 @@ export default function MyPageDialog({
   isAnonymous,
   avatarUrl,
   onAvatarChange,
+  orgId,
+  companies,
   isDark,
   onToggleTheme,
   onClose,
@@ -66,6 +68,8 @@ export default function MyPageDialog({
   isAnonymous: boolean;
   avatarUrl: string | null;
   onAvatarChange: (url: string | null) => void;
+  orgId: string;
+  companies: { org_id: string; display_name: string; domain: string | null }[];
   isDark: boolean;
   onToggleTheme: () => void;
   onClose: () => void;
@@ -369,6 +373,35 @@ export default function MyPageDialog({
                 </div>
               ))}
             </div>
+
+            {/* 会社の履歴（複数の窓口の顧客になっている場合だけ表示） */}
+            {companies.length > 1 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 9, paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>
+                <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-accent)" }}>ご利用中の窓口</div>
+                {companies.map((c) => {
+                  const isCurrent = c.org_id === orgId;
+                  const content = (
+                    <>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.display_name}</span>
+                      {isCurrent && <span style={{ flex: "none", fontSize: 10.5, color: "var(--color-neutral-600)" }}>閲覧中</span>}
+                    </>
+                  );
+                  return isCurrent || !c.domain ? (
+                    <div key={c.org_id} style={{ ...rowBox, opacity: isCurrent ? 1 : 0.6 }}>
+                      {content}
+                    </div>
+                  ) : (
+                    <a
+                      key={c.org_id}
+                      href={`https://${c.domain}`}
+                      style={{ ...rowBox, textDecoration: "none", color: "inherit", cursor: "pointer" }}
+                    >
+                      {content}
+                    </a>
+                  );
+                })}
+              </div>
+            )}
               </>
             )}
 
