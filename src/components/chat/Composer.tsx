@@ -17,6 +17,8 @@ interface Props {
   onOpenMenuSheet: () => void;
 }
 
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20MB。Supabase側の上限に確実に収まるよう、送信前にここで弾く
+
 function fileIconClass(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   if (["png", "jpg", "jpeg", "gif", "webp", "heic"].includes(ext)) return "ph ph-image";
@@ -28,6 +30,7 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
   const [history, setHistory] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -65,17 +68,24 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
     e.target.value = "";
     if (!files.length) return;
     setUploading(true);
+    setUploadError("");
+    const failed: string[] = [];
     const supabase = createClient();
     try {
       for (const file of files) {
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          failed.push(`${file.name}（20MBを超えています）`);
+          continue;
+        }
         const path = `${threadId}/${crypto.randomUUID()}-${file.name}`;
         const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
         if (error) {
-          console.error(error);
+          failed.push(`${file.name}（${error.message}）`);
           continue;
         }
         setAttachments((a) => [...a, { path, name: file.name, mime: file.type, bytes: file.size }]);
       }
+      if (failed.length) setUploadError(`送信できなかったファイルがあります: ${failed.join("、")}`);
     } finally {
       setUploading(false);
     }
@@ -95,6 +105,7 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
       setDraft("");
       setAttachments([]);
       setHistory([]);
+      setUploadError("");
       requestAnimationFrame(() => autoGrow(true));
     } finally {
       setSending(false);
@@ -120,6 +131,10 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
             </span>
           ))}
         </div>
+      )}
+
+      {uploadError && (
+        <div style={{ fontSize: 11.5, color: "var(--color-accent-200)", marginBottom: 8, lineHeight: 1.5 }}>{uploadError}</div>
       )}
 
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { BellRinging, Star, CheckCircle, MinusCircle } from "@phosphor-icons/react";
+import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
 import type { AttachmentRow, MessageWithExtras, RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { stageInfoFor } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
 import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
+import { createClient } from "@/lib/supabase/client";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 
@@ -70,6 +71,25 @@ export function TextBubble({ msg, highlight }: { msg: MessageWithExtras; highlig
 
 export function FilesBubble({ msg, highlight }: { msg: MessageWithExtras; highlight: boolean }) {
   const isSelf = msg.sender_role === "client";
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [errorId, setErrorId] = useState<string | null>(null);
+
+  async function openAttachment(f: AttachmentRow) {
+    if (!f.file_path || openingId) return;
+    setOpeningId(f.id);
+    setErrorId(null);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.storage.from("attachments").createSignedUrl(f.file_path, 60);
+      if (error || !data?.signedUrl) throw error ?? new Error("URLを発行できませんでした");
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      setErrorId(f.id);
+    } finally {
+      setOpeningId(null);
+    }
+  }
+
   return (
     <div style={{ ...bubbleShell, alignSelf: isSelf ? "flex-end" : "flex-start", outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
       <div
@@ -85,10 +105,34 @@ export function FilesBubble({ msg, highlight }: { msg: MessageWithExtras; highli
         }}
       >
         {msg.attachments.map((f: AttachmentRow) => (
-          <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, padding: "6px 8px", borderRadius: "var(--radius-md)", background: isSelf ? "color-mix(in srgb, var(--color-bubble-self-text) 6%, transparent)" : "var(--color-bg)" }}>
-            <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 17, color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-accent)" }} />
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5, color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-text)" }}>{f.file_name}</span>
-            <span style={{ flex: "none", fontSize: 10, color: isSelf ? "color-mix(in srgb, var(--color-bubble-self-text) 60%, transparent)" : "var(--color-neutral-500)" }}>{fileSizeLabel(f.bytes)}</span>
+          <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <button
+              onClick={() => openAttachment(f)}
+              disabled={openingId === f.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 9,
+                minWidth: 0,
+                width: "100%",
+                padding: "6px 8px",
+                cursor: openingId === f.id ? "wait" : "pointer",
+                border: "none",
+                borderRadius: "var(--radius-md)",
+                background: isSelf ? "color-mix(in srgb, var(--color-bubble-self-text) 6%, transparent)" : "var(--color-bg)",
+              }}
+            >
+              {openingId === f.id ? (
+                <CircleNotch size={17} style={{ flex: "none", color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} />
+              ) : (
+                <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 17, color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-accent)" }} />
+              )}
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5, color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-text)" }}>{f.file_name}</span>
+              <span style={{ flex: "none", fontSize: 10, color: isSelf ? "color-mix(in srgb, var(--color-bubble-self-text) 60%, transparent)" : "var(--color-neutral-500)" }}>{fileSizeLabel(f.bytes)}</span>
+            </button>
+            {errorId === f.id && (
+              <span style={{ fontSize: 10.5, paddingLeft: 8, color: "var(--color-accent-200)" }}>開けませんでした。もう一度お試しください</span>
+            )}
           </div>
         ))}
       </div>
