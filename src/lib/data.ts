@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle } from "@/lib/chat-types";
 
@@ -6,7 +7,9 @@ export type { CustomerContext, MessageWithExtras, RequestBundle };
 
 // Assumes proxy.ts has already ensured an authenticated (possibly anonymous)
 // session and the DB trigger has provisioned profile/customer/thread rows.
-export async function getCustomerContext(): Promise<CustomerContext | null> {
+// Wrapped in React's cache() so generateMetadata and the page component share
+// one lookup per request instead of hitting Supabase twice.
+export const getCustomerContext = cache(async (): Promise<CustomerContext | null> => {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return null;
@@ -34,9 +37,16 @@ export async function getCustomerContext(): Promise<CustomerContext | null> {
     .limit(1)
     .maybeSingle();
 
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("display_name")
+    .eq("id", customer.org_id)
+    .maybeSingle();
+
   return {
     userId: auth.user.id,
     orgId: customer.org_id,
+    orgDisplayName: org?.display_name ?? "窓口",
     customerId: customer.id,
     customerName: customer.name,
     memberNo: customer.member_no,
@@ -44,7 +54,7 @@ export async function getCustomerContext(): Promise<CustomerContext | null> {
     email: auth.user.email ?? null,
     receptionName: reception?.display_name ?? "受付",
   };
-}
+});
 
 export async function getThreadMessages(threadId: string): Promise<MessageWithExtras[]> {
   const supabase = await createClient();

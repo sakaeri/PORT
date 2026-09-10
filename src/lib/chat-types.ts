@@ -51,6 +51,7 @@ export function mapMessageRow(row: RawMessageRow): MessageWithExtras {
 export interface CustomerContext {
   userId: string;
   orgId: string;
+  orgDisplayName: string;
   customerId: string;
   customerName: string;
   memberNo: string | null;

@@ -175,7 +175,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--color-bg)", fontFamily: "var(--font-body)", color: "var(--color-text)" }}>
       <Header
-        brandName="動画制作の窓口"
+        brandName={ctx.orgDisplayName}
         activeCount={activeCount}
         reportsCount={reportsCount}
         searchQuery={searchQuery}

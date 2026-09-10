@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import { getCustomerContext, getMenus, getRefundPolicies, getThreadMessages, getVaultItems } from "@/lib/data";
 import ChatScreen from "@/components/chat/ChatScreen";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const ctx = await getCustomerContext();
+  return { title: ctx?.orgDisplayName ?? "動画制作の窓口" };
+}
 
 export default async function Home() {
   const ctx = await getCustomerContext();
