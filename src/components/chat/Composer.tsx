@@ -55,8 +55,8 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
   function autoGrow(reset = false) {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "38px";
-    if (!reset) el.style.height = Math.min(Math.max(el.scrollHeight, 38), 170) + "px";
+    el.style.height = "40px";
+    if (!reset) el.style.height = Math.min(Math.max(el.scrollHeight, 40), 170) + "px";
   }
 
   function pushHistory(prev: string) {
@@ -267,7 +267,7 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
             placeholder="ご相談内容を入力…"
             rows={1}
             className="vid-textarea"
-            style={{ width: "100%", resize: "none", maxHeight: 170, minHeight: 38, padding: draft || history.length > 0 ? "8px 64px 8px 10px" : "8px 10px", font: "inherit", fontSize: 14, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", overflowY: "auto", outline: "none" }}
+            style={{ width: "100%", resize: "none", maxHeight: 170, minHeight: 40, height: 40, padding: draft || history.length > 0 ? "9px 64px 9px 10px" : "9px 10px", font: "inherit", fontSize: 14, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", overflowY: "auto", outline: "none" }}
           />
           {(!!draft || history.length > 0) && (
             <div style={{ position: "absolute", top: 5, right: 5, display: "flex", gap: 2, width: 79, height: 30 }}>

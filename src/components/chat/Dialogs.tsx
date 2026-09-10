@@ -51,20 +51,17 @@ export function ProgressPanel({ bundles, onClose, onCancel }: { bundles: Request
   const items = bundles.filter((b) => b.request.phase !== "draft").slice().reverse();
 
   return (
-    <div style={{ ...scrim, display: "flex", justifyContent: "flex-end" }} onClick={onClose}>
-      <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{ width: "min(400px, 100%)", height: "100%", display: "flex", flexDirection: "column", gap: 12, padding: 18, background: "var(--color-surface)", boxShadow: "var(--shadow-lg)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 19, flex: 1 }}>進捗状況</div>
-          <button onClick={onClose} aria-label="閉じる" style={{ width: 28, height: 28, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
-            <X size={16} />
-          </button>
-        </div>
-        <div style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>{headline}</div>
-        {items.length === 0 ? (
-          <div style={{ fontSize: 13.5, opacity: 0.8, lineHeight: 1.6 }}>進行中の依頼はまだありません。チャットで頼みごとを送ると、見積もり後にここで進捗を追えます。</div>
-        ) : (
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-            {items.map(({ request: r, items: lineItems }) => {
+    <Centered onBackdrop={onClose}>
+      <button onClick={onClose} aria-label="閉じる" style={{ position: "absolute", top: 14, right: 14, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
+        <X size={16} />
+      </button>
+      <div style={{ ...dialogTitle, position: "relative" }}>進捗状況</div>
+      <div style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>{headline}</div>
+      {items.length === 0 ? (
+        <div style={{ fontSize: 13.5, opacity: 0.8, lineHeight: 1.6 }}>進行中の依頼はまだありません。チャットで頼みごとを送ると、見積もり後にここで進捗を追えます。</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 420, overflowY: "auto" }}>
+          {items.map(({ request: r, items: lineItems }) => {
               const badge = statusBadgeFor(r);
               const stage = stageInfoFor(r);
               const canCancel = r.phase === "quoted" || ["preparing", "started", "approved"].includes(r.phase);
@@ -107,10 +104,9 @@ export function ProgressPanel({ bundles, onClose, onCancel }: { bundles: Request
                 </div>
               );
             })}
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </Centered>
   );
 }
 
