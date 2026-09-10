@@ -58,4 +58,5 @@ export interface CustomerContext {
   threadId: string;
   email: string | null;
   isAnonymous: boolean;
+  avatarUrl: string | null;
 }

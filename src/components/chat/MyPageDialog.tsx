@@ -7,6 +7,7 @@ import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNam
 import { headingWeight } from "@/lib/style";
 import LoginPanel from "@/components/chat/LoginPanel";
 import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
+import AvatarPicker from "@/components/chat/AvatarPicker";
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 60 };
 const dialogBox: React.CSSProperties = {
@@ -44,22 +45,28 @@ function authTabBtn(active: boolean): React.CSSProperties {
 }
 
 export default function MyPageDialog({
+  userId,
   memberNo,
   customerName,
   currentEmail,
   vault,
   hasGuestActivity,
   isAnonymous,
+  avatarUrl,
+  onAvatarChange,
   isDark,
   onToggleTheme,
   onClose,
 }: {
+  userId: string;
   memberNo: string | null;
   customerName: string;
   currentEmail: string | null;
   vault: VaultRow[];
   hasGuestActivity: boolean;
   isAnonymous: boolean;
+  avatarUrl: string | null;
+  onAvatarChange: (url: string | null) => void;
   isDark: boolean;
   onToggleTheme: () => void;
   onClose: () => void;
@@ -202,6 +209,9 @@ export default function MyPageDialog({
               </div>
             ) : (
               <>
+            {/* プロフィール画像 */}
+            <AvatarPicker userId={userId} customerName={customerName} avatarUrl={avatarUrl} onChange={onAvatarChange} />
+
             {/* お名前 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               <label style={fieldLabel}>お名前</label>

@@ -59,6 +59,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
   const [busy, setBusy] = useState(false);
   const [ackedIds, setAckedIds] = useState<Set<string>>(() => (typeof window === "undefined" ? new Set<string>() : readAcked()));
   const [isDark, setIsDark] = useState(() => typeof document === "undefined" ? true : document.documentElement.getAttribute("data-vid-theme") !== "light");
+  const [avatarUrl, setAvatarUrl] = useState(ctx.avatarUrl);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -184,6 +185,9 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
         onOpenProgress={() => setShowProgress(true)}
         onOpenReports={() => setShowReports(true)}
         onOpenMyPage={() => setShowMyPage(true)}
+        isAnonymous={ctx.isAnonymous}
+        customerName={ctx.customerName}
+        avatarUrl={avatarUrl}
       />
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "var(--space-6) var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
@@ -245,12 +249,15 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
       )}
       {showMyPage && (
         <MyPageDialog
+          userId={ctx.userId}
           memberNo={ctx.memberNo}
           customerName={ctx.customerName}
           currentEmail={ctx.email}
           vault={initialVault}
           hasGuestActivity={messages.length > 0}
           isAnonymous={ctx.isAnonymous}
+          avatarUrl={avatarUrl}
+          onAvatarChange={setAvatarUrl}
           isDark={isDark}
           onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}

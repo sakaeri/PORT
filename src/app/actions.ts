@@ -203,6 +203,20 @@ export async function setInitialName(name: string) {
   if (error || !data?.length) throw new Error("お名前は既に登録済みです。変更は「変更を依頼」からお願いします。");
 }
 
+export async function updateAvatar(url: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", ctx.userId);
+  if (error) throw error;
+}
+
+export async function removeAvatar() {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", ctx.userId);
+  if (error) throw error;
+}
+
 export async function changeEmail(newEmail: string) {
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });

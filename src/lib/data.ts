@@ -35,6 +35,12 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     .eq("id", customer.org_id)
     .maybeSingle();
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("avatar_url")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+
   return {
     userId: auth.user.id,
     orgId: customer.org_id,
@@ -45,6 +51,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     threadId: thread.id,
     email: auth.user.email ?? null,
     isAnonymous: auth.user.is_anonymous ?? false,
+    avatarUrl: profile?.avatar_url ?? null,
   };
 });
 
