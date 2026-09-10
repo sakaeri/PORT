@@ -30,6 +30,19 @@ const input: React.CSSProperties = { width: "100%", height: 36, padding: "6px 10
 const NAME_PLACEHOLDER = "未登録の依頼主";
 const NAME_REASONS = ["入力の誤り", "改姓・改名", "社名・屋号の変更"];
 
+function authTabBtn(active: boolean): React.CSSProperties {
+  return {
+    flex: 1,
+    height: 36,
+    cursor: "pointer",
+    fontSize: 12.5,
+    color: active ? "var(--color-accent-100)" : "var(--color-accent)",
+    background: active ? "var(--color-accent-900)" : "transparent",
+    border: "1px solid var(--color-accent)",
+    borderRadius: "var(--radius-md)",
+  };
+}
+
 export default function MyPageDialog({
   memberNo,
   customerName,
@@ -73,6 +86,8 @@ export default function MyPageDialog({
 
   const [refOpen, setRefOpen] = useState(false);
   const [refStarted, setRefStarted] = useState(false);
+
+  const [authView, setAuthView] = useState<"none" | "login" | "create">("none");
 
   async function saveSelfName() {
     if (!name.trim() || nameSelfSaving) return;
@@ -171,9 +186,19 @@ export default function MyPageDialog({
             </div>
 
             {isAnonymous ? (
-              <div style={{ display: "flex", gap: 8 }}>
-                <LoginPanel hasGuestActivity={hasGuestActivity} asButton />
-                <AccountCreatePanel />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setAuthView((v) => (v === "login" ? "none" : "login"))} style={authTabBtn(authView === "login")}>
+                    ログイン
+                  </button>
+                  <button onClick={() => setAuthView((v) => (v === "create" ? "none" : "create"))} style={authTabBtn(authView === "create")}>
+                    アカウント作成
+                  </button>
+                </div>
+                {authView === "login" && (
+                  <LoginPanel hasGuestActivity={hasGuestActivity} forceOpen onRequestClose={() => setAuthView("none")} />
+                )}
+                {authView === "create" && <AccountCreatePanel onRequestClose={() => setAuthView("none")} />}
               </div>
             ) : (
               <>
