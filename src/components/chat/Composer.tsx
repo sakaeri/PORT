@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ListDashes, Paperclip, ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-resize";
 
 export interface PendingAttachment {
   path: string;
@@ -18,11 +19,24 @@ interface Props {
 }
 
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20MB。Supabase側の上限に確実に収まるよう、送信前にここで弾く
+const LARGE_IMAGE_BYTES = 6 * 1024 * 1024; // これを超える画像は送信前に圧縮するか確認する
+
+function isImageFile(file: File): boolean {
+  return file.type.startsWith("image/") || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.name);
+}
+function isPdfFile(file: File): boolean {
+  return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+}
 
 function fileIconClass(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   if (["png", "jpg", "jpeg", "gif", "webp", "heic"].includes(ext)) return "ph ph-image";
+  if (ext === "pdf") return "ph ph-file-pdf";
   return "ph ph-paperclip";
+}
+
+function sizeMbLabel(bytes: number): string {
+  return (bytes / 1048576).toFixed(1);
 }
 
 export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
@@ -31,7 +45,10 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [compressQueue, setCompressQueue] = useState<File[]>([]);
+  const [compressing, setCompressing] = useState(false);
   const [sending, setSending] = useState(false);
+  const compressTarget = compressQueue[0] ?? null;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +80,16 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
     });
   }
 
+  // 成功なら null、失敗ならエラーメッセージを返す
+  async function uploadFile(file: File): Promise<string | null> {
+    const supabase = createClient();
+    const path = `${threadId}/${crypto.randomUUID()}-${file.name}`;
+    const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
+    if (error) return error.message;
+    setAttachments((a) => [...a, { path, name: file.name, mime: file.type, bytes: file.size }]);
+    return null;
+  }
+
   async function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
@@ -70,25 +97,64 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
     setUploading(true);
     setUploadError("");
     const failed: string[] = [];
-    const supabase = createClient();
+    const toConfirm: File[] = [];
     try {
       for (const file of files) {
+        if (!isImageFile(file) && !isPdfFile(file)) {
+          failed.push(`${file.name}（対応していない形式です。画像かPDFをお選びください）`);
+          continue;
+        }
+        if (isImageFile(file) && file.size > LARGE_IMAGE_BYTES) {
+          toConfirm.push(file);
+          continue;
+        }
         if (file.size > MAX_ATTACHMENT_BYTES) {
           failed.push(`${file.name}（20MBを超えています）`);
           continue;
         }
-        const path = `${threadId}/${crypto.randomUUID()}-${file.name}`;
-        const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
-        if (error) {
-          failed.push(`${file.name}（${error.message}）`);
-          continue;
-        }
-        setAttachments((a) => [...a, { path, name: file.name, mime: file.type, bytes: file.size }]);
+        const err = await uploadFile(file);
+        if (err) failed.push(`${file.name}（${err}）`);
       }
+      if (toConfirm.length) setCompressQueue((q) => [...q, ...toConfirm]);
       if (failed.length) setUploadError(`送信できなかったファイルがあります: ${failed.join("、")}`);
     } finally {
       setUploading(false);
     }
+  }
+
+  async function confirmCompress() {
+    if (!compressTarget || compressing) return;
+    setCompressing(true);
+    try {
+      const small = await compressImage(compressTarget);
+      if (small.size > MAX_ATTACHMENT_BYTES) {
+        setUploadError(`${compressTarget.name} は圧縮しても20MBを超えてしまいました`);
+      } else {
+        const err = await uploadFile(small);
+        if (err) setUploadError(`${compressTarget.name} を送信できませんでした（${err}）`);
+      }
+    } catch {
+      setUploadError(`${compressTarget.name} を圧縮できませんでした。「そのまま送信」をお試しください`);
+    } finally {
+      setCompressing(false);
+      setCompressQueue((q) => q.slice(1));
+    }
+  }
+
+  async function sendAsIs() {
+    if (!compressTarget || compressing) return;
+    setCompressing(true);
+    try {
+      const err = await uploadFile(compressTarget);
+      if (err) setUploadError(`${compressTarget.name} を送信できませんでした（${err}）`);
+    } finally {
+      setCompressing(false);
+      setCompressQueue((q) => q.slice(1));
+    }
+  }
+
+  function skipCompressTarget() {
+    setCompressQueue((q) => q.slice(1));
   }
 
   function removeAttachment(path: string) {
@@ -137,11 +203,44 @@ export default function Composer({ threadId, onSend, onOpenMenuSheet }: Props) {
         <div style={{ fontSize: 11.5, color: "var(--color-accent-200)", marginBottom: 8, lineHeight: 1.5 }}>{uploadError}</div>
       )}
 
+      {compressTarget && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, marginBottom: 8, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+          <span style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+            「{compressTarget.name}」（{sizeMbLabel(compressTarget.size)}MB）は容量が大きいです。圧縮して送信しますか？
+          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <button
+              onClick={confirmCompress}
+              disabled={compressing}
+              style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+            >
+              {compressing ? "圧縮中…" : "圧縮して送信"}
+            </button>
+            {compressTarget.size <= MAX_ATTACHMENT_BYTES && (
+              <button
+                onClick={sendAsIs}
+                disabled={compressing}
+                style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+              >
+                そのまま送信
+              </button>
+            )}
+            <button
+              onClick={skipCompressTarget}
+              disabled={compressing}
+              style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+            >
+              送信しない
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
         <button onClick={onOpenMenuSheet} aria-label="メニューから問い合わせる" title="メニューから問い合わせる" style={{ flex: "none", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
           <ListDashes size={17} />
         </button>
-        <input ref={fileInputRef} type="file" multiple accept="image/*" onChange={handlePickFiles} style={{ display: "none" }} />
+        <input ref={fileInputRef} type="file" multiple accept="image/*,application/pdf" onChange={handlePickFiles} style={{ display: "none" }} />
         <button
           onClick={() => fileInputRef.current?.click()}
           aria-label="ファイルを添付"
