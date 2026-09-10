@@ -81,10 +81,10 @@ export default function LoginPanel({
           />
           {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={handleSubmit} disabled={sending} style={{ flex: 1, height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+            <button onClick={handleSubmit} disabled={sending} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
               ログインリンクを送る
             </button>
-            <button onClick={close} style={{ flex: "none", height: 34, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+            <button onClick={close} style={{ flex: "none", height: 36, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
               閉じる
             </button>
           </div>
@@ -93,10 +93,10 @@ export default function LoginPanel({
         <>
           <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>ログインすると、今のトークの内容は引き継がれません。よろしいですか？</div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={send} disabled={sending} style={{ flex: 1, height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+            <button onClick={send} disabled={sending} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
               {sending ? "送信中…" : "ログインする"}
             </button>
-            <button onClick={() => setConfirming(false)} style={{ flex: "none", height: 34, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+            <button onClick={() => setConfirming(false)} style={{ flex: "none", height: 36, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
               やめる
             </button>
           </div>

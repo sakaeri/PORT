@@ -44,14 +44,11 @@ export default function Header({
 }: Props) {
   return (
     <div
+      className="vid-header"
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
         padding: "10px 14px",
         borderBottom: "1px solid var(--color-divider)",
         flex: "none",
-        flexWrap: "wrap",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
@@ -74,7 +71,7 @@ export default function Header({
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 170px", minWidth: 130 }}>
+      <div className="vid-header-search" style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 170px", minWidth: 130 }}>
         <MagnifyingGlass size={14} color="var(--color-neutral-600)" style={{ flex: "none" }} />
         <input
           value={searchQuery}
@@ -100,13 +97,15 @@ export default function Header({
       </div>
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-        <button onClick={onOpenProgress} style={iconBtn}>
+        <button onClick={onOpenProgress} title="進捗状況" style={iconBtn}>
           <ListChecks size={15} />
-          進捗状況{activeCount ? `（${activeCount}）` : ""}
+          <span className="vid-header-label">進捗状況</span>
+          {activeCount ? `（${activeCount}）` : ""}
         </button>
-        <button onClick={onOpenReports} style={iconBtn}>
+        <button onClick={onOpenReports} title="報告書一覧" style={iconBtn}>
           <ClipboardText size={15} />
-          報告書一覧{reportsCount ? `（${reportsCount}）` : ""}
+          <span className="vid-header-label">報告書一覧</span>
+          {reportsCount ? `（${reportsCount}）` : ""}
         </button>
         <button
           onClick={onOpenMyPage}

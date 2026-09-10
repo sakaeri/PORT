@@ -16,6 +16,8 @@ type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 50 };
 const dialogBox: React.CSSProperties = {
   width: "min(440px, 100%)",
+  maxHeight: "calc(100vh - 32px)",
+  overflowY: "auto",
   display: "flex",
   flexDirection: "column",
   gap: 12,
@@ -283,7 +285,7 @@ export function MenuSheet({
 
   return (
     <Centered onBackdrop={onClose}>
-      <div style={{ maxHeight: "calc(100vh - 32px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {!selected ? (
           <>
             <div style={dialogTitle}>メニューから問い合わせる</div>
@@ -345,7 +347,7 @@ export function MenuSheet({
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
               <button onClick={() => setSelected(null)} style={ghostBtn}>戻る</button>
-              <button onClick={submit} disabled={submitting} style={{ ...accentBtn, height: 38, padding: "0 16px", opacity: submitting ? 0.6 : 1 }}>
+              <button onClick={submit} disabled={submitting} style={{ ...accentBtn, padding: "0 16px", opacity: submitting ? 0.6 : 1 }}>
                 この内容で送る
               </button>
             </div>

@@ -145,3 +145,25 @@ button {
     transform: rotate(360deg);
   }
 }
+
+.vid-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+/* スマホ幅ではヘッダーの検索欄を2段目に落とし、ボタンはアイコンのみにして横幅の破綻を防ぐ */
+@media (max-width: 640px) {
+  .vid-header {
+    flex-wrap: wrap;
+  }
+  .vid-header-search {
+    order: 3;
+    flex-basis: 100% !important;
+    min-width: 0 !important;
+  }
+  .vid-header-label {
+    display: none;
+  }
+}

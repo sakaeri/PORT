@@ -24,7 +24,7 @@ const dialogBox: React.CSSProperties = {
 };
 const fieldLabel: React.CSSProperties = { display: "block", fontSize: 12, color: "var(--color-neutral-500)" };
 const rowBox: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" };
-const smallBtn: React.CSSProperties = { flex: "none", height: 30, padding: "0 12px", cursor: "pointer", fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
+const smallBtn: React.CSSProperties = { flex: "none", height: 36, padding: "0 12px", cursor: "pointer", fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
 const input: React.CSSProperties = { width: "100%", height: 36, padding: "6px 10px", fontSize: 13.5, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" };
 
 const NAME_PLACEHOLDER = "未登録の依頼主";
@@ -178,7 +178,7 @@ export default function MyPageDialog({
               <span style={{ flex: 1, fontSize: 13.5 }}>画面の色合い</span>
               <button
                 onClick={onToggleTheme}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 30, padding: "0 12px", cursor: "pointer", fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", cursor: "pointer", fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
               >
                 {isDark ? <Sun size={14} /> : <MoonStars size={14} />}
                 {isDark ? "ライトに切替" : "ダークに切替"}
@@ -363,7 +363,7 @@ export default function MyPageDialog({
                   </span>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                  <button onClick={() => setRefStarted(true)} style={{ height: 34, padding: "0 14px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+                  <button onClick={() => setRefStarted(true)} style={{ height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
                     3ヶ月無料で始める
                   </button>
                   <button onClick={() => setRefOpen((v) => !v)} style={{ height: 34, padding: "0 12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>

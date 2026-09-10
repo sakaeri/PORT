@@ -59,10 +59,10 @@ export default function AccountCreatePanel({ onRequestClose }: { onRequestClose:
       />
       {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={submit} disabled={sending} style={{ flex: 1, height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+        <button onClick={submit} disabled={sending} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
           {sending ? "作成中…" : "作成する"}
         </button>
-        <button onClick={onRequestClose} style={{ flex: "none", height: 34, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+        <button onClick={onRequestClose} style={{ flex: "none", height: 36, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
           閉じる
         </button>
       </div>
