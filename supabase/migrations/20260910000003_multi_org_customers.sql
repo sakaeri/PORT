@@ -9,9 +9,11 @@
 -- ヘッダーを送らないアクセス（＝別アプリのスタッフ用画面）は今まで通りプロフィール基準のまま動く。
 
 -- ============================================================
--- 1. 事業所ごとのサブドメイン
+-- 1. 事業所ごとの区別: 独自ドメイン（将来の大口向け）と、URLパスの合言葉（既定）
 -- ============================================================
 alter table organizations add column if not exists domain text unique;
+alter table organizations add column if not exists slug text unique
+  check (slug is null or slug <> 'auth'); -- /auth/confirm と衝突させない
 
 -- ドメイン→org_id の変換。ログイン前の匿名ユーザーでも呼べる必要があるため
 -- security definer にして誰でも実行可にする（返すのは id だけで機微情報なし）。
@@ -25,6 +27,16 @@ language sql stable security definer set search_path = public as $$
   )
 $$;
 grant execute on function org_id_by_domain(text) to anon, authenticated;
+
+-- URLの先頭パス（例: port.example.com/a-company の "a-company"）→ org_id。
+-- 一致しなければ null を返す（ドメイン判定にフォールバックさせるため、ここでは
+-- デフォルト事業所にはフォールバックしない）。新しい事業所を増やすのに
+-- Vercel・DNSを一切触らず、この1行を足すだけで済むようにするための仕組み。
+create or replace function org_id_by_slug(p_slug text) returns uuid
+language sql stable security definer set search_path = public as $$
+  select id from organizations where slug = p_slug
+$$;
+grant execute on function org_id_by_slug(text) to anon, authenticated;
 
 -- ============================================================
 -- 2. auth_org() をヘッダー優先に書き換える（ヘッダーがなければ今まで通り）
@@ -58,9 +70,9 @@ $$;
 -- ============================================================
 -- 4. 自分が顧客になっている事業所の一覧（マイページの「会社の履歴」用）
 -- ============================================================
-create or replace function my_companies() returns table(org_id uuid, display_name text, domain text)
+create or replace function my_companies() returns table(org_id uuid, display_name text, domain text, slug text)
 language sql stable security definer set search_path = public as $$
-  select o.id, o.display_name, o.domain
+  select o.id, o.display_name, o.domain, o.slug
   from organizations o
   join customers c on c.org_id = o.id
   where c.profile_id = auth.uid()

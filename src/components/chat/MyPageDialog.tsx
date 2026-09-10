@@ -69,7 +69,7 @@ export default function MyPageDialog({
   avatarUrl: string | null;
   onAvatarChange: (url: string | null) => void;
   orgId: string;
-  companies: { org_id: string; display_name: string; domain: string | null }[];
+  companies: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];
   isDark: boolean;
   onToggleTheme: () => void;
   onClose: () => void;
@@ -380,20 +380,21 @@ export default function MyPageDialog({
                 <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-accent)" }}>ご利用中の窓口</div>
                 {companies.map((c) => {
                   const isCurrent = c.org_id === orgId;
+                  const href = c.slug ? `/${c.slug}` : c.domain ? `https://${c.domain}` : null;
                   const content = (
                     <>
                       <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.display_name}</span>
                       {isCurrent && <span style={{ flex: "none", fontSize: 10.5, color: "var(--color-neutral-600)" }}>閲覧中</span>}
                     </>
                   );
-                  return isCurrent || !c.domain ? (
+                  return isCurrent || !href ? (
                     <div key={c.org_id} style={{ ...rowBox, opacity: isCurrent ? 1 : 0.6 }}>
                       {content}
                     </div>
                   ) : (
                     <a
                       key={c.org_id}
-                      href={`https://${c.domain}`}
+                      href={href}
                       style={{ ...rowBox, textDecoration: "none", color: "inherit", cursor: "pointer" }}
                     >
                       {content}

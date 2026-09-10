@@ -27,7 +27,7 @@ interface Props {
   menus: MenuRow[];
   refundPolicies: RefundPolicyRow[];
   initialVault: VaultRow[];
-  companies: { org_id: string; display_name: string; domain: string | null }[];
+  companies: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];
 }
 
 const ACKED_KEY = "VID_acked_reports";
