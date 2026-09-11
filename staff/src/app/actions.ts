@@ -2,7 +2,7 @@
 
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
-import type { AgreementKind, PayMode, RefundMode, RefundStage } from "@/lib/supabase/types";
+import type { RefundMode, RefundStage } from "@/lib/supabase/types";
 
 async function requireContext() {
   const ctx = await getStaffContext();
@@ -186,88 +186,6 @@ export async function deleteIntakeField(id: string) {
   await requireContext();
   const supabase = await createClient();
   const { error } = await supabase.from("intake_fields").delete().eq("id", id);
-  if (error) throw error;
-}
-
-// ============================================================
-// 契約書テンプレート（雛形の用意のみ。送付はスタッフ機能の実装後に対応）
-// ============================================================
-export async function createAgreement(orgId: string) {
-  await requireContext();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("agreements")
-    .insert({ org_id: orgId, label: "新しいテンプレート" })
-    .select("id")
-    .single();
-  if (error || !data) throw error ?? new Error("作成できませんでした");
-  return data.id;
-}
-
-export async function updateAgreement(
-  id: string,
-  fields: {
-    label: string;
-    kind: AgreementKind;
-    scope: string;
-    pay_mode: PayMode;
-    pay_fixed: number | null;
-    pay_pct: number | null;
-    close_day: string;
-    pay_day: string;
-    pay_method: string;
-    open_term: boolean;
-    body_text: string;
-  },
-) {
-  await requireContext();
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("agreements")
-    .update({
-      label: fields.label.trim(),
-      kind: fields.kind,
-      scope: fields.scope.trim() || null,
-      pay_mode: fields.pay_mode,
-      pay_fixed: fields.pay_fixed,
-      pay_pct: fields.pay_pct,
-      close_day: fields.close_day.trim() || null,
-      pay_day: fields.pay_day.trim() || null,
-      pay_method: fields.pay_method.trim() || null,
-      open_term: fields.open_term,
-      body_text: fields.body_text.trim() || null,
-    })
-    .eq("id", id);
-  if (error) throw error;
-}
-
-export async function deleteAgreement(id: string) {
-  await requireContext();
-  const supabase = await createClient();
-  const { error } = await supabase.from("agreements").delete().eq("id", id);
-  if (error) throw error;
-}
-
-export async function addAgreementExtra(agreementId: string, clause: string) {
-  await requireContext();
-  const supabase = await createClient();
-  const { error } = await supabase.from("agreement_extras").insert({ agreement_id: agreementId, clause: clause.trim() || "新しい条項" });
-  if (error) throw error;
-}
-
-export async function updateAgreementExtra(agreementId: string, oldClause: string, newClause: string) {
-  await requireContext();
-  const trimmed = newClause.trim();
-  if (!trimmed || trimmed === oldClause) return;
-  const supabase = await createClient();
-  const { error } = await supabase.from("agreement_extras").update({ clause: trimmed }).eq("agreement_id", agreementId).eq("clause", oldClause);
-  if (error) throw error;
-}
-
-export async function removeAgreementExtra(agreementId: string, clause: string) {
-  await requireContext();
-  const supabase = await createClient();
-  const { error } = await supabase.from("agreement_extras").delete().eq("agreement_id", agreementId).eq("clause", clause);
   if (error) throw error;
 }
 

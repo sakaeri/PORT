@@ -19,15 +19,9 @@ import {
   addIntakeField,
   updateIntakeField,
   deleteIntakeField,
-  createAgreement,
-  updateAgreement,
-  deleteAgreement,
-  addAgreementExtra,
-  updateAgreementExtra,
-  removeAgreementExtra,
   updateRefundPolicy,
 } from "@/app/actions";
-import type { AgreementKind, PayMode, RefundMode, RefundStage } from "@/lib/supabase/types";
+import type { RefundMode, RefundStage } from "@/lib/supabase/types";
 
 interface Company {
   name: string;
@@ -75,27 +69,6 @@ interface IntakeForm {
   intake_fields: IntakeField[];
 }
 
-interface AgreementExtra {
-  clause: string;
-}
-
-interface Agreement {
-  id: string;
-  org_id: string;
-  label: string;
-  kind: AgreementKind;
-  scope: string | null;
-  pay_mode: PayMode;
-  pay_fixed: number | null;
-  pay_pct: number | null;
-  close_day: string | null;
-  pay_day: string | null;
-  pay_method: string | null;
-  open_term: boolean;
-  body_text: string | null;
-  agreement_extras: AgreementExtra[];
-}
-
 interface RefundPolicyRow {
   stage: RefundStage;
   mode: RefundMode;
@@ -141,7 +114,6 @@ export default function MenuSettings({
   initialMenus,
   initialLoginEmail,
   initialTemplates,
-  initialAgreements,
   initialRefundPolicy,
 }: {
   orgId: string;
@@ -149,7 +121,6 @@ export default function MenuSettings({
   initialMenus: Menu[];
   initialLoginEmail: string;
   initialTemplates: IntakeForm[];
-  initialAgreements: Agreement[];
   initialRefundPolicy: RefundPolicyRow[];
 }) {
   const [tab, setTab] = useState<TabKey>("company");
@@ -188,20 +159,18 @@ export default function MenuSettings({
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
       {tab === "login" && <LoginInfoCard initialEmail={initialLoginEmail} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
-      {tab === "agreements" && <AgreementsCard orgId={orgId} initialAgreements={initialAgreements} />}
       {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} />}
     </div>
   );
 }
 
-type TabKey = "company" | "menu" | "login" | "templates" | "agreements" | "refund";
+type TabKey = "company" | "menu" | "login" | "templates" | "refund";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "company", label: "会社情報" },
   { key: "menu", label: "受付メニュー" },
   { key: "login", label: "ログイン情報" },
   { key: "templates", label: "返信テンプレ" },
-  { key: "agreements", label: "契約書テンプレート" },
   { key: "refund", label: "キャンセル・返金ポリシー" },
 ];
 
@@ -673,297 +642,6 @@ function TemplateFieldsEditor({ formId, fields, onChange }: { formId: string; fi
       ))}
       <button onClick={add} style={{ alignSelf: "flex-start", ...smallBtn, height: 30 }}>
         ＋項目を追加
-      </button>
-    </div>
-  );
-}
-
-const AGREEMENT_KINDS: { value: AgreementKind; label: string }[] = [
-  { value: "contract", label: "業務委託契約" },
-  { value: "employment_part", label: "雇用契約（パート）" },
-  { value: "employment_full", label: "雇用契約（フルタイム）" },
-  { value: "nda", label: "秘密保持契約（NDA）" },
-  { value: "consent", label: "同意書" },
-];
-
-const PAY_MODES: { value: PayMode; label: string }[] = [
-  { value: "hourly", label: "時給" },
-  { value: "daily", label: "日給" },
-  { value: "monthly", label: "月給" },
-  { value: "menu", label: "メニューごとの単価" },
-  { value: "share", label: "請求額シェア（%）" },
-  { value: "none", label: "報酬なし" },
-];
-
-function AgreementsCard({ orgId, initialAgreements }: { orgId: string; initialAgreements: Agreement[] }) {
-  const [agreements, setAgreements] = useState(initialAgreements);
-  const [openId, setOpenId] = useState<string | null>(null);
-
-  async function handleAdd() {
-    const id = await createAgreement(orgId);
-    setAgreements((a) => [
-      ...a,
-      {
-        id,
-        org_id: orgId,
-        label: "新しいテンプレート",
-        kind: "contract",
-        scope: null,
-        pay_mode: "hourly",
-        pay_fixed: null,
-        pay_pct: null,
-        close_day: "月末",
-        pay_day: "翌月15日",
-        pay_method: "振込",
-        open_term: true,
-        body_text: null,
-        agreement_extras: [],
-      },
-    ]);
-    setOpenId(id);
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm("このテンプレートを削除しますか？")) return;
-    await deleteAgreement(id);
-    setAgreements((a) => a.filter((x) => x.id !== id));
-  }
-
-  function patchLocal(id: string, patch: Partial<Agreement>) {
-    setAgreements((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  }
-
-  async function commit(a: Agreement) {
-    await updateAgreement(a.id, {
-      label: a.label,
-      kind: a.kind,
-      scope: a.scope ?? "",
-      pay_mode: a.pay_mode,
-      pay_fixed: a.pay_fixed,
-      pay_pct: a.pay_pct,
-      close_day: a.close_day ?? "",
-      pay_day: a.pay_day ?? "",
-      pay_method: a.pay_method ?? "",
-      open_term: a.open_term,
-      body_text: a.body_text ?? "",
-    });
-  }
-
-  return (
-    <div style={card}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>契約書テンプレート</div>
-        <button onClick={handleAdd} style={smallBtn}>
-          <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-          テンプレートを追加
-        </button>
-      </div>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>ここでは雛形を用意するだけです。スタッフへの送付・署名の管理は、スタッフ機能を作るときにあわせて対応します。</div>
-
-      {agreements.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだテンプレートがありません。</div>}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {agreements.map((a) => {
-          const open = openId === a.id;
-          return (
-            <div key={a.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
-              <button
-                onClick={() => setOpenId(open ? null : a.id)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
-              >
-                {open ? <CaretDown size={13} /> : <CaretRight size={13} />}
-                <span style={{ flex: 1, fontSize: 13.5 }}>{a.label || "（無題）"}</span>
-                <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{AGREEMENT_KINDS.find((k) => k.value === a.kind)?.label ?? a.kind}</span>
-              </button>
-              {open && (
-                <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>テンプレート名</span>
-                      <input value={a.label} onChange={(e) => patchLocal(a.id, { label: e.target.value })} onBlur={() => commit(a)} className="vid-input" style={input} />
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>種別</span>
-                      <select
-                        value={a.kind}
-                        onChange={(e) => { const kind = e.target.value as AgreementKind; patchLocal(a.id, { kind }); commit({ ...a, kind }); }}
-                        className="vid-input"
-                        style={input}
-                      >
-                        {AGREEMENT_KINDS.map((k) => (
-                          <option key={k.value} value={k.value}>{k.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <span style={label}>業務範囲・対象</span>
-                    <input
-                      value={a.scope ?? ""}
-                      onChange={(e) => patchLocal(a.id, { scope: e.target.value })}
-                      onBlur={() => commit(a)}
-                      placeholder="例：動画編集業務全般"
-                      className="vid-input"
-                      style={input}
-                    />
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>報酬の形</span>
-                      <select
-                        value={a.pay_mode}
-                        onChange={(e) => { const pay_mode = e.target.value as PayMode; patchLocal(a.id, { pay_mode }); commit({ ...a, pay_mode }); }}
-                        className="vid-input"
-                        style={input}
-                      >
-                        {PAY_MODES.map((m) => (
-                          <option key={m.value} value={m.value}>{m.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {(a.pay_mode === "hourly" || a.pay_mode === "daily" || a.pay_mode === "monthly") && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        <span style={label}>金額（円）</span>
-                        <input
-                          type="number"
-                          value={a.pay_fixed ?? 0}
-                          onChange={(e) => patchLocal(a.id, { pay_fixed: Number(e.target.value) })}
-                          onBlur={() => commit(a)}
-                          className="vid-input"
-                          style={input}
-                        />
-                      </div>
-                    )}
-                    {a.pay_mode === "share" && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        <span style={label}>シェア（%）</span>
-                        <input
-                          type="number"
-                          value={a.pay_pct ?? 0}
-                          onChange={(e) => patchLocal(a.id, { pay_pct: Number(e.target.value) })}
-                          onBlur={() => commit(a)}
-                          className="vid-input"
-                          style={input}
-                        />
-                      </div>
-                    )}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>支払方法</span>
-                      <input
-                        value={a.pay_method ?? ""}
-                        onChange={(e) => patchLocal(a.id, { pay_method: e.target.value })}
-                        onBlur={() => commit(a)}
-                        className="vid-input"
-                        style={input}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>締め日</span>
-                      <input
-                        value={a.close_day ?? ""}
-                        onChange={(e) => patchLocal(a.id, { close_day: e.target.value })}
-                        onBlur={() => commit(a)}
-                        className="vid-input"
-                        style={input}
-                      />
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>支払日</span>
-                      <input
-                        value={a.pay_day ?? ""}
-                        onChange={(e) => patchLocal(a.id, { pay_day: e.target.value })}
-                        onBlur={() => commit(a)}
-                        className="vid-input"
-                        style={input}
-                      />
-                    </div>
-                  </div>
-
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
-                    <input
-                      type="checkbox"
-                      checked={a.open_term}
-                      onChange={(e) => { patchLocal(a.id, { open_term: e.target.checked }); commit({ ...a, open_term: e.target.checked }); }}
-                    />
-                    期間の定めなし
-                  </label>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <span style={label}>契約書の本文（雛形として使う条文）</span>
-                    <textarea
-                      value={a.body_text ?? ""}
-                      onChange={(e) => patchLocal(a.id, { body_text: e.target.value })}
-                      onBlur={() => commit(a)}
-                      rows={5}
-                      className="vid-input"
-                      style={{ ...input, height: "auto", padding: "8px 10px", resize: "vertical" }}
-                    />
-                  </div>
-
-                  <AgreementExtrasEditor agreementId={a.id} extras={a.agreement_extras} onChange={(extras) => patchLocal(a.id, { agreement_extras: extras })} />
-
-                  <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
-                    <button onClick={() => handleDelete(a.id)} style={{ ...smallBtn, color: "var(--color-accent-200)", borderColor: "var(--color-divider)" }}>
-                      <Trash size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-                      削除
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function AgreementExtrasEditor({ agreementId, extras, onChange }: { agreementId: string; extras: AgreementExtra[]; onChange: (e: AgreementExtra[]) => void }) {
-  async function add() {
-    const clause = "新しい条項";
-    await addAgreementExtra(agreementId, clause);
-    onChange([...extras, { clause }]);
-  }
-  async function commit(oldClause: string, newClause: string) {
-    if (oldClause === newClause) return;
-    await updateAgreementExtra(agreementId, oldClause, newClause);
-  }
-  function patch(index: number, value: string) {
-    onChange(extras.map((x, i) => (i === index ? { clause: value } : x)));
-  }
-  async function remove(clause: string) {
-    await removeAgreementExtra(agreementId, clause);
-    onChange(extras.filter((x) => x.clause !== clause));
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <span style={label}>追加の条項</span>
-      {extras.map((x, i) => {
-        const original = x.clause;
-        return (
-          <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-            <textarea
-              value={x.clause}
-              onChange={(e) => patch(i, e.target.value)}
-              onBlur={(e) => commit(original, e.target.value)}
-              rows={2}
-              className="vid-input"
-              style={{ ...input, flex: 1, height: "auto", padding: "6px 8px", resize: "vertical" }}
-            />
-            <button onClick={() => remove(original)} aria-label="削除" style={{ flex: "none", width: 32, height: 32, cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-              <Trash size={13} />
-            </button>
-          </div>
-        );
-      })}
-      <button onClick={add} style={{ alignSelf: "flex-start", ...smallBtn, height: 30 }}>
-        ＋条項を追加
       </button>
     </div>
   );
