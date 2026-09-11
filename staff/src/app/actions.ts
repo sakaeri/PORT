@@ -44,6 +44,20 @@ export async function updateCompanyInfo(fields: {
   if (!data?.length) throw new Error("会社情報の変更はオーナーのみ行えます");
 }
 
+// solo=true が「1人運用（スタッフ機能を隠す）」。トグルのラベルは
+// 「スタッフ連携を使う」＝solo の反転で見せる。
+export async function updateStaffMode(enabled: boolean) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("organizations")
+    .update({ solo: !enabled })
+    .eq("id", ctx.orgId)
+    .select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("この切り替えはオーナーのみ行えます");
+}
+
 export async function createMenu(orgId: string) {
   await requireContext();
   const supabase = await createClient();

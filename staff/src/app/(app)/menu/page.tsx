@@ -42,6 +42,7 @@ export default async function MenuSettingsPage() {
       initialLoginEmail={userData.user?.email ?? ""}
       initialTemplates={(templates ?? []).map((t) => ({ ...t, intake_fields: (t.intake_fields ?? []).sort((a, b) => a.sort - b.sort) }))}
       initialRefundPolicy={policy ?? []}
+      initialSolo={ctx.solo}
     />
   );
 }

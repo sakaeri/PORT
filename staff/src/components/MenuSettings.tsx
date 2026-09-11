@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Trash, Plus, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import {
   updateCompanyInfo,
+  updateStaffMode,
   createMenu,
   updateMenu,
   deleteMenu,
@@ -115,6 +117,7 @@ export default function MenuSettings({
   initialLoginEmail,
   initialTemplates,
   initialRefundPolicy,
+  initialSolo,
 }: {
   orgId: string;
   initialCompany: Company;
@@ -122,6 +125,7 @@ export default function MenuSettings({
   initialLoginEmail: string;
   initialTemplates: IntakeForm[];
   initialRefundPolicy: RefundPolicyRow[];
+  initialSolo: boolean;
 }) {
   const [tab, setTab] = useState<TabKey>("company");
 
@@ -155,7 +159,12 @@ export default function MenuSettings({
         })}
       </div>
 
-      {tab === "company" && <CompanyInfoCard initial={initialCompany} />}
+      {tab === "company" && (
+        <>
+          <CompanyInfoCard initial={initialCompany} />
+          <StaffModeCard initialSolo={initialSolo} />
+        </>
+      )}
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
       {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} />}
@@ -218,6 +227,62 @@ function CompanyInfoCard({ initial }: { initial: Company }) {
         </button>
         {done && <span style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>保存しました</span>}
       </div>
+    </div>
+  );
+}
+
+function StaffModeCard({ initialSolo }: { initialSolo: boolean }) {
+  const router = useRouter();
+  const [enabled, setEnabled] = useState(!initialSolo);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function toggle() {
+    if (saving) return;
+    const next = !enabled;
+    setSaving(true);
+    setError("");
+    try {
+      await updateStaffMode(next);
+      setEnabled(next);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "切り替えできませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={card}>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>スタッフ連携</div>
+      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+        オンにすると、左メニューに「スタッフ」が表示され、案件ごとに担当者を割り当てられるようになります。オフのままなら、受付が1人で全ての案件に対応する運用になります。
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button
+          onClick={toggle}
+          disabled={saving}
+          role="switch"
+          aria-checked={enabled}
+          style={{
+            width: 42,
+            height: 24,
+            padding: 2,
+            flex: "none",
+            cursor: "pointer",
+            display: "flex",
+            justifyContent: enabled ? "flex-end" : "flex-start",
+            background: enabled ? "var(--color-accent)" : "var(--color-neutral-800)",
+            border: "none",
+            borderRadius: 999,
+          }}
+        >
+          <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--color-surface)" }} />
+        </button>
+        <span style={{ fontSize: 12.5 }}>{enabled ? "スタッフ連携を使う" : "1人運用（スタッフ機能を隠す）"}</span>
+      </div>
+      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
     </div>
   );
 }
