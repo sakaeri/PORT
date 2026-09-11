@@ -16,11 +16,17 @@ export type { CustomerContext, MessageWithExtras, RequestBundle };
 export const getCustomerContext = cache(async (): Promise<CustomerContext | null> => {
   const h = await headers();
   const orgId = h.get("x-vid-org");
-  if (!orgId) return null; // proxy.ts failed to resolve an org for this domain
+  if (!orgId) {
+    console.error("getCustomerContext: x-vid-org header missing (proxy.ts failed to resolve an org for this domain)");
+    return null;
+  }
 
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return null;
+  const { data: auth, error: authErr } = await supabase.auth.getUser();
+  if (!auth.user) {
+    console.error("getCustomerContext: no authenticated user", authErr);
+    return null;
+  }
 
   let customer = (
     await supabase
@@ -33,7 +39,10 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
 
   if (!customer) {
     const { data: newCustomerId, error } = await supabase.rpc("ensure_customer_for_org", { p_org_id: orgId });
-    if (error || !newCustomerId) return null;
+    if (error || !newCustomerId) {
+      console.error("getCustomerContext: ensure_customer_for_org failed", { orgId, error });
+      return null;
+    }
     customer = (
       await supabase
         .from("customers")
@@ -42,7 +51,10 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
         .maybeSingle()
     ).data;
   }
-  if (!customer) return null;
+  if (!customer) {
+    console.error("getCustomerContext: customer row still missing after ensure_customer_for_org", { orgId, userId: auth.user.id });
+    return null;
+  }
 
   const { data: thread } = await supabase
     .from("threads")
@@ -50,7 +62,10 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     .eq("customer_id", customer.id)
     .eq("kind", "customer")
     .maybeSingle();
-  if (!thread) return null;
+  if (!thread) {
+    console.error("getCustomerContext: no customer thread found", { customerId: customer.id });
+    return null;
+  }
 
   const { data: org } = await supabase
     .from("organizations")

@@ -58,7 +58,9 @@ export async function proxy(request: NextRequest) {
   }
   if (!orgId) {
     const host = request.headers.get("host") ?? "";
-    orgId = (await supabase.rpc("org_id_by_domain", { p_domain: host })).data;
+    const { data, error } = await supabase.rpc("org_id_by_domain", { p_domain: host });
+    orgId = data;
+    if (!orgId) console.error("proxy: org_id_by_domain resolved no org", { host, error });
   }
   if (orgId) requestHeaders.set("x-vid-org", orgId);
 
