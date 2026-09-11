@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Sibling app lives in its own subfolder with its own lint config.
+    "staff/**",
   ]),
 ]);
 

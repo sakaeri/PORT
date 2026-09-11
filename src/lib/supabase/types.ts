@@ -81,6 +81,7 @@ export interface Database {
           stripe_subscription_id: string | null;
           domain: string | null;
           slug: string | null;
+          is_hq: boolean;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["organizations"]["Row"]>;

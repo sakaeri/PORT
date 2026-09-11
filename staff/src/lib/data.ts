@@ -9,6 +9,7 @@ export interface StaffContext {
   role: "owner" | "reception";
   displayName: string;
   solo: boolean;
+  isHq: boolean;
 }
 
 // null means: not logged in, or logged in but not owner/reception (e.g. a
@@ -28,7 +29,7 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("display_name, solo")
+    .select("display_name, solo, is_hq")
     .eq("id", profile.org_id)
     .maybeSingle();
 
@@ -39,5 +40,6 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
     role: profile.role,
     displayName: profile.display_name,
     solo: org?.solo ?? false,
+    isHq: org?.is_hq ?? false,
   };
 });
