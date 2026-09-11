@@ -157,9 +157,9 @@ export default function MenuSettings({
 
       {tab === "company" && <CompanyInfoCard initial={initialCompany} />}
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
-      {tab === "login" && <LoginInfoCard initialEmail={initialLoginEmail} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
       {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} />}
+      {tab === "login" && <LoginInfoCard initialEmail={initialLoginEmail} />}
     </div>
   );
 }
@@ -169,9 +169,9 @@ type TabKey = "company" | "menu" | "login" | "templates" | "refund";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "company", label: "会社情報" },
   { key: "menu", label: "受付メニュー" },
-  { key: "login", label: "ログイン情報" },
   { key: "templates", label: "返信テンプレ" },
   { key: "refund", label: "キャンセル・返金ポリシー" },
+  { key: "login", label: "ログイン情報" },
 ];
 
 function CompanyInfoCard({ initial }: { initial: Company }) {
