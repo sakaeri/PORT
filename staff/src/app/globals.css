@@ -1,0 +1,147 @@
+/* Design tokens shared with the client app (../../src/app/globals.css) —
+   ported from the same Claude Design handoff (VID-director.dc.html).
+   Colors/spacing/radii/shadows must only be consumed via these variables —
+   never hardcode a hex or px value they already cover. */
+
+:root {
+  --color-bg: #101d1a;
+  --color-surface: #1b2926;
+  --color-text: #e9e9ed;
+  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+
+  --color-neutral-100: #f3f5fe;
+  --color-neutral-200: #e4e7f5;
+  --color-neutral-300: #cfd3e5;
+  --color-neutral-400: #b2b6ca;
+  --color-neutral-500: #9397ab;
+  --color-neutral-600: #75798c;
+  --color-neutral-700: #595d6c;
+  --color-neutral-800: #3f424d;
+  --color-neutral-900: #292b31;
+
+  --color-accent: #3ecf9a;
+  --color-accent-100: #eafaf3;
+  --color-accent-200: #cdf3e3;
+  --color-accent-300: #a3e9cd;
+  --color-accent-400: #6bdab3;
+  --color-accent-500: #3ecf9a;
+  --color-accent-600: #2ba97b;
+  --color-accent-700: #1f7f5c;
+  --color-accent-800: #17573f;
+  --color-accent-900: #123328;
+
+  --color-section: #10382d;
+  --color-section-glow: #175644;
+  --color-section-ghost: #2f7a63;
+  --stb-scrim: rgba(4, 12, 9, 0.62);
+  --stb-stage: #08110e;
+
+  --color-bubble-self-bg: #ffffff;
+  --color-bubble-self-text: #182420;
+  --color-bubble-other-bg: var(--color-surface);
+  --color-bubble-other-text: var(--color-text);
+
+  /* 電子印鑑の朱肉色。Nocturneパレットの外だが、印の実物要件のため意図的な例外。 */
+  --stb-seal-ink: #b8483c;
+
+  --font-heading: var(--font-inter), var(--font-noto-jp), system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: var(--font-inter), var(--font-noto-jp), system-ui, sans-serif;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 0 0 1px #3f424d;
+  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+}
+
+/* Light theme override — default is dark; opt in with data-vid-theme="light" */
+html[data-vid-theme="light"] {
+  --color-bg: #f4faf7;
+  --color-surface: #ffffff;
+  --color-text: #10231d;
+  --color-divider: color-mix(in srgb, #10231d 14%, transparent);
+  --color-neutral-100: #17241f;
+  --color-neutral-200: #22322c;
+  --color-neutral-300: #35443e;
+  --color-neutral-400: #4b5a54;
+  --color-neutral-500: #5f6e68;
+  --color-neutral-600: #78877f;
+  --color-neutral-700: #aebbb4;
+  --color-neutral-800: #d5e0da;
+  --color-neutral-900: #eaf2ee;
+  --color-accent: #12855f;
+  --color-accent-100: #06251b;
+  --color-accent-200: #0a3527;
+  --color-accent-300: #0d5c41;
+  --color-accent-400: #0f7050;
+  --color-accent-500: #12855f;
+  --color-accent-600: #2aa87c;
+  --color-accent-700: #7bd7b4;
+  --color-accent-800: #d3f2e5;
+  --color-accent-900: #edfbf5;
+  --color-section: #d6f0e6;
+  --color-section-glow: #b9e6d3;
+  --color-section-ghost: #8fd4b8;
+  --stb-stage: #dde9e4;
+  --stb-scrim: rgba(16, 35, 29, 0.34);
+
+  --color-bubble-self-bg: var(--color-accent);
+  --color-bubble-self-text: #ffffff;
+  --color-bubble-other-bg: var(--color-surface);
+  --color-bubble-other-text: var(--color-text);
+  --shadow-sm: 0 0 0 1px color-mix(in srgb, #10231d 10%, transparent);
+  --shadow-md: 0 0 0 1px color-mix(in srgb, #10231d 10%, transparent), 0 4px 14px rgba(16, 35, 29, 0.1);
+  --shadow-lg: 0 0 0 1px color-mix(in srgb, #10231d 12%, transparent), 0 14px 38px rgba(16, 35, 29, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.vid-input::placeholder,
+.vid-textarea::placeholder {
+  color: var(--color-neutral-600);
+}
+
+@keyframes vid-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
