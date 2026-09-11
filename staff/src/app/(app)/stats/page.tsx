@@ -19,7 +19,7 @@ export default async function StatsPage() {
   if (!ctx) return null;
 
   return (
-    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 760 }}>
+    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>売上・実績</div>
       {ctx.isHq ? <HqStats /> : <OrgStats orgId={ctx.orgId} />}
     </div>

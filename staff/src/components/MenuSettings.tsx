@@ -152,18 +152,58 @@ export default function MenuSettings({
   initialAgreements: Agreement[];
   initialRefundPolicy: RefundPolicyRow[];
 }) {
+  const [tab, setTab] = useState<TabKey>("company");
+
   return (
-    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 760 }}>
+    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>メニュー管理</div>
-      <CompanyInfoCard initial={initialCompany} />
-      <MenuListCard orgId={orgId} initialMenus={initialMenus} />
-      <LoginInfoCard initialEmail={initialLoginEmail} />
-      <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />
-      <AgreementsCard orgId={orgId} initialAgreements={initialAgreements} />
-      <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} />
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
+        {TABS.map((t) => {
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                height: 34,
+                padding: "0 14px",
+                cursor: "pointer",
+                fontSize: 12.5,
+                whiteSpace: "nowrap",
+                color: active ? "var(--color-accent-100)" : "var(--color-neutral-400)",
+                background: active ? "var(--color-accent-900)" : "transparent",
+                border: "1px solid",
+                borderColor: active ? "var(--color-accent-800)" : "transparent",
+                borderRadius: "var(--radius-md)",
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "company" && <CompanyInfoCard initial={initialCompany} />}
+      {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
+      {tab === "login" && <LoginInfoCard initialEmail={initialLoginEmail} />}
+      {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
+      {tab === "agreements" && <AgreementsCard orgId={orgId} initialAgreements={initialAgreements} />}
+      {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} />}
     </div>
   );
 }
+
+type TabKey = "company" | "menu" | "login" | "templates" | "agreements" | "refund";
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "company", label: "会社情報" },
+  { key: "menu", label: "受付メニュー" },
+  { key: "login", label: "ログイン情報" },
+  { key: "templates", label: "返信テンプレ" },
+  { key: "agreements", label: "契約書テンプレート" },
+  { key: "refund", label: "キャンセル・返金ポリシー" },
+];
 
 function CompanyInfoCard({ initial }: { initial: Company }) {
   const [form, setForm] = useState(initial);

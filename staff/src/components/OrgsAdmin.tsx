@@ -114,7 +114,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
   }
 
   return (
-    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 760 }}>
+    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
         <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>事業者管理</div>
         {!showForm && (
