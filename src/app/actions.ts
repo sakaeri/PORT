@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getCustomerContext, getRefundPolicies } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
+import { notifyNewInquiryIfFirst } from "@/lib/notify";
 
 async function requireContext() {
   const ctx = await getCustomerContext();
@@ -53,6 +54,7 @@ export async function sendMessage(text: string, attachments: { path: string; nam
       .insert({ thread_id: ctx.threadId, sender_id: ctx.userId, sender_role: "client", kind: "text", body: trimmed });
     if (error) throw error;
   }
+  await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
 }
 
 export async function submitMenuInquiry(
@@ -73,6 +75,7 @@ export async function submitMenuInquiry(
     payload: { menuId, menuLabel, menuIcon, rows: filled, note: note.trim() },
   });
   if (error) throw error;
+  await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
 }
 
 // id が null（または DB にまだ存在しない一時ID）なら新規作成として扱い、
