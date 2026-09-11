@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Sun, MoonStars, SignOut } from "@phosphor-icons/react";
+import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { headingWeight } from "@/lib/style";
 import type { StaffContext } from "@/lib/data";
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/stats", label: "売上・実績", icon: ChartBar },
   { href: "/staff", label: "スタッフ", icon: UsersThree, hideWhenSolo: true },
   { href: "/menu", label: "メニュー管理", icon: GearSix },
+  { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true },
 ];
 
 export default function Shell({ ctx, children }: { ctx: StaffContext; children: React.ReactNode }) {
@@ -62,7 +63,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           </div>
         </div>
 
-        {NAV.filter((n) => !(n.hideWhenSolo && ctx.solo)).map((n) => {
+        {NAV.filter((n) => !(n.hideWhenSolo && ctx.solo) && !(n.hqOnly && !ctx.isHq)).map((n) => {
           const active = pathname === n.href || pathname.startsWith(n.href + "/");
           const Icon = n.icon;
           return (

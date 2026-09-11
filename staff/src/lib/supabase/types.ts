@@ -34,6 +34,9 @@ export type RefundStage = "prequote" | "accepted" | "started" | "delivered" | "t
 export type RefundMode = "nocharge" | "full" | "partial" | "none";
 export type PaymentMethod = "card" | "bank";
 export type PaymentStatus = "unpaid" | "processing" | "paid" | "refunded" | "failed";
+export type AgreementKind = "contract" | "employment_part" | "employment_full" | "nda" | "consent";
+export type PayMode = "hourly" | "daily" | "monthly" | "menu" | "share" | "none";
+export type PlanStatus = "trial" | "active" | "past_due" | "paused" | "cancelled";
 
 export interface QuotePayloadItem {
   label: string;
@@ -186,6 +189,64 @@ export interface Database {
         Insert: Partial<Database["public"]["Tables"]["refund_policies"]["Row"]> & { org_id: string; stage: RefundStage; mode: RefundMode };
         Update: Partial<Database["public"]["Tables"]["refund_policies"]["Row"]>;
         Relationships: [];
+      };
+      intake_forms: {
+        Row: {
+          id: string;
+          org_id: string;
+          label: string;
+          note: string | null;
+          icon: string | null;
+          body: string | null;
+          save_answers: boolean;
+          sort: number;
+        };
+        Insert: Partial<Database["public"]["Tables"]["intake_forms"]["Row"]> & { org_id: string; label: string };
+        Update: Partial<Database["public"]["Tables"]["intake_forms"]["Row"]>;
+        Relationships: [];
+      };
+      intake_fields: {
+        Row: {
+          id: string;
+          form_id: string;
+          key: string;
+          label: string;
+          kind: string;
+          required: boolean;
+          sort: number;
+        };
+        Insert: Partial<Database["public"]["Tables"]["intake_fields"]["Row"]> & { form_id: string; key: string; label: string };
+        Update: Partial<Database["public"]["Tables"]["intake_fields"]["Row"]>;
+        Relationships: [{ foreignKeyName: "intake_fields_form_id_fkey"; columns: ["form_id"]; isOneToOne: false; referencedRelation: "intake_forms"; referencedColumns: ["id"] }];
+      };
+      agreements: {
+        Row: {
+          id: string;
+          org_id: string;
+          label: string;
+          kind: AgreementKind;
+          start_on: string | null;
+          open_term: boolean;
+          end_on: string | null;
+          scope: string | null;
+          pay_mode: PayMode;
+          pay_fixed: number | null;
+          pay_pct: number | null;
+          close_day: string | null;
+          pay_day: string | null;
+          pay_method: string | null;
+          body_text: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["agreements"]["Row"]> & { org_id: string; label: string };
+        Update: Partial<Database["public"]["Tables"]["agreements"]["Row"]>;
+        Relationships: [];
+      };
+      agreement_extras: {
+        Row: { agreement_id: string; clause: string };
+        Insert: Partial<Database["public"]["Tables"]["agreement_extras"]["Row"]> & { agreement_id: string; clause: string };
+        Update: Partial<Database["public"]["Tables"]["agreement_extras"]["Row"]>;
+        Relationships: [{ foreignKeyName: "agreement_extras_agreement_id_fkey"; columns: ["agreement_id"]; isOneToOne: false; referencedRelation: "agreements"; referencedColumns: ["id"] }];
       };
       requests: {
         Row: {
@@ -354,6 +415,9 @@ export interface Database {
       refund_mode: RefundMode;
       payment_method: PaymentMethod;
       payment_status: PaymentStatus;
+      agreement_kind: AgreementKind;
+      pay_mode: PayMode;
+      plan_status: PlanStatus;
     };
   };
 }

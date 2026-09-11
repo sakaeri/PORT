@@ -7,7 +7,7 @@ export default async function MenuSettingsPage() {
   if (!ctx) return null;
 
   const supabase = await createClient();
-  const [{ data: org }, { data: menus }] = await Promise.all([
+  const [{ data: org }, { data: menus }, { data: templates }, { data: agreements }, { data: policy }, { data: userData }] = await Promise.all([
     supabase
       .from("organizations")
       .select("name, display_name, rep_name, address, tel, email")
@@ -18,6 +18,18 @@ export default async function MenuSettingsPage() {
       .select("*, menu_questions(*)")
       .eq("org_id", ctx.orgId)
       .order("sort", { ascending: true }),
+    supabase
+      .from("intake_forms")
+      .select("*, intake_fields(*)")
+      .eq("org_id", ctx.orgId)
+      .order("sort", { ascending: true }),
+    supabase
+      .from("agreements")
+      .select("*, agreement_extras(*)")
+      .eq("org_id", ctx.orgId)
+      .order("created_at", { ascending: true }),
+    supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId),
+    supabase.auth.getUser(),
   ]);
 
   return (
@@ -32,6 +44,10 @@ export default async function MenuSettingsPage() {
         email: org?.email ?? "",
       }}
       initialMenus={(menus ?? []).map((m) => ({ ...m, menu_questions: (m.menu_questions ?? []).sort((a, b) => a.sort - b.sort) }))}
+      initialLoginEmail={userData.user?.email ?? ""}
+      initialTemplates={(templates ?? []).map((t) => ({ ...t, intake_fields: (t.intake_fields ?? []).sort((a, b) => a.sort - b.sort) }))}
+      initialAgreements={(agreements ?? []).map((a) => ({ ...a, agreement_extras: a.agreement_extras ?? [] }))}
+      initialRefundPolicy={policy ?? []}
     />
   );
 }
