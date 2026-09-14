@@ -20,12 +20,13 @@ export async function proxy(request: NextRequest) {
   // Rewriting to "/" keeps the visible URL as /<slug> while page.tsx renders
   // unchanged; the org comes from the x-vid-org header either way.
   let targetUrl: URL | null = null;
-  const makeResponse = () =>
-    targetUrl
-      ? NextResponse.rewrite(targetUrl, { request: { headers: requestHeaders } })
-      : NextResponse.next({ request: { headers: requestHeaders } });
-
-  let response = makeResponse();
+  // Cookie writes from the Supabase client are collected here and applied to
+  // the response once, at the very end — the response itself is only built
+  // after requestHeaders (incl. x-vid-org) is fully finalized. Building it
+  // earlier (as this used to) meant a request that never re-set a cookie
+  // (an already-signed-in visitor whose session didn't need a refresh) would
+  // be returned without the x-vid-org header ever making it onto the response.
+  const pendingCookies: { name: string; value: string; options?: Parameters<NextResponse["cookies"]["set"]>[2] }[] = [];
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,10 +38,7 @@ export async function proxy(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = makeResponse();
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
+          pendingCookies.push(...cookiesToSet);
         },
       },
     },
@@ -53,7 +51,6 @@ export async function proxy(request: NextRequest) {
     if (orgId) {
       targetUrl = request.nextUrl.clone();
       targetUrl.pathname = "/" + request.nextUrl.pathname.split("/").slice(2).join("/");
-      response = makeResponse();
     }
   }
   if (!orgId) {
@@ -73,6 +70,11 @@ export async function proxy(request: NextRequest) {
     // getCustomerContext() (a shared login may be a customer of several orgs).
     await supabase.auth.signInAnonymously();
   }
+
+  const response = targetUrl
+    ? NextResponse.rewrite(targetUrl, { request: { headers: requestHeaders } })
+    : NextResponse.next({ request: { headers: requestHeaders } });
+  pendingCookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
 
   return response;
 }
