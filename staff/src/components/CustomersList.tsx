@@ -2,165 +2,104 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowSquareOut, Buildings, CaretDown, CaretRight } from "@phosphor-icons/react";
-import { headingWeight } from "@/lib/style";
-import { convertCustomerToOrg } from "@/app/actions";
-import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
+import { ArrowSquareOut, Buildings, Archive, ArrowCounterClockwise, Trash } from "@phosphor-icons/react";
+import { archiveThread, unarchiveThread, deleteThread } from "@/app/actions";
 
 interface CustomerRow {
   id: string;
   name: string;
   memberNo: string | null;
+  active: boolean;
   creatorName: string | null;
   convertedOrg: { displayName: string; slug: string | null } | null;
+  thread: { id: string; archived: boolean } | null;
 }
 
-const card: React.CSSProperties = {
-  padding: 16,
-  borderRadius: "var(--radius-md)",
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-divider)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-};
 const smallBtn: React.CSSProperties = {
-  height: 30,
-  padding: "0 12px",
+  height: 28,
+  width: 28,
+  display: "grid",
+  placeItems: "center",
   cursor: "pointer",
-  fontSize: 11.5,
-  whiteSpace: "nowrap",
-  color: "var(--color-accent)",
+  color: "var(--color-neutral-500)",
   background: "transparent",
-  border: "1px solid var(--color-accent)",
+  border: "1px solid var(--color-divider)",
   borderRadius: "var(--radius-md)",
 };
 
 export default function CustomersList({ rows: initialRows, isHq }: { rows: CustomerRow[]; isHq: boolean }) {
   const [rows, setRows] = useState(initialRows);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const visible = rows.filter((c) => c.active || showInactive);
+  const inactiveCount = rows.filter((c) => !c.active).length;
 
-  function markConverted(id: string, displayName: string, slug: string | null) {
-    setRows((r) => r.map((row) => (row.id === id ? { ...row, convertedOrg: { displayName, slug } } : row)));
-    setOpenId(null);
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {rows.map((c) => {
-        const open = openId === c.id;
-        return (
-          <div key={c.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--color-surface)" }}>
-              {isHq && !c.convertedOrg && (
-                <button onClick={() => setOpenId(open ? null : c.id)} aria-label="事業者として登録" style={{ flex: "none", display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
-                  {open ? <CaretDown size={13} /> : <CaretRight size={13} />}
-                </button>
-              )}
-              <Link href={`/customers/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
-                <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
-                <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{c.memberNo ?? "—"}</div>
-              </Link>
-              {!isHq && (
-                <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>
-                  {c.creatorName ? `担当: ${c.creatorName}` : "未割り当て"}
-                </div>
-              )}
-              {isHq && c.convertedOrg && (
-                <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: "var(--color-accent-200)" }}>
-                  <Buildings size={14} />
-                  {c.convertedOrg.displayName} として登録済み
-                  {c.convertedOrg.slug && (
-                    <a href={`https://port.s-stylegolf.com/${c.convertedOrg.slug}`} target="_blank" rel="noreferrer" style={{ display: "flex", color: "var(--color-neutral-400)" }} aria-label="サイトを開く">
-                      <ArrowSquareOut size={13} />
-                    </a>
-                  )}
-                </div>
-              )}
-              {isHq && !c.convertedOrg && (
-                <button onClick={() => setOpenId(open ? null : c.id)} style={smallBtn}>
-                  事業者として登録
-                </button>
-              )}
-            </div>
-            {open && <ConvertForm customerId={c.id} customerName={c.name} onDone={markConverted} onCancel={() => setOpenId(null)} />}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ConvertForm({
-  customerId,
-  customerName,
-  onDone,
-  onCancel,
-}: {
-  customerId: string;
-  customerName: string;
-  onDone: (id: string, displayName: string, slug: string | null) => void;
-  onCancel: () => void;
-}) {
-  const [form, setForm] = useState<OrgAccountFormState>({ ...EMPTY_ORG_FORM, display_name: customerName, slug: slugify(customerName) });
-  const [slugTouched, setSlugTouched] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [created, setCreated] = useState<{ slug: string; email: string; password: string } | null>(null);
-
-  function set<K extends keyof OrgAccountFormState>(key: K, value: string) {
-    setForm((f) => {
-      const next = { ...f, [key]: value };
-      if (key === "display_name" && !slugTouched) next.slug = slugify(value);
-      if (key === "slug") setSlugTouched(true);
-      return next;
-    });
-  }
-
-  async function submit() {
-    if (saving) return;
-    setError("");
-    setSaving(true);
+  async function toggleArchive(c: CustomerRow) {
+    if (!c.thread || busyId) return;
+    setBusyId(c.id);
+    const willArchive = !c.thread.archived;
     try {
-      const result = await convertCustomerToOrg(customerId, form);
-      setCreated({ slug: result.slug, email: form.owner_email, password: form.owner_password });
-      onDone(customerId, form.display_name, result.slug);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "登録できませんでした");
+      if (willArchive) await archiveThread(c.thread.id);
+      else await unarchiveThread(c.thread.id);
+      setRows((r) => r.map((row) => (row.id === c.id && row.thread ? { ...row, active: !willArchive, thread: { ...row.thread, archived: willArchive } } : row)));
     } finally {
-      setSaving(false);
+      setBusyId(null);
     }
   }
 
-  if (created) {
-    return (
-      <div style={{ ...card, borderRadius: 0, border: "none", borderTop: "1px solid var(--color-divider)", background: "var(--color-accent-900)" }}>
-        <div style={{ fontSize: 13.5, color: "var(--color-accent-100)" }}>「{form.display_name}」を事業者として登録しました。次の内容をお伝えください。</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12.5 }}>
-          <div>URL：<b>port.s-stylegolf.com/{created.slug}</b></div>
-          <div>ログインメール：<b>{created.email}</b></div>
-          <div>初期パスワード：<b style={{ letterSpacing: "0.04em" }}>{created.password}</b></div>
-        </div>
-        <div style={{ fontSize: 11, color: "var(--color-accent-200)", lineHeight: 1.6 }}>パスワードはこの画面にしか出ません。忘れずにコピーして伝えてください。</div>
-      </div>
-    );
+  async function handleDelete(c: CustomerRow) {
+    if (!c.thread || busyId) return;
+    if (!confirm(`「${c.name}」とのトーク履歴を完全に削除します。元に戻せません。よろしいですか？`)) return;
+    setBusyId(c.id);
+    try {
+      await deleteThread(c.thread.id);
+      setRows((r) => r.map((row) => (row.id === c.id ? { ...row, active: false, thread: null } : row)));
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
-    <div style={{ ...card, borderRadius: 0, border: "none", borderTop: "1px solid var(--color-divider)" }}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 14 }}>事業者として登録</div>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        この依頼主をそのまま新しい事業者にします。表示名は問い合わせ時の名前を引き継いでいるので、必要に応じて書き換えてください。
-      </div>
-      <OrgAccountFields form={form} set={set} />
-      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={submit} disabled={saving} style={{ ...smallBtn, height: 36, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
-          {saving ? "登録中…" : "この内容で登録"}
-        </button>
-        <button onClick={onCancel} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-          キャンセル
-        </button>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {inactiveCount > 0 && (
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
+          <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
+          非表示・削除済みも表示（{inactiveCount}件）
+        </label>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {visible.map((c) => (
+          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", opacity: c.active ? 1 : 0.55 }}>
+            <Link href={`/customers/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
+              <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+              <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{c.memberNo ?? "—"}</div>
+            </Link>
+            {!isHq && (
+              <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>{c.creatorName ? `担当: ${c.creatorName}` : "未割り当て"}</div>
+            )}
+            {isHq && c.convertedOrg && (
+              <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: "var(--color-accent-200)" }}>
+                <Buildings size={14} />
+                {c.convertedOrg.displayName} として登録済み
+                {c.convertedOrg.slug && (
+                  <a href={`https://port.s-stylegolf.com/${c.convertedOrg.slug}`} target="_blank" rel="noreferrer" style={{ display: "flex", color: "var(--color-neutral-400)" }} aria-label="サイトを開く">
+                    <ArrowSquareOut size={13} />
+                  </a>
+                )}
+              </div>
+            )}
+            {c.thread && (
+              <>
+                <button onClick={() => toggleArchive(c)} disabled={busyId === c.id} aria-label={c.thread.archived ? "一覧に戻す" : "アーカイブ"} style={smallBtn}>
+                  {c.thread.archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
+                </button>
+                <button onClick={() => handleDelete(c)} disabled={busyId === c.id} aria-label="トークを削除" style={{ ...smallBtn, color: "var(--color-accent-200)" }}>
+                  <Trash size={13} />
+                </button>
+              </>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -11,11 +11,13 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const supabase = await createClient();
   const { data: customer } = await supabase
     .from("customers")
-    .select("id, name, member_no")
+    .select("id, name, member_no, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
     .eq("id", id)
     .eq("org_id", ctx.orgId)
     .maybeSingle();
   if (!customer) notFound();
+  const convertedOrgRaw = Array.isArray(customer.converted_org) ? customer.converted_org[0] : customer.converted_org;
+  const convertedOrg = convertedOrgRaw ? { displayName: convertedOrgRaw.display_name, slug: convertedOrgRaw.slug } : null;
 
   const { data: thread } = await supabase
     .from("threads")
@@ -40,6 +42,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       thread={thread ? { id: thread.id, archived: !!thread.archived_at } : null}
       initialMessages={initialMessages}
       role={ctx.role}
+      isHq={ctx.isHq}
+      convertedOrg={convertedOrg}
     />
   );
 }

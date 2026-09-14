@@ -469,11 +469,20 @@ export async function deleteMessage(messageId: string) {
   if (error) throw error;
 }
 
+// アーカイブ・削除は依頼主一覧の見た目にも反映する（customers.active）。
+// アーカイブは元に戻せる（一覧の「非表示も表示」から見つけて戻せる）。
+async function setCustomerActiveForThread(threadId: string, active: boolean) {
+  const supabase = await createClient();
+  const { data: thread } = await supabase.from("threads").select("customer_id").eq("id", threadId).maybeSingle();
+  if (thread?.customer_id) await supabase.from("customers").update({ active }).eq("id", thread.customer_id);
+}
+
 export async function archiveThread(threadId: string) {
   await requireContext();
   const supabase = await createClient();
   const { error } = await supabase.from("threads").update({ archived_at: new Date().toISOString() }).eq("id", threadId);
   if (error) throw error;
+  await setCustomerActiveForThread(threadId, false);
 }
 
 export async function unarchiveThread(threadId: string) {
@@ -481,11 +490,14 @@ export async function unarchiveThread(threadId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("threads").update({ archived_at: null }).eq("id", threadId);
   if (error) throw error;
+  await setCustomerActiveForThread(threadId, true);
 }
 
 // トークを丸ごと削除（メッセージ・添付も on delete cascade で連動削除）。
+// 依頼主データ自体は履歴として残すが、一覧からは外す。
 export async function deleteThread(threadId: string) {
   await requireContext();
+  await setCustomerActiveForThread(threadId, false);
   const supabase = await createClient();
   const { error } = await supabase.from("threads").delete().eq("id", threadId);
   if (error) throw error;

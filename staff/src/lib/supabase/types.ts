@@ -314,7 +314,7 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["threads"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["threads"]["Row"]>;
-        Relationships: [];
+        Relationships: [{ foreignKeyName: "threads_customer_id_fkey"; columns: ["customer_id"]; isOneToOne: false; referencedRelation: "customers"; referencedColumns: ["id"] }];
       };
       messages: {
         Row: {

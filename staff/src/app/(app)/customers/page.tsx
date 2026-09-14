@@ -11,22 +11,24 @@ export default async function CustomersPage() {
   const { data: customers, error } = await supabase
     .from("customers")
     .select(
-      "id, name, member_no, creator_id, creators(profiles(display_name)), converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)",
+      "id, name, member_no, active, creator_id, creators(profiles(display_name)), converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug), threads(id, kind, archived_at)",
     )
     .eq("org_id", ctx.orgId)
-    .eq("active", true)
     .order("created_at", { ascending: false });
 
   const rows = (customers ?? []).map((c) => {
     const creator = Array.isArray(c.creators) ? c.creators[0] : c.creators;
     const profile = creator && !Array.isArray(creator.profiles) ? creator.profiles : Array.isArray(creator?.profiles) ? creator.profiles[0] : null;
     const convertedOrg = Array.isArray(c.converted_org) ? c.converted_org[0] : c.converted_org;
+    const thread = (c.threads ?? []).find((t) => t.kind === "customer") ?? null;
     return {
       id: c.id,
       name: c.name,
       memberNo: c.member_no,
+      active: c.active,
       creatorName: profile?.display_name ?? null,
       convertedOrg: convertedOrg ? { displayName: convertedOrg.display_name, slug: convertedOrg.slug } : null,
+      thread: thread ? { id: thread.id, archived: !!thread.archived_at } : null,
     };
   });
 
