@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import type { RefundMode, RefundStage } from "@/lib/supabase/types";
@@ -218,44 +219,39 @@ export async function updateRefundPolicy(orgId: string, stage: RefundStage, mode
 // ============================================================
 // 新規事業者アカウント作成（PORT本部のみ）
 // ============================================================
-interface OrgAccountFields {
+interface OrgFields {
   name: string;
   display_name: string;
   rep_name: string;
   tel: string;
   email: string;
   slug: string;
+}
+
+interface OrgAccountFields extends OrgFields {
   owner_email: string;
   owner_password: string;
   owner_display_name: string;
 }
 
-async function createOrgCore(fields: OrgAccountFields) {
-  const slug = fields.slug.trim().toLowerCase();
+function validateSlug(rawSlug: string) {
+  const slug = rawSlug.trim().toLowerCase();
   if (!/^[a-z0-9-]{2,40}$/.test(slug) || slug === "auth") {
     throw new Error("URLの合言葉は半角英数字とハイフンのみ・2〜40文字で入力してください");
   }
-  if (fields.owner_password.length < 8) {
-    throw new Error("パスワードは8文字以上にしてください");
-  }
-  if (!fields.name.trim() || !fields.display_name.trim() || !fields.owner_email.trim()) {
-    throw new Error("正式名称・表示名・オーナーのメールアドレスは必須です");
-  }
+  return slug;
+}
 
-  const admin = createServiceRoleClient();
+// 事業者の行＋既定のキャンセル/返金ポリシーを作るだけの部分。オーナーの
+// ログインをどう用意するか（新規作成 or 今のログインに追加）は呼び出し側で分ける。
+async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createServiceRoleClient>) {
+  const slug = validateSlug(fields.slug);
+  if (!fields.name.trim() || !fields.display_name.trim()) {
+    throw new Error("正式名称・表示名は必須です");
+  }
 
   const { data: existing } = await admin.from("organizations").select("id").eq("slug", slug).maybeSingle();
   if (existing) throw new Error("このURLの合言葉はすでに使われています");
-
-  const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
-    email: fields.owner_email.trim(),
-    password: fields.owner_password,
-    email_confirm: true,
-  });
-  if (userErr || !userRes.user) {
-    throw new Error(userErr?.message.includes("already been registered") ? "このメールアドレスはすでに使われています" : (userErr?.message ?? "アカウントを作成できませんでした"));
-  }
-  const userId = userRes.user.id;
 
   const { data: org, error: orgErr } = await admin
     .from("organizations")
@@ -271,22 +267,7 @@ async function createOrgCore(fields: OrgAccountFields) {
     })
     .select("id")
     .single();
-  if (orgErr || !org) {
-    await admin.auth.admin.deleteUser(userId);
-    throw orgErr ?? new Error("事業者を作成できませんでした");
-  }
-
-  const { error: profileErr } = await admin.from("profiles").insert({
-    id: userId,
-    org_id: org.id,
-    role: "owner",
-    display_name: fields.owner_display_name.trim() || fields.rep_name.trim() || fields.display_name.trim(),
-  });
-  if (profileErr) {
-    await admin.from("organizations").delete().eq("id", org.id);
-    await admin.auth.admin.deleteUser(userId);
-    throw profileErr;
-  }
+  if (orgErr || !org) throw orgErr ?? new Error("事業者を作成できませんでした");
 
   const defaults: { stage: RefundStage; mode: RefundMode; pct: number }[] = [
     { stage: "prequote", mode: "nocharge", pct: 0 },
@@ -298,6 +279,49 @@ async function createOrgCore(fields: OrgAccountFields) {
   await admin.from("refund_policies").insert(defaults.map((d) => ({ org_id: org.id, ...d })));
 
   return { orgId: org.id as string, slug };
+}
+
+async function createOrgCore(fields: OrgAccountFields) {
+  if (fields.owner_password.length < 8) {
+    throw new Error("パスワードは8文字以上にしてください");
+  }
+  if (!fields.owner_email.trim()) {
+    throw new Error("オーナーのメールアドレスは必須です");
+  }
+
+  const admin = createServiceRoleClient();
+
+  const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
+    email: fields.owner_email.trim(),
+    password: fields.owner_password,
+    email_confirm: true,
+  });
+  if (userErr || !userRes.user) {
+    throw new Error(userErr?.message.includes("already been registered") ? "このメールアドレスはすでに使われています" : (userErr?.message ?? "アカウントを作成できませんでした"));
+  }
+  const userId = userRes.user.id;
+
+  let result: { orgId: string; slug: string };
+  try {
+    result = await createOrgRow(fields, admin);
+  } catch (e) {
+    await admin.auth.admin.deleteUser(userId);
+    throw e;
+  }
+
+  const { error: profileErr } = await admin.from("profiles").insert({
+    id: userId,
+    org_id: result.orgId,
+    role: "owner",
+    display_name: fields.owner_display_name.trim() || fields.rep_name.trim() || fields.display_name.trim(),
+  });
+  if (profileErr) {
+    await admin.from("organizations").delete().eq("id", result.orgId);
+    await admin.auth.admin.deleteUser(userId);
+    throw profileErr;
+  }
+
+  return result;
 }
 
 export async function createOrgAccount(fields: OrgAccountFields) {
@@ -322,4 +346,46 @@ export async function convertCustomerToOrg(customerId: string, fields: OrgAccoun
   if (error) throw error;
 
   return result;
+}
+
+// ============================================================
+// 複数窓口（1つのログインで複数事業者のスタッフを兼任する）
+// ============================================================
+
+// 新しいログインを作らず、今ログイン中の自分をそのまま新しい事業者の
+// オーナーとして追加する。事業者を複数運営したい人向け。owner だけに許可
+// する（reception が勝手に窓口を増やせると困るため）。
+export async function createOrgForCurrentUser(fields: OrgFields) {
+  const ctx = await requireContext();
+  if (ctx.role !== "owner") throw new Error("この操作はオーナーのみ行えます");
+
+  const admin = createServiceRoleClient();
+  const result = await createOrgRow(fields, admin);
+
+  const { error } = await admin.from("staff_org_links").insert({
+    user_id: ctx.userId,
+    org_id: result.orgId,
+    role: "owner",
+    display_name: ctx.displayName,
+  });
+  if (error) {
+    await admin.from("organizations").delete().eq("id", result.orgId);
+    throw error;
+  }
+
+  return result;
+}
+
+// サイドバーの窓口切替。my_staff_orgs() に含まれる事業者かどうかはRLS側
+// （auth_role()/is_office() が該当なしなら null/false になる）で担保される
+// ため、ここでは単に選んだ事業者IDをCookieに保存するだけでよい。
+export async function switchStaffOrg(orgId: string) {
+  await requireContext();
+  const jar = await cookies();
+  jar.set("staff_org_id", orgId, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
 }

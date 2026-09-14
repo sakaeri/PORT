@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
-import { headingWeight } from "@/lib/style";
+import OrgSwitcher from "@/components/OrgSwitcher";
 import type { StaffContext } from "@/lib/data";
 
 const NAV = [
@@ -53,13 +53,12 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           borderRight: "1px solid var(--color-divider)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 4px 18px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "6px 4px 4px" }}>
           <div style={{ width: 30, height: 30, flex: "none", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", border: "1px solid var(--color-accent)" }}>
             <Headset size={16} color="var(--color-accent)" />
           </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ctx.orgDisplayName}</div>
-            <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>受付画面</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <OrgSwitcher orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} role={ctx.role} orgs={ctx.orgs} />
           </div>
         </div>
 

@@ -397,6 +397,12 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["referral_leads"]["Row"]>;
         Relationships: [];
       };
+      staff_org_links: {
+        Row: { user_id: string; org_id: string; role: AppRole; display_name: string; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["staff_org_links"]["Row"]> & { user_id: string; org_id: string; display_name: string };
+        Update: Partial<Database["public"]["Tables"]["staff_org_links"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -408,6 +414,14 @@ export interface Database {
       my_companies: {
         Args: Record<string, never>;
         Returns: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];
+      };
+      my_staff_orgs: {
+        Args: Record<string, never>;
+        Returns: { org_id: string; role: AppRole; display_name: string; is_primary: boolean }[];
+      };
+      staff_context: {
+        Args: Record<string, never>;
+        Returns: { org_id: string; org_display_name: string; solo: boolean; is_hq: boolean; role: AppRole; display_name: string }[];
       };
     };
     Enums: {

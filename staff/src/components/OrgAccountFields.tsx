@@ -65,9 +65,13 @@ const smallBtn: React.CSSProperties = {
 export function OrgAccountFields({
   form,
   set,
+  showOwnerLogin = true,
 }: {
   form: OrgAccountFormState;
   set: <K extends keyof OrgAccountFormState>(key: K, value: string) => void;
+  // false のとき: 「今ログイン中の自分にそのまま追加する」フロー用。新しい
+  // ログイン情報を作らないので、オーナーのログイン欄自体を出さない。
+  showOwnerLogin?: boolean;
 }) {
   return (
     <>
@@ -80,22 +84,26 @@ export function OrgAccountFields({
         <Field label="URLの合言葉（半角英数字とハイフン）" value={form.slug} onChange={(v) => set("slug", slugify(v))} />
       </div>
 
-      <div style={{ fontSize: 12, color: "var(--color-neutral-500)", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
-        この事業者のオーナーが受付画面に入るためのログイン情報
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="オーナーの表示名" value={form.owner_display_name} onChange={(v) => set("owner_display_name", v)} />
-        <Field label="ログインメールアドレス" value={form.owner_email} onChange={(v) => set("owner_email", v)} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <span style={label}>初期パスワード</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={form.owner_password} onChange={(e) => set("owner_password", e.target.value)} className="vid-input" style={input} />
-            <button onClick={() => set("owner_password", randomPassword())} style={{ ...smallBtn, flex: "none" }}>
-              自動生成
-            </button>
+      {showOwnerLogin && (
+        <>
+          <div style={{ fontSize: 12, color: "var(--color-neutral-500)", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
+            この事業者のオーナーが受付画面に入るためのログイン情報
           </div>
-        </div>
-      </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="オーナーの表示名" value={form.owner_display_name} onChange={(v) => set("owner_display_name", v)} />
+            <Field label="ログインメールアドレス" value={form.owner_email} onChange={(v) => set("owner_email", v)} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <span style={label}>初期パスワード</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={form.owner_password} onChange={(e) => set("owner_password", e.target.value)} className="vid-input" style={input} />
+                <button onClick={() => set("owner_password", randomPassword())} style={{ ...smallBtn, flex: "none" }}>
+                  自動生成
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
