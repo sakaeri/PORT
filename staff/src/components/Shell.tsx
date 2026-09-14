@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut } from "@phosphor-icons/react";
@@ -20,7 +20,17 @@ const NAV = [
 export default function Shell({ ctx, children }: { ctx: StaffContext; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isDark, setIsDark] = useState(() => (typeof document === "undefined" ? true : document.documentElement.getAttribute("data-vid-theme") !== "light"));
+  // Always start matching the server's render (dark) — the inline script in
+  // layout.tsx already set the real data-vid-theme attribute on <html>
+  // before hydration, so reading it here in the initializer would make the
+  // client's first render diverge from the server's and produce a hydration
+  // mismatch whenever the visitor had actually chosen light mode before.
+  // Syncing in an effect (client-only, runs after hydration) avoids that.
+  const [isDark, setIsDark] = useState(true);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from the DOM (set by an inline script outside React), not state derived from props/state
+    setIsDark(document.documentElement.getAttribute("data-vid-theme") !== "light");
+  }, []);
 
   function toggleTheme() {
     const next = isDark ? "light" : "dark";

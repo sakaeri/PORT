@@ -58,8 +58,20 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
   const [payTargetId, setPayTargetId] = useState<string | null>(null);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [ackedIds, setAckedIds] = useState<Set<string>>(() => (typeof window === "undefined" ? new Set<string>() : readAcked()));
-  const [isDark, setIsDark] = useState(() => typeof document === "undefined" ? true : document.documentElement.getAttribute("data-vid-theme") !== "light");
+  // Both start matching the server's render (empty set / dark) and sync from
+  // localStorage/the DOM in an effect (client-only, after hydration) — an
+  // inline script in layout.tsx already applies the persisted theme to <html>
+  // before hydration, so reading it in the initializer here would make the
+  // client's first render diverge from what the server actually sent
+  // whenever the visitor had light mode (or acked reports) already saved,
+  // producing a hydration mismatch.
+  const [ackedIds, setAckedIds] = useState<Set<string>>(() => new Set());
+  const [isDark, setIsDark] = useState(true);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from localStorage/the DOM (set outside React), not state derived from props/state
+    setAckedIds(readAcked());
+    setIsDark(document.documentElement.getAttribute("data-vid-theme") !== "light");
+  }, []);
   const [avatarUrl, setAvatarUrl] = useState(ctx.avatarUrl);
   const scrollRef = useRef<HTMLDivElement>(null);
 

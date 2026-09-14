@@ -35,6 +35,14 @@ export function slugify(v: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+// Same character rules as slugify(), but keeps a trailing hyphen instead of
+// trimming it. slugify() runs on every keystroke would otherwise strip a
+// hyphen the moment it's typed (it's the last character until the next one
+// is), making it look like "-" simply can't be entered.
+function sanitizeSlugInput(v: string) {
+  return v.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+/, "");
+}
+
 const input: React.CSSProperties = {
   width: "100%",
   height: 36,
@@ -81,7 +89,7 @@ export function OrgAccountFields({
         <Field label="代表者名" value={form.rep_name} onChange={(v) => set("rep_name", v)} />
         <Field label="電話番号" value={form.tel} onChange={(v) => set("tel", v)} />
         <Field label="連絡用メールアドレス" value={form.email} onChange={(v) => set("email", v)} />
-        <Field label="URLの合言葉（半角英数字とハイフン）" value={form.slug} onChange={(v) => set("slug", slugify(v))} />
+        <Field label="URLの合言葉（半角英数字とハイフン）" value={form.slug} onChange={(v) => set("slug", sanitizeSlugInput(v))} />
       </div>
 
       {showOwnerLogin && (
