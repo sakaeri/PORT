@@ -58,7 +58,7 @@ export default async function CustomersPage() {
         </div>
       )}
 
-      <CustomersList rows={rows} isHq={ctx.isHq} />
+      <CustomersList rows={rows} isHq={ctx.isHq} orgId={ctx.orgId} />
     </div>
   );
 }

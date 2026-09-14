@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowSquareOut, Buildings, Archive, ArrowCounterClockwise, Trash } from "@phosphor-icons/react";
+import { createClient } from "@/lib/supabase/client";
 import { archiveThread, unarchiveThread, deleteCustomer } from "@/app/actions";
 
 interface CustomerRow {
@@ -29,12 +31,37 @@ const smallBtn: React.CSSProperties = {
   borderRadius: "var(--radius-md)",
 };
 
-export default function CustomersList({ rows: initialRows, isHq }: { rows: CustomerRow[]; isHq: boolean }) {
+export default function CustomersList({ rows: initialRows, isHq, orgId }: { rows: CustomerRow[]; isHq: boolean; orgId: string }) {
+  const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const visible = rows.filter((c) => c.active || showArchived);
   const archivedCount = rows.filter((c) => !c.active).length;
+
+  // サーバーから渡された最新の行を反映する（下のポーリング/リアルタイムが
+  // router.refresh() でこのページを再取得するたびに initialRows が更新される）。
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a server-refetched prop (router.refresh()), not state derived from other client state
+    setRows(initialRows);
+  }, [initialRows]);
+
+  // 一覧の未読マーク・直近メッセージはこのコンポーネント自身では再取得せず、
+  // ページ全体(customers/page.tsx)を router.refresh() で再取得させることで
+  // 既存のサーバー側クエリをそのまま使い回す。
+  useEffect(() => {
+    const supabase = createClient(orgId);
+    const channel = supabase
+      .channel(`customers-list-${orgId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "threads" }, () => router.refresh())
+      .subscribe();
+    const interval = setInterval(() => router.refresh(), 4000);
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [orgId, router]);
 
   async function toggleArchive(c: CustomerRow) {
     if (!c.thread || busyId) return;
