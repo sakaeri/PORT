@@ -19,29 +19,32 @@ export default async function CustomersPage() {
     .order("sent_at", { referencedTable: "threads.messages", ascending: false })
     .limit(1, { referencedTable: "threads.messages" });
 
-  const rows = (customers ?? []).map((c) => {
-    const creator = Array.isArray(c.creators) ? c.creators[0] : c.creators;
-    const profile = creator && !Array.isArray(creator.profiles) ? creator.profiles : Array.isArray(creator?.profiles) ? creator.profiles[0] : null;
-    const convertedOrg = Array.isArray(c.converted_org) ? c.converted_org[0] : c.converted_org;
-    const thread = (c.threads ?? []).find((t) => t.kind === "customer") ?? null;
-    const lastMessage = thread?.messages?.[0] ?? null;
-    const unread =
-      !!thread &&
-      !thread.archived_at &&
-      lastMessage?.sender_role === "client" &&
-      (!thread.last_read_at || (thread.last_msg_at != null && thread.last_msg_at > thread.last_read_at));
-    return {
-      id: c.id,
-      name: c.name,
-      memberNo: c.member_no,
-      active: c.active,
-      creatorName: profile?.display_name ?? null,
-      convertedOrg: convertedOrg ? { displayName: convertedOrg.display_name, slug: convertedOrg.slug } : null,
-      thread: thread ? { id: thread.id, archived: !!thread.archived_at } : null,
-      lastMessagePreview: lastMessage ? previewMessage(lastMessage) : null,
-      unread,
-    };
-  });
+  const rows = (customers ?? [])
+    .map((c) => {
+      const creator = Array.isArray(c.creators) ? c.creators[0] : c.creators;
+      const profile = creator && !Array.isArray(creator.profiles) ? creator.profiles : Array.isArray(creator?.profiles) ? creator.profiles[0] : null;
+      const convertedOrg = Array.isArray(c.converted_org) ? c.converted_org[0] : c.converted_org;
+      const thread = (c.threads ?? []).find((t) => t.kind === "customer") ?? null;
+      const lastMessage = thread?.messages?.[0] ?? null;
+      const unread =
+        !!thread &&
+        !thread.archived_at &&
+        lastMessage?.sender_role === "client" &&
+        (!thread.last_read_at || (thread.last_msg_at != null && thread.last_msg_at > thread.last_read_at));
+      return {
+        id: c.id,
+        name: c.name,
+        memberNo: c.member_no,
+        active: c.active,
+        creatorName: profile?.display_name ?? null,
+        convertedOrg: convertedOrg ? { displayName: convertedOrg.display_name, slug: convertedOrg.slug } : null,
+        thread: thread ? { id: thread.id, archived: !!thread.archived_at } : null,
+        lastMessagePreview: lastMessage ? previewMessage(lastMessage) : null,
+        unread,
+      };
+    })
+    // やり取りが一度もない依頼主（ページを開いただけ）は一覧に一切出さない
+    .filter((r) => r.lastMessagePreview !== null);
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>
