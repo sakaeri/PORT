@@ -35,9 +35,11 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, refreshUnread)
       .on("postgres_changes", { event: "*", schema: "public", table: "threads" }, refreshUnread)
       .subscribe();
+    const interval = setInterval(refreshUnread, 4000);
     return () => {
       cancelled = true;
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
     // pathname included so navigating away from a thread (which marks it read) re-checks the count
   }, [ctx.orgId, pathname]);

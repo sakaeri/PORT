@@ -99,8 +99,12 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
       .on("postgres_changes", { event: "*", schema: "public", table: "completion_reports" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "ratings", filter: `customer_id=eq.${ctx.customerId}` }, refresh)
       .subscribe();
+    // WebSocket通知だけに頼らず、数秒おきのポーリングも保険として併用する
+    // （接続直後の認証タイミング等でイベントを取りこぼしても、数秒以内に追いつく）。
+    const interval = setInterval(refresh, 4000);
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [ctx.threadId, ctx.customerId, ctx.orgId, refresh]);
 

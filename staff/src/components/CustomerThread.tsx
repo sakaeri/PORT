@@ -127,8 +127,12 @@ export default function CustomerThread({
       .channel(`staff-thread-${thread.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `thread_id=eq.${thread.id}` }, refresh)
       .subscribe();
+    // WebSocket通知だけに頼らず、数秒おきのポーリングも保険として併用する
+    // （接続直後の認証タイミング等でイベントを取りこぼしても、数秒以内に追いつく）。
+    const interval = setInterval(refresh, 4000);
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [thread, orgId, refresh]);
 
