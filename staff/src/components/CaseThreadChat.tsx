@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PaperPlaneTilt, Trash } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { sendCaseMessage, deleteMessage, markThreadRead } from "@/app/actions";
@@ -31,6 +31,11 @@ export default function CaseThreadChat({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages]);
 
   useEffect(() => {
     void markThreadRead(threadId);
@@ -97,7 +102,7 @@ export default function CaseThreadChat({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>案件トーク（スタッフ内・進捗ログ）</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto", padding: "4px 2px" }}>
+      <div ref={scrollRef} style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto", padding: "4px 2px" }}>
         {messages.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ記録がありません。</div>}
         {messages.map((m) => {
           if (m.kind === "notice") {
