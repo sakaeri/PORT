@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/chat/Header";
 import Composer, { type PendingAttachment } from "@/components/chat/Composer";
 import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, IntakeCard } from "@/components/chat/Bubbles";
-import { ProgressPanel, PayDialog, CancelDialog, ReportsDialog, MenuSheet } from "@/components/chat/Dialogs";
+import { ProgressPanel, CancelDialog, ReportsDialog, MenuSheet } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
 import { createClient } from "@/lib/supabase/client";
 import { mapMessageRow, type CustomerContext, type MenuRow, type MessageWithExtras, type RawMessageRow, type RequestBundle, type VaultRow } from "@/lib/chat-types";
@@ -12,11 +12,9 @@ import type { Database } from "@/lib/supabase/types";
 import {
   sendMessage as sendMessageAction,
   submitMenuInquiry,
-  payRequest,
   cancelRequest,
   submitRating,
   skipRating,
-  setInitialProfile,
 } from "@/app/actions";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
@@ -29,6 +27,8 @@ interface Props {
   initialVault: VaultRow[];
   companies: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];
 }
+
+const MENU_SELECT = "*, menu_questions(*)";
 
 const ACKED_KEY = "VID_acked_reports";
 
@@ -48,15 +48,15 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies, initialVault, companies }: Props) {
+export default function ChatScreen({ ctx, initialMessages, menus: initialMenus, refundPolicies, initialVault, companies }: Props) {
   const [messages, setMessages] = useState(initialMessages);
+  const [menus, setMenus] = useState(initialMenus);
   const [vault, setVault] = useState(initialVault);
   const [searchQuery, setSearchQuery] = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showReports, setShowReports] = useState(false);
   const [showMyPage, setShowMyPage] = useState(false);
   const [showMenuSheet, setShowMenuSheet] = useState(false);
-  const [payTargetId, setPayTargetId] = useState<string | null>(null);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Both start matching the server's render (empty set / dark) and sync from
@@ -109,6 +109,33 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
     };
   }, [ctx.threadId, ctx.customerId, ctx.orgId, refresh]);
 
+  // 受付側でメニューや「はじめの質問」を追加・編集しても、この画面をすでに開いている
+  // 依頼主に反映されるようにする（開いたまま放置されがちな画面のため）。
+  const refreshMenus = useCallback(async () => {
+    const supabase = createClient(ctx.orgId);
+    const { data } = await supabase
+      .from("menus")
+      .select(MENU_SELECT)
+      .eq("org_id", ctx.orgId)
+      .eq("active", true)
+      .order("sort", { ascending: true });
+    if (data) setMenus(data as MenuRow[]);
+  }, [ctx.orgId]);
+
+  useEffect(() => {
+    const supabase = createClient(ctx.orgId);
+    const channel = supabase
+      .channel(`menus-${ctx.orgId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "menus", filter: `org_id=eq.${ctx.orgId}` }, refreshMenus)
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_questions" }, refreshMenus)
+      .subscribe();
+    const interval = setInterval(refreshMenus, 4000);
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [ctx.orgId, refreshMenus]);
+
   function toggleTheme() {
     const next = isDark ? "light" : "dark";
     document.documentElement.setAttribute("data-vid-theme", next);
@@ -151,24 +178,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
     setShowMenuSheet(false);
   }
 
-  const payTargetBundle = payTargetId ? bundles.find((b) => b.request.id === payTargetId) ?? null : null;
   const cancelTargetBundle = cancelTargetId ? bundles.find((b) => b.request.id === cancelTargetId) ?? null : null;
-  const needsProfile = ctx.customerName === "未登録の依頼主" || !ctx.email;
-
-  async function handlePayConfirm(profile?: { name: string; email: string; phone: string }) {
-    if (!payTargetId || busy) return;
-    setBusy(true);
-    try {
-      if (profile) await setInitialProfile(profile.name, profile.email, profile.phone);
-      await payRequest(payTargetId);
-      await refresh();
-      setPayTargetId(null);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleCancelConfirm() {
     if (!cancelTargetId || busy) return;
@@ -232,7 +242,6 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
                   msg={m}
                   bundle={m.requestBundle}
                   refundPolicies={refundPolicies}
-                  onPay={setPayTargetId}
                   onCancel={setCancelTargetId}
                   onSubmitRating={async (id, stars, comment) => {
                     await submitRating(id, stars, comment);
@@ -255,16 +264,6 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
       {showProgress && <ProgressPanel bundles={bundles} onClose={() => setShowProgress(false)} onCancel={(id) => { setShowProgress(false); setCancelTargetId(id); }} />}
       {showReports && <ReportsDialog bundles={bundles} ackedIds={ackedIds} onAck={ackReport} onClose={() => setShowReports(false)} />}
       {showMenuSheet && <MenuSheet menus={menus} onClose={() => setShowMenuSheet(false)} onSubmit={handleMenuSubmit} />}
-      {payTargetBundle && (
-        <PayDialog
-          price={payTargetBundle.request.amount}
-          needsProfile={needsProfile}
-          hasGuestActivity={messages.length > 0}
-          confirming={busy}
-          onClose={() => setPayTargetId(null)}
-          onConfirm={handlePayConfirm}
-        />
-      )}
       {cancelTargetBundle && (
         <CancelDialog bundle={cancelTargetBundle} refundPolicies={refundPolicies} confirming={busy} onClose={() => setCancelTargetId(null)} onConfirm={handleCancelConfirm} />
       )}

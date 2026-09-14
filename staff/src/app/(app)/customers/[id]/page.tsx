@@ -35,10 +35,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   const { data: menuRows } = await supabase
     .from("menus")
-    .select("id, label, note, price")
+    .select("id, label, note, price, payout, lead_hours")
     .eq("org_id", ctx.orgId)
+    .eq("active", true)
     .order("sort", { ascending: true });
-  const menus = (menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price }));
+  const menus = (menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, payout: m.payout, leadHours: m.lead_hours }));
 
   const { data: memoRows } = await supabase
     .from("work_memos")

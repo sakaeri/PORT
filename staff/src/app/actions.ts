@@ -466,9 +466,24 @@ export async function deleteMessage(messageId: string) {
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", messageId)
     .eq("sender_id", ctx.userId)
-    .select("id");
+    .select("id, kind, request_id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("自分が送ったメッセージのみ削除できます");
+
+  // 見積もりチャットを削除したら、まだ決済前（quoted）ならその見積もり自体も取り下げる
+  // （決済済み・対応中のものは削除しても取り下げない）。
+  const deleted = data[0];
+  if (deleted.kind === "quote" && deleted.request_id) {
+    const { data: declined } = await supabase
+      .from("requests")
+      .update({ phase: "declined" })
+      .eq("id", deleted.request_id)
+      .eq("phase", "quoted")
+      .select("id");
+    if (declined && declined.length > 0) {
+      await postCaseNotice(supabase, deleted.request_id, "見積もりチャットが削除されたため取り下げました");
+    }
+  }
 }
 
 // アーカイブ・削除は依頼主一覧の見た目にも反映する（customers.active）。
@@ -513,22 +528,29 @@ export async function deleteCustomer(customerId: string) {
 export async function createCaseRequest(
   customerThreadId: string,
   customerId: string,
-  input: { title: string; note: string; amount: number; due: string; saveAsMenu?: boolean },
+  input: {
+    items: { menuId: string | null; label: string; price: number; payout: number; qty: number }[];
+    note: string;
+    due: string;
+    saveAsMenu?: boolean;
+  },
 ) {
   const ctx = await requireContext();
   const supabase = await createClient();
-  const title = input.title.trim();
-  if (!title) throw new Error("件名を入力してください");
-  if (!Number.isFinite(input.amount) || input.amount < 0) throw new Error("金額が正しくありません");
+  const items = input.items.filter((it) => it.qty > 0 && it.label.trim());
+  if (items.length === 0) throw new Error("見積もりの項目を1つ以上追加してください");
+
+  const amount = items.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const title = items.length > 2 ? `${items[0].label}ほか${items.length - 1}件` : items.map((it) => it.label).join("・");
 
   if (input.saveAsMenu) {
-    const { error: menuError } = await supabase.from("menus").insert({
-      org_id: ctx.orgId,
-      label: title,
-      note: input.note.trim() || null,
-      price: Math.round(input.amount),
-    });
-    if (menuError) throw menuError;
+    const customItems = items.filter((it) => !it.menuId);
+    if (customItems.length > 0) {
+      const { error: menuError } = await supabase
+        .from("menus")
+        .insert(customItems.map((it) => ({ org_id: ctx.orgId, label: it.label, price: it.price, payout: it.payout })));
+      if (menuError) throw menuError;
+    }
   }
 
   const { data: request, error: reqError } = await supabase
@@ -538,13 +560,18 @@ export async function createCaseRequest(
       customer_id: customerId,
       title,
       note: input.note.trim() || null,
-      amount: Math.round(input.amount),
+      amount,
       phase: "quoted",
       quoted_at: new Date().toISOString(),
     })
     .select("id")
     .single();
   if (reqError || !request) throw reqError ?? new Error("案件の作成に失敗しました");
+
+  const { error: itemsError } = await supabase
+    .from("request_items")
+    .insert(items.map((it, i) => ({ request_id: request.id, menu_id: it.menuId, label: it.label, price: it.price, payout: it.payout, qty: it.qty, sort: i })));
+  if (itemsError) throw itemsError;
 
   const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: input.due.trim() || undefined };
   const { error: msgError } = await supabase.from("messages").insert({
@@ -574,7 +601,7 @@ export async function createCaseRequest(
     sender_id: null,
     sender_role: null,
     kind: "notice",
-    body: `見積もりを送信しました（¥${Math.round(input.amount).toLocaleString("ja-JP")}）`,
+    body: `見積もりを送信しました（¥${amount.toLocaleString("ja-JP")}）`,
   });
 
   return request.id as string;
@@ -608,6 +635,29 @@ export async function startCaseRequest(requestId: string) {
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("着手できる状態ではありません");
   await postCaseNotice(supabase, requestId, "着手しました");
+}
+
+export async function confirmPayment(requestId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("requests")
+    .update({
+      phase: "preparing",
+      accepted_at: now,
+      pay_method: "bank",
+      pay_status: "paid",
+      paid_at: now,
+      paid_marked_by: ctx.userId,
+    })
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId)
+    .eq("phase", "quoted")
+    .select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
+  await postCaseNotice(supabase, requestId, "入金を確認しました");
 }
 
 export async function declineCaseRequest(requestId: string) {

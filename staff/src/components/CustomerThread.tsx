@@ -187,7 +187,7 @@ export default function CustomerThread({
   isHq: boolean;
   convertedOrg: { displayName: string; slug: string | null } | null;
   templates: { id: string; label: string; note: string | null; fieldCount: number }[];
-  menus: { id: string; label: string; note: string | null; price: number }[];
+  menus: MenuOption[];
   memos: WorkMemo[];
   ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
@@ -499,15 +499,37 @@ function CaseSummarySection({
 }: {
   thread: { id: string; archived: boolean } | null;
   customerId: string;
-  menus: { id: string; label: string; note: string | null; price: number }[];
+  menus: MenuOption[];
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
 }) {
+  const router = useRouter();
+  const [showDialog, setShowDialog] = useState(false);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-400)" }}>このトークの依頼</span>
-        {thread && <CreateCaseSection threadId={thread.id} customerId={customerId} menus={menus} />}
+        {thread && (
+          <button
+            onClick={() => setShowDialog(true)}
+            style={{ flex: "none", height: 24, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)" }}
+          >
+            見積もり
+          </button>
+        )}
       </div>
+      {showDialog && thread && (
+        <QuoteDialog
+          threadId={thread.id}
+          customerId={customerId}
+          menus={menus}
+          onClose={() => setShowDialog(false)}
+          onCreated={(requestId) => {
+            setShowDialog(false);
+            router.push(`/cases/${requestId}`);
+          }}
+        />
+      )}
       {latestRequest ? (
         <Link
           href={`/cases/${latestRequest.id}`}
@@ -601,51 +623,68 @@ function ConvertSection({ customerId, customerName }: { customerId: string; cust
   );
 }
 
-function CreateCaseSection({
+interface MenuOption {
+  id: string;
+  label: string;
+  note: string | null;
+  price: number;
+  payout: number;
+  leadHours: number;
+}
+
+interface CustomItem {
+  label: string;
+  price: number;
+  qty: number;
+}
+
+function QuoteDialog({
   threadId,
   customerId,
   menus,
+  onClose,
+  onCreated,
 }: {
   threadId: string;
   customerId: string;
-  menus: { id: string; label: string; note: string | null; price: number }[];
+  menus: MenuOption[];
+  onClose: () => void;
+  onCreated: (requestId: string) => void;
 }) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [menuId, setMenuId] = useState("");
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
+  const [qty, setQty] = useState<Record<string, number>>({});
+  const [customItems, setCustomItems] = useState<CustomItem[]>([]);
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customLabel, setCustomLabel] = useState("");
+  const [customPrice, setCustomPrice] = useState("");
   const [due, setDue] = useState("");
   const [note, setNote] = useState("");
   const [saveAsMenu, setSaveAsMenu] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  function pickMenu(id: string) {
-    setMenuId(id);
-    const menu = menus.find((m) => m.id === id);
-    if (menu) {
-      setTitle(menu.label);
-      setAmount(String(menu.price));
-      setNote(menu.note ?? "");
-      setSaveAsMenu(false);
-    }
+  function bump(menuId: string, delta: number) {
+    setQty((q) => ({ ...q, [menuId]: Math.max(0, (q[menuId] ?? 0) + delta) }));
   }
 
+  function addCustomItem() {
+    const price = Number(customPrice);
+    if (!customLabel.trim() || !Number.isFinite(price) || price < 0) return;
+    setCustomItems((rows) => [...rows, { label: customLabel.trim(), price, qty: 1 }]);
+    setCustomLabel("");
+    setCustomPrice("");
+  }
+
+  const menuItems = menus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id] }));
+  const allItems = [...menuItems, ...customItems.map((c) => ({ menuId: null as string | null, label: c.label, price: c.price, payout: 0, qty: c.qty }))];
+  const total = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+
   async function submit() {
-    if (saving) return;
+    if (saving || allItems.length === 0) return;
     setError("");
     setSaving(true);
     try {
-      const requestId = await createCaseRequest(threadId, customerId, { title, note, amount: Number(amount), due, saveAsMenu: !menuId && saveAsMenu });
-      setOpen(false);
-      setMenuId("");
-      setTitle("");
-      setAmount("");
-      setDue("");
-      setNote("");
-      setSaveAsMenu(false);
-      router.push(`/cases/${requestId}`);
+      const requestId = await createCaseRequest(threadId, customerId, { items: allItems, note, due, saveAsMenu });
+      onCreated(requestId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "作成できませんでした");
     } finally {
@@ -653,62 +692,112 @@ function CreateCaseSection({
     }
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        style={{ flex: "none", height: 24, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)" }}
-      >
-        見積もり
-      </button>
-    );
-  }
-
   return (
-    <div style={card}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 14 }}>案件を作成</div>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        トークにお見積もりカードが届き、依頼主が決済すると案件が着手待ちになります。
-      </div>
-      {menus.length > 0 && (
-        <select value={menuId} onChange={(e) => pickMenu(e.target.value)} className="vid-input" style={inputStyle}>
-          <option value="">受付メニューから選ぶ（任意）</option>
-          {menus.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}（¥{m.price.toLocaleString("ja-JP")}）
-            </option>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: "min(480px, 100%)", maxHeight: "85vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, padding: 20, borderRadius: "var(--radius-lg)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}
+      >
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>見積もりを発行</div>
+        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+          このトークの内容を正式な依頼にします。発行するとトークに見積もりカードが入ります。
+        </div>
+
+        {menus.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>受付メニュー</span>
+            {menus.map((m) => (
+              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</div>
+                  <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>
+                    ¥{m.price.toLocaleString("ja-JP")}・納期{m.leadHours}時間
+                  </div>
+                </div>
+                <button onClick={() => bump(m.id, -1)} disabled={!qty[m.id]} style={stepperBtn}>
+                  −
+                </button>
+                <span style={{ width: 20, textAlign: "center", fontSize: 13 }}>{qty[m.id] ?? 0}</span>
+                <button onClick={() => bump(m.id, 1)} style={stepperBtn}>
+                  ＋
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <button onClick={() => setShowCustomForm((v) => !v)} style={{ alignSelf: "flex-start", fontSize: 11.5, color: "var(--color-accent)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+            白紙から見積もる（メニュー外）
+          </button>
+          {showCustomForm && (
+            <div style={{ display: "flex", gap: 6 }}>
+              <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder="件名" className="vid-input" style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
+              <input value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} type="number" min={0} placeholder="金額" className="vid-input" style={{ ...inputStyle, width: 100 }} />
+              <button onClick={addCustomItem} style={{ ...smallBtn, height: 36 }}>
+                追加
+              </button>
+            </div>
+          )}
+          {customItems.map((c, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+              <span style={{ flex: 1, minWidth: 0 }}>{c.label}</span>
+              <span style={{ color: "var(--color-neutral-500)" }}>¥{c.price.toLocaleString("ja-JP")}</span>
+              <button onClick={() => setCustomItems((rows) => rows.filter((_, j) => j !== i))} style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
+                <Trash size={12} />
+              </button>
+            </div>
           ))}
-        </select>
-      )}
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="件名" className="vid-input" style={inputStyle} />
-      <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min={0} placeholder="金額（税込・円）" className="vid-input" style={inputStyle} />
-      <input value={due} onChange={(e) => setDue(e.target.value)} placeholder="対応の目安（例：3日後）任意" className="vid-input" style={inputStyle} />
-      <textarea
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="補足メモ（依頼主にも表示されます）任意"
-        rows={2}
-        className="vid-input"
-        style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
-      />
-      {!menuId && (
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-400)" }}>
-          <input type="checkbox" checked={saveAsMenu} onChange={(e) => setSaveAsMenu(e.target.checked)} />
-          この内容を受付メニューにも追加する
-        </label>
-      )}
-      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={submit} disabled={saving || !title.trim() || !amount} style={{ ...smallBtn, height: 36, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
-          {saving ? "送信中…" : "見積もりを送る"}
-        </button>
-        <button onClick={() => setOpen(false)} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-          キャンセル
-        </button>
+          {customItems.length > 0 && (
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--color-neutral-400)" }}>
+              <input type="checkbox" checked={saveAsMenu} onChange={(e) => setSaveAsMenu(e.target.checked)} />
+              この内容を受付メニューにも追加する
+            </label>
+          )}
+        </div>
+
+        <input value={due} onChange={(e) => setDue(e.target.value)} placeholder="対応の目安（例：3日後）任意" className="vid-input" style={inputStyle} />
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="補足メモ（依頼主にも表示されます）任意"
+          rows={2}
+          className="vid-input"
+          style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
+        />
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
+          <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>請求額（依頼主に表示）</span>
+          <span style={{ fontSize: 18, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{total.toLocaleString("ja-JP")}</span>
+        </div>
+
+        {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={submit} disabled={saving || allItems.length === 0} style={{ ...smallBtn, height: 36, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
+            {saving ? "送信中…" : "見積もりを送る"}
+          </button>
+          <button onClick={onClose} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+            キャンセル
+          </button>
+        </div>
       </div>
     </div>
   );
 }
+
+const stepperBtn: React.CSSProperties = {
+  flex: "none",
+  width: 24,
+  height: 24,
+  display: "grid",
+  placeItems: "center",
+  cursor: "pointer",
+  fontSize: 14,
+  color: "var(--color-accent)",
+  background: "transparent",
+  border: "1px solid var(--color-divider)",
+  borderRadius: "var(--radius-sm)",
+};
 
 const inputStyle: React.CSSProperties = {
   height: 36,

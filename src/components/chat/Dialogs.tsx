@@ -9,7 +9,6 @@ import { computeRefund, type RefundResult } from "@/lib/refund";
 import type { MenuRow } from "@/lib/chat-types";
 import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
-import LoginPanel from "@/components/chat/LoginPanel";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 
@@ -106,69 +105,6 @@ export function ProgressPanel({ bundles, onClose, onCancel }: { bundles: Request
             })}
         </div>
       )}
-    </Centered>
-  );
-}
-
-// ---------- 支払いダイアログ ----------
-export function PayDialog({
-  price,
-  needsProfile,
-  hasGuestActivity,
-  onClose,
-  onConfirm,
-  confirming,
-}: {
-  price: number;
-  needsProfile: boolean;
-  hasGuestActivity: boolean;
-  onClose: () => void;
-  onConfirm: (profile?: { name: string; email: string; phone: string }) => void;
-  confirming: boolean;
-}) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const ready = !needsProfile || (name.trim() && email.trim());
-
-  return (
-    <Centered onBackdrop={onClose}>
-      <div style={dialogTitle}>{needsProfile ? "お支払いの前に" : "お支払い"}</div>
-      {needsProfile ? (
-        <>
-          <div style={{ fontSize: 14, opacity: 0.85, lineHeight: 1.6 }}>
-            お名前は書類の宛名、メールアドレスは領収書と完了報告の送信先に使います。この見積もりのお支払いに進むために一度だけご登録ください。
-          </div>
-          <LoginPanel hasGuestActivity={hasGuestActivity} />
-          <div>
-            <label style={{ display: "block", fontSize: 12, marginBottom: 5, color: "var(--color-neutral-500)" }}>お名前</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" className="vid-input" style={{ width: "100%", height: 36, padding: "6px 10px", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }} />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12, marginBottom: 5, color: "var(--color-neutral-500)" }}>メールアドレス</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="vid-input" style={{ width: "100%", height: 36, padding: "6px 10px", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }} />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12, marginBottom: 5, color: "var(--color-neutral-500)" }}>電話番号（任意）</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} className="vid-input" style={{ width: "100%", height: 36, padding: "6px 10px", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }} />
-          </div>
-        </>
-      ) : (
-        <div style={{ fontSize: 14, opacity: 0.85 }}>{yen(price)} を決済し、この見積もりで正式にご依頼します。</div>
-      )}
-      <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>
-        カード決済は準備中です。今は「決済して依頼する」を押すと即時に確定します（本番はStripe Connect導入後に置き換わります）。
-      </div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
-        <button onClick={onClose} style={ghostBtn}>閉じる</button>
-        <button
-          onClick={() => onConfirm(needsProfile ? { name, email, phone } : undefined)}
-          disabled={confirming || !ready}
-          style={{ ...accentBtn, opacity: confirming || !ready ? 0.6 : 1 }}
-        >
-          {confirming ? "処理中…" : needsProfile ? "登録してお支払いへ" : "決済して依頼する"}
-        </button>
-      </div>
     </Centered>
   );
 }

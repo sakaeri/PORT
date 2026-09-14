@@ -199,7 +199,6 @@ export function RequestCard({
   msg,
   bundle,
   refundPolicies,
-  onPay,
   onCancel,
   onSubmitRating,
   onSkipRating,
@@ -207,7 +206,6 @@ export function RequestCard({
   msg: MessageWithExtras;
   bundle: RequestBundle;
   refundPolicies: RefundPolicyRow[];
-  onPay: (id: string) => void;
   onCancel: (id: string) => void;
   onSubmitRating: (id: string, stars: number, comment: string) => void;
   onSkipRating: (id: string) => void;
@@ -261,9 +259,9 @@ export function RequestCard({
             </div>
           )}
           {isPending && (
-            <button onClick={() => onPay(r.id)} style={{ ...outlineBtn, marginTop: 10, width: "100%" }}>
-              決済して依頼する
-            </button>
+            <div style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-neutral-400)", padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+              受付からのご案内に沿ってお支払いください。入金確認後、対応を開始します。
+            </div>
           )}
           {!isPending && r.phase !== "declined" && (
             <span style={{ display: "inline-flex", marginTop: 10, fontSize: 11, padding: "3px 10px", borderRadius: 6, background: "var(--color-accent-800)", color: "var(--color-accent-100)", width: "fit-content" }}>

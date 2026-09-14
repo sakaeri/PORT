@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Star } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { PHASE_LABEL } from "@/lib/stage";
-import { startCaseRequest, declineCaseRequest, submitCaseReport } from "@/app/actions";
+import { confirmPayment, startCaseRequest, declineCaseRequest, submitCaseReport } from "@/app/actions";
 import type { RequestPhase } from "@/lib/supabase/types";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
 
@@ -64,6 +64,21 @@ export default function CaseDetail({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  async function handleConfirmPayment() {
+    if (busy) return;
+    if (!confirm("入金を確認しましたか？この操作で対応中に進みます。")) return;
+    setBusy(true);
+    setError("");
+    try {
+      await confirmPayment(request.id);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "操作に失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleStart() {
     if (busy) return;
     setBusy(true);
@@ -120,10 +135,15 @@ export default function CaseDetail({
 
         {request.phase === "quoted" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>依頼主の決済待ちです。</div>
-            <button onClick={handleDecline} disabled={busy} style={{ ...btn, alignSelf: "flex-start", color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
-              見積もりを取り下げる
-            </button>
+            <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金待ちです。チャットで送った決済案内の着金を確認したら押してください。</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={handleConfirmPayment} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
+                {busy ? "処理中…" : "入金を確認した"}
+              </button>
+              <button onClick={handleDecline} disabled={busy} style={{ ...btn, alignSelf: "flex-start", color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
+                見積もりを取り下げる
+              </button>
+            </div>
           </div>
         )}
 

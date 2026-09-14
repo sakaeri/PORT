@@ -242,54 +242,6 @@ export async function skipRating(requestId: string) {
   if (error) throw error;
 }
 
-// 決済・返金は customer 自身の RLS 権限では requests を更新できない設計（意図的）。
-// 実カード決済は Stripe Connect Standard 導入後、ここを PaymentIntent 作成 +
-// webhook 確定に置き換える。今は Stripe 未接続のため service-role 経由で即時確定する。
-export async function payRequest(requestId: string) {
-  const ctx = await requireContext();
-  const admin = createServiceRoleClient();
-
-  const { data: r, error } = await admin
-    .from("requests")
-    .select("*")
-    .eq("id", requestId)
-    .eq("customer_id", ctx.customerId)
-    .single();
-  if (error || !r) throw new Error("見積もりが見つかりません");
-  if (r.phase !== "quoted") throw new Error("この見積もりはすでに処理済みです");
-
-  const now = new Date().toISOString();
-  await admin
-    .from("requests")
-    .update({ phase: "preparing", accepted_at: now, pay_method: "card", pay_status: "paid", paid_at: now })
-    .eq("id", requestId);
-
-  const { data: thread } = await admin.from("threads").select("id").eq("id", ctx.threadId).single();
-  if (thread) {
-    await admin.from("messages").insert({
-      thread_id: thread.id,
-      sender_id: null,
-      sender_role: null,
-      kind: "notice",
-      request_id: requestId,
-      body: `${r.amount.toLocaleString("ja-JP")}円の決済が完了しました。進捗はカードでご確認いただけます`,
-    });
-  }
-
-  // 受付側の案件トーク（進捗ログ）にも記録する
-  const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
-  if (caseThread) {
-    await admin.from("messages").insert({
-      thread_id: caseThread.id,
-      sender_id: null,
-      sender_role: null,
-      kind: "notice",
-      body: `依頼主が決済しました（${r.amount.toLocaleString("ja-JP")}円）`,
-    });
-    await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
-  }
-}
-
 export async function cancelRequest(requestId: string) {
   const ctx = await requireContext();
   const admin = createServiceRoleClient();
