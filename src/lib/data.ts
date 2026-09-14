@@ -101,7 +101,7 @@ export async function getThreadMessages(threadId: string): Promise<MessageWithEx
       "*, message_attachments(*), requests(*, request_items(*), completion_reports(*), ratings(*))",
     )
     .eq("thread_id", threadId)
-    .is("hidden_at", null)
+    .is("deleted_at", null)
     .order("sent_at", { ascending: true });
   if (error || !data) return [];
   return (data as RawMessageRow[]).map(mapMessageRow);

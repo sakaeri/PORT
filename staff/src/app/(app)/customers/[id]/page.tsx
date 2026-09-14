@@ -42,6 +42,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       thread={thread ? { id: thread.id, archived: !!thread.archived_at } : null}
       initialMessages={initialMessages}
       role={ctx.role}
+      currentUserId={ctx.userId}
       isHq={ctx.isHq}
       convertedOrg={convertedOrg}
     />

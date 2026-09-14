@@ -448,25 +448,19 @@ export async function sendStaffMessage(threadId: string, text: string) {
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
 }
 
-export async function hideMessage(messageId: string) {
-  await requireContext();
-  const supabase = await createClient();
-  const { error } = await supabase.from("messages").update({ hidden_at: new Date().toISOString() }).eq("id", messageId);
-  if (error) throw error;
-}
-
-export async function unhideMessage(messageId: string) {
-  await requireContext();
-  const supabase = await createClient();
-  const { error } = await supabase.from("messages").update({ hidden_at: null }).eq("id", messageId);
-  if (error) throw error;
-}
-
+// 自分が送ったメッセージだけ削除できる（RLS の messages_sender_delete でも
+// 強制されるが、他人の分は0件更新になるだけで気付きにくいのでここで検知する）。
 export async function deleteMessage(messageId: string) {
-  await requireContext();
+  const ctx = await requireContext();
   const supabase = await createClient();
-  const { error } = await supabase.from("messages").delete().eq("id", messageId);
+  const { data, error } = await supabase
+    .from("messages")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", messageId)
+    .eq("sender_id", ctx.userId)
+    .select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error("自分が送ったメッセージのみ削除できます");
 }
 
 // アーカイブ・削除は依頼主一覧の見た目にも反映する（customers.active）。

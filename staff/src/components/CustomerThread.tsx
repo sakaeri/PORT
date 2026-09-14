@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, EyeSlash, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
-import { sendStaffMessage, hideMessage, unhideMessage, deleteMessage, convertCustomerToOrg } from "@/app/actions";
+import { sendStaffMessage, deleteMessage, convertCustomerToOrg } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
 export interface ThreadAttachment {
@@ -16,12 +16,13 @@ export interface ThreadAttachment {
 
 export interface ThreadMessage {
   id: string;
+  sender_id: string | null;
   sender_role: "owner" | "reception" | "creator" | "client" | null;
   kind: string;
   body: string | null;
   payload: unknown;
   sent_at: string;
-  hidden_at: string | null;
+  deleted_at: string | null;
   attachments: ThreadAttachment[];
 }
 
@@ -81,6 +82,7 @@ export default function CustomerThread({
   thread,
   initialMessages,
   role,
+  currentUserId,
   isHq,
   convertedOrg,
 }: {
@@ -88,6 +90,7 @@ export default function CustomerThread({
   thread: { id: string; archived: boolean } | null;
   initialMessages: Message[];
   role: "owner" | "reception";
+  currentUserId: string;
   isHq: boolean;
   convertedOrg: { displayName: string; slug: string | null } | null;
 }) {
@@ -104,7 +107,7 @@ export default function CustomerThread({
       await sendStaffMessage(thread.id, body);
       setMessages((m) => [
         ...m,
-        { id: `temp-${Date.now()}`, sender_role: role, kind: "text", body, payload: {}, sent_at: new Date().toISOString(), hidden_at: null, attachments: [] },
+        { id: `temp-${Date.now()}`, sender_id: currentUserId, sender_role: role, kind: "text", body, payload: {}, sent_at: new Date().toISOString(), deleted_at: null, attachments: [] },
       ]);
       setDraft("");
     } finally {
@@ -112,29 +115,13 @@ export default function CustomerThread({
     }
   }
 
-  async function toggleHide(m: Message) {
-    if (busy) return;
-    setBusy(true);
-    try {
-      if (m.hidden_at) {
-        await unhideMessage(m.id);
-        setMessages((rows) => rows.map((r) => (r.id === m.id ? { ...r, hidden_at: null } : r)));
-      } else {
-        await hideMessage(m.id);
-        setMessages((rows) => rows.map((r) => (r.id === m.id ? { ...r, hidden_at: new Date().toISOString() } : r)));
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleDeleteMessage(m: Message) {
     if (busy) return;
-    if (!confirm("このメッセージを完全に削除します。元に戻せません。よろしいですか？")) return;
+    if (!confirm("このメッセージを削除します。よろしいですか？")) return;
     setBusy(true);
     try {
       await deleteMessage(m.id);
-      setMessages((rows) => rows.filter((r) => r.id !== m.id));
+      setMessages((rows) => rows.map((r) => (r.id === m.id ? { ...r, deleted_at: new Date().toISOString() } : r)));
     } finally {
       setBusy(false);
     }
@@ -174,35 +161,41 @@ export default function CustomerThread({
         {!thread && <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>まだやり取りがありません。</div>}
         {messages.map((m) => {
           const isStaff = m.sender_role === "owner" || m.sender_role === "reception";
+          const isOwn = m.sender_id === currentUserId;
           return (
             <div key={m.id} style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: isStaff ? "flex-end" : "flex-start" }}>
-              <div
-                style={{
-                  maxWidth: "70%",
-                  padding: "9px 13px",
-                  borderRadius: "var(--radius-lg)",
-                  fontSize: 13.5,
-                  lineHeight: 1.5,
-                  whiteSpace: "pre-wrap",
-                  opacity: m.hidden_at ? 0.45 : 1,
-                  background: isStaff ? "var(--color-accent-900)" : "var(--color-surface)",
-                  border: isStaff ? "1px solid var(--color-accent-800)" : "1px solid var(--color-divider)",
-                }}
-              >
-                {summarize(m)}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>
-                  {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  {m.hidden_at ? "・非表示中" : ""}
-                </span>
-                <button onClick={() => toggleHide(m)} disabled={busy} aria-label={m.hidden_at ? "表示に戻す" : "非表示にする"} style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
-                  {m.hidden_at ? <Eye size={13} /> : <EyeSlash size={13} />}
-                </button>
-                <button onClick={() => handleDeleteMessage(m)} disabled={busy} aria-label="削除" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
-                  <Trash size={13} />
-                </button>
-              </div>
+              {m.deleted_at ? (
+                <div style={{ maxWidth: "70%", padding: "9px 13px", fontSize: 12.5, fontStyle: "italic", color: "var(--color-neutral-500)" }}>
+                  削除されました
+                </div>
+              ) : (
+                <div
+                  style={{
+                    maxWidth: "70%",
+                    padding: "9px 13px",
+                    borderRadius: "var(--radius-lg)",
+                    fontSize: 13.5,
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap",
+                    background: isStaff ? "var(--color-accent-900)" : "var(--color-surface)",
+                    border: isStaff ? "1px solid var(--color-accent-800)" : "1px solid var(--color-divider)",
+                  }}
+                >
+                  {summarize(m)}
+                </div>
+              )}
+              {!m.deleted_at && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>
+                    {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  {isOwn && (
+                    <button onClick={() => handleDeleteMessage(m)} disabled={busy} aria-label="削除" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
+                      <Trash size={13} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
