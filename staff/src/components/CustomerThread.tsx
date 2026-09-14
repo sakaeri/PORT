@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
 import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest } from "@/app/actions";
@@ -88,6 +88,7 @@ export default function CustomerThread({
   orgId,
   isHq,
   convertedOrg,
+  templates,
 }: {
   customer: { id: string; name: string; memberNo: string | null };
   thread: { id: string; archived: boolean } | null;
@@ -97,11 +98,13 @@ export default function CustomerThread({
   orgId: string;
   isHq: boolean;
   convertedOrg: { displayName: string; slug: string | null } | null;
+  templates: { id: string; label: string; note: string | null; fieldCount: number }[];
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -250,8 +253,51 @@ export default function CustomerThread({
         })}
       </div>
 
+      {thread && templates.length > 0 && showTemplates && (
+        <div style={{ flex: "none", margin: "0 20px", padding: 8, display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+          {templates.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => {
+                if (t.fieldCount > 0) {
+                  alert("項目付きのテンプレはまだトークから送れません（次のフェーズで対応します）");
+                  return;
+                }
+                setDraft(t.note ?? t.label);
+                setShowTemplates(false);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                padding: "7px 9px",
+                cursor: "pointer",
+                textAlign: "left",
+                fontSize: 12.5,
+                color: t.fieldCount > 0 ? "var(--color-neutral-500)" : "var(--color-text)",
+                background: "transparent",
+                border: "none",
+                borderRadius: "var(--radius-sm)",
+              }}
+            >
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
+              {t.fieldCount > 0 && <span style={{ flex: "none", fontSize: 10.5, color: "var(--color-neutral-600)" }}>項目付き・未対応</span>}
+            </button>
+          ))}
+        </div>
+      )}
       {thread && (
         <div style={{ flex: "none", display: "flex", gap: 8, padding: "14px 20px", borderTop: "1px solid var(--color-divider)" }}>
+          {templates.length > 0 && (
+            <button
+              onClick={() => setShowTemplates((v) => !v)}
+              aria-label="テンプレを選ぶ"
+              style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+            >
+              <ChatCircleText size={16} />
+            </button>
+          )}
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

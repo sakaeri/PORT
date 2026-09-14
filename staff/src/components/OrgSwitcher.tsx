@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash } from "@phosphor-icons/react";
+import { Plus, Trash, ArrowSquareOut } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { switchStaffOrg, createOrgForCurrentUser, removeMyOrgLink } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
@@ -152,7 +152,15 @@ function ManageOrgsDialog({ orgs, onClose, onRemoved }: { orgs: StaffOrgOption[]
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {rows.map((o) => (
             <div key={o.orgId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-              <div style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.displayName}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.displayName}</div>
+                <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>{o.slug ? `port.s-stylegolf.com/${o.slug}` : "URL未設定"}</div>
+              </div>
+              {o.slug && (
+                <a href={`https://port.s-stylegolf.com/${o.slug}`} target="_blank" rel="noreferrer" style={{ flex: "none", display: "flex", color: "var(--color-neutral-400)" }} aria-label="サイトを開く">
+                  <ArrowSquareOut size={14} />
+                </a>
+              )}
               <button
                 onClick={() => remove(o)}
                 disabled={removingId === o.orgId}

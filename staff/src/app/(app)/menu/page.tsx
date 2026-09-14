@@ -10,7 +10,7 @@ export default async function MenuSettingsPage() {
   const [{ data: org }, { data: menus }, { data: templates }, { data: policy }, { data: userData }] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, display_name, rep_name, address, tel, email")
+      .select("name, display_name, rep_name, address, tel, email, slug")
       .eq("id", ctx.orgId)
       .single(),
     supabase
@@ -43,6 +43,7 @@ export default async function MenuSettingsPage() {
       initialTemplates={(templates ?? []).map((t) => ({ ...t, intake_fields: (t.intake_fields ?? []).sort((a, b) => a.sort - b.sort) }))}
       initialRefundPolicy={policy ?? []}
       initialSolo={ctx.solo}
+      slug={org?.slug ?? null}
     />
   );
 }

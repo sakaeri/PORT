@@ -118,6 +118,7 @@ export default function MenuSettings({
   initialTemplates,
   initialRefundPolicy,
   initialSolo,
+  slug,
 }: {
   orgId: string;
   initialCompany: Company;
@@ -126,6 +127,7 @@ export default function MenuSettings({
   initialTemplates: IntakeForm[];
   initialRefundPolicy: RefundPolicyRow[];
   initialSolo: boolean;
+  slug: string | null;
 }) {
   const [tab, setTab] = useState<TabKey>("company");
 
@@ -161,7 +163,7 @@ export default function MenuSettings({
 
       {tab === "company" && (
         <>
-          <CompanyInfoCard initial={initialCompany} />
+          <CompanyInfoCard initial={initialCompany} slug={slug} />
           <StaffModeCard initialSolo={initialSolo} />
         </>
       )}
@@ -183,7 +185,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "login", label: "ログイン情報" },
 ];
 
-function CompanyInfoCard({ initial }: { initial: Company }) {
+function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | null }) {
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -212,6 +214,15 @@ function CompanyInfoCard({ initial }: { initial: Company }) {
     <div style={card}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>会社情報</div>
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>契約書の「甲」・依頼主への表示名・見積書と請求書に使います</div>
+      {slug && (
+        <div style={{ fontSize: 12, color: "var(--color-neutral-400)" }}>
+          依頼主用URL：
+          <a href={`https://port.s-stylegolf.com/${slug}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
+            port.s-stylegolf.com/{slug}
+          </a>
+          （ホームページ等に載せてご利用ください）
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="正式名称" value={form.name} onChange={(v) => set("name", v)} />
         <Field label="表示名（依頼主に見える）" value={form.display_name} onChange={(v) => set("display_name", v)} />

@@ -424,7 +424,7 @@ export interface Database {
       };
       my_staff_orgs: {
         Args: Record<string, never>;
-        Returns: { org_id: string; role: AppRole; display_name: string; is_primary: boolean }[];
+        Returns: { org_id: string; role: AppRole; display_name: string; is_primary: boolean; slug: string | null }[];
       };
       staff_context: {
         Args: Record<string, never>;

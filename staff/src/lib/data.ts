@@ -7,6 +7,7 @@ export interface StaffOrgOption {
   displayName: string;
   role: "owner" | "reception";
   isPrimary: boolean;
+  slug: string | null;
 }
 
 export interface StaffContext {
@@ -46,6 +47,6 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
     displayName: ctx.display_name ?? "スタッフ",
     solo: ctx.solo ?? false,
     isHq: ctx.is_hq ?? false,
-    orgs: (orgs ?? []).map((o) => ({ orgId: o.org_id, displayName: o.display_name, role: o.role as "owner" | "reception", isPrimary: o.is_primary })),
+    orgs: (orgs ?? []).map((o) => ({ orgId: o.org_id, displayName: o.display_name, role: o.role as "owner" | "reception", isPrimary: o.is_primary, slug: o.slug })),
   };
 });

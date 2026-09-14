@@ -26,6 +26,13 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     .eq("kind", "customer")
     .maybeSingle();
 
+  const { data: templateRows } = await supabase
+    .from("intake_forms")
+    .select("id, label, note, intake_fields(id)")
+    .eq("org_id", ctx.orgId)
+    .order("sort", { ascending: true });
+  const templates = (templateRows ?? []).map((t) => ({ id: t.id, label: t.label, note: t.note, fieldCount: (t.intake_fields ?? []).length }));
+
   let initialMessages: ThreadMessage[] = [];
   if (thread) {
     const { data } = await supabase
@@ -46,6 +53,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       orgId={ctx.orgId}
       isHq={ctx.isHq}
       convertedOrg={convertedOrg}
+      templates={templates}
     />
   );
 }
