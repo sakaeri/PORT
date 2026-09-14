@@ -85,6 +85,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
       .from("messages")
       .select("*, message_attachments(*), requests(*, request_items(*), completion_reports(*), ratings(*))")
       .eq("thread_id", ctx.threadId)
+      .is("deleted_at", null)
       .order("sent_at", { ascending: true });
     if (data) setMessages((data as RawMessageRow[]).map(mapMessageRow));
   }, [ctx.threadId, ctx.orgId]);

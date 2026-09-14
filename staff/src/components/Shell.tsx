@@ -20,6 +20,27 @@ const NAV = [
 export default function Shell({ ctx, children }: { ctx: StaffContext; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const supabase = createClient(ctx.orgId);
+    let cancelled = false;
+    async function refreshUnread() {
+      const { data } = await supabase.rpc("unread_customer_count");
+      if (!cancelled && typeof data === "number") setUnreadCount(data);
+    }
+    void refreshUnread();
+    const channel = supabase
+      .channel(`unread-${ctx.orgId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, refreshUnread)
+      .on("postgres_changes", { event: "*", schema: "public", table: "threads" }, refreshUnread)
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+    // pathname included so navigating away from a thread (which marks it read) re-checks the count
+  }, [ctx.orgId, pathname]);
   // Always start matching the server's render (dark) — the inline script in
   // layout.tsx already set the real data-vid-theme attribute on <html>
   // before hydration, so reading it here in the initializer would make the
@@ -94,6 +115,25 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
             >
               <Icon size={16} />
               {n.label}
+              {n.href === "/customers" && unreadCount > 0 && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    minWidth: 18,
+                    height: 18,
+                    padding: "0 5px",
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    color: "var(--color-bg)",
+                    background: "var(--color-accent-200)",
+                    borderRadius: 9,
+                  }}
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
           );
         })}

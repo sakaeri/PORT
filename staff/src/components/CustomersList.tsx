@@ -74,8 +74,12 @@ export default function CustomersList({ rows: initialRows, isHq }: { rows: Custo
           <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", opacity: c.active ? 1 : 0.55 }}>
             <Link href={`/customers/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {c.unread && <span aria-label="未読" style={{ flex: "none", width: 7, height: 7, borderRadius: "50%", background: "var(--color-accent-200)" }} />}
                 <div style={{ fontSize: 14, fontWeight: c.unread ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                {c.unread && (
+                  <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: "var(--radius-sm)", padding: "1.5px 6px" }}>
+                    未読
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.lastMessagePreview ?? "まだやり取りがありません"}</div>
             </Link>
