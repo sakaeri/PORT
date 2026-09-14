@@ -548,10 +548,41 @@ export async function createCaseRequest(
   if (msgError) throw msgError;
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", customerThreadId);
 
-  // 制作者とのやり取り用の案件トーク（今は担当者未定のまま作る）
-  await supabase.from("threads").insert({ org_id: ctx.orgId, kind: "case", request_id: request.id, customer_id: customerId, last_msg_at: new Date().toISOString() });
+  // 制作者とのやり取り・進捗ログ用の案件トーク（今は担当者未定のまま作る）
+  const { data: caseThread, error: caseThreadError } = await supabase
+    .from("threads")
+    .insert({ org_id: ctx.orgId, kind: "case", request_id: request.id, customer_id: customerId, last_msg_at: new Date().toISOString() })
+    .select("id")
+    .single();
+  if (caseThreadError || !caseThread) throw caseThreadError ?? new Error("案件トークの作成に失敗しました");
+
+  // sender_id=null（システム発）の行は messages_send の RLS (sender_id = auth.uid()) を
+  // 通らないため、通知メッセージだけは service-role で書く。
+  const admin = createServiceRoleClient();
+  await admin.from("messages").insert({
+    thread_id: caseThread.id,
+    sender_id: null,
+    sender_role: null,
+    kind: "notice",
+    body: `見積もりを送信しました（¥${Math.round(input.amount).toLocaleString("ja-JP")}）`,
+  });
 
   return request.id as string;
+}
+
+async function getCaseThreadId(supabase: Awaited<ReturnType<typeof createClient>>, requestId: string) {
+  const { data } = await supabase.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
+  return data?.id ?? null;
+}
+
+// sender_id=null（システム発）の行は messages_send の RLS (sender_id = auth.uid()) を
+// 通らないため service-role で書く。案件トークの検索自体は通常クライアントでよい。
+async function postCaseNotice(supabase: Awaited<ReturnType<typeof createClient>>, requestId: string, body: string) {
+  const caseThreadId = await getCaseThreadId(supabase, requestId);
+  if (!caseThreadId) return;
+  const admin = createServiceRoleClient();
+  await admin.from("messages").insert({ thread_id: caseThreadId, sender_id: null, sender_role: null, kind: "notice", body });
+  await admin.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", caseThreadId);
 }
 
 export async function startCaseRequest(requestId: string) {
@@ -566,6 +597,7 @@ export async function startCaseRequest(requestId: string) {
     .select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("着手できる状態ではありません");
+  await postCaseNotice(supabase, requestId, "着手しました");
 }
 
 export async function declineCaseRequest(requestId: string) {
@@ -580,6 +612,7 @@ export async function declineCaseRequest(requestId: string) {
     .select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("取り下げできる状態ではありません（すでに決済済みの可能性があります）");
+  await postCaseNotice(supabase, requestId, "見積もりを取り下げました");
 }
 
 export async function submitCaseReport(requestId: string, summary: string, noteToCustomer: string) {
@@ -604,4 +637,19 @@ export async function submitCaseReport(requestId: string, summary: string, noteT
 
   const { error: reqError } = await supabase.from("requests").update({ phase: "completed", completed_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
   if (reqError) throw reqError;
+  await postCaseNotice(supabase, requestId, "完了報告を送信しました");
+}
+
+// 案件トーク（スタッフ内メモ・進捗ログ）への書き込み。削除は deleteMessage を共用する
+// （自分が送ったメッセージだけ削除できる、というチェックはメッセージの種類によらない）。
+export async function sendCaseMessage(caseThreadId: string, text: string) {
+  const ctx = await requireContext();
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("messages")
+    .insert({ thread_id: caseThreadId, sender_id: ctx.userId, sender_role: ctx.role, kind: "text", body: trimmed });
+  if (error) throw error;
+  await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", caseThreadId);
 }

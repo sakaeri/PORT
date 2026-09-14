@@ -277,6 +277,19 @@ export async function payRequest(requestId: string) {
       body: `${r.amount.toLocaleString("ja-JP")}円の決済が完了しました。進捗はカードでご確認いただけます`,
     });
   }
+
+  // 受付側の案件トーク（進捗ログ）にも記録する
+  const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
+  if (caseThread) {
+    await admin.from("messages").insert({
+      thread_id: caseThread.id,
+      sender_id: null,
+      sender_role: null,
+      kind: "notice",
+      body: `依頼主が決済しました（${r.amount.toLocaleString("ja-JP")}円）`,
+    });
+    await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
+  }
 }
 
 export async function cancelRequest(requestId: string) {
@@ -304,6 +317,17 @@ export async function cancelRequest(requestId: string) {
     .update({ phase: nextPhase, cancelled_at: now, refund_pct: refund.pct, refunded_amount: refund.amount })
     .eq("id", requestId);
 
+  const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
+  if (caseThread) {
+    await admin.from("messages").insert({
+      thread_id: caseThread.id,
+      sender_id: null,
+      sender_role: null,
+      kind: "notice",
+      body: nextPhase === "declined" ? "依頼主が見積もりをキャンセルしました" : `依頼主が依頼をキャンセルしました（返金 ${refund.amount.toLocaleString("ja-JP")}円）`,
+    });
+    await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
+  }
 }
 
 // マイページの「自社でも」→「3ヶ月無料で始める」用。まだ自動返信メールの仕組みは

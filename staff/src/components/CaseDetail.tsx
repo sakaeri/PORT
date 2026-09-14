@@ -8,6 +8,7 @@ import { headingWeight } from "@/lib/style";
 import { PHASE_LABEL } from "@/lib/stage";
 import { startCaseRequest, declineCaseRequest, submitCaseReport } from "@/app/actions";
 import type { RequestPhase } from "@/lib/supabase/types";
+import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
 
 const card: React.CSSProperties = {
   padding: 16,
@@ -45,11 +46,19 @@ export default function CaseDetail({
   customer,
   report,
   rating,
+  caseThread,
+  caseMessages,
+  orgId,
+  currentUserId,
 }: {
   request: { id: string; title: string; note: string | null; amount: number; phase: RequestPhase; createdAt: string };
   customer: { id: string; name: string } | null;
   report: { summary: string; noteToCustomer: string | null } | null;
   rating: { stars: number | null; comment: string | null; skipped: boolean } | null;
+  caseThread: { id: string } | null;
+  caseMessages: CaseMessage[];
+  orgId: string;
+  currentUserId: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -146,6 +155,12 @@ export default function CaseDetail({
           </div>
         )}
       </div>
+
+      {caseThread && (
+        <div style={card}>
+          <CaseThreadChat threadId={caseThread.id} orgId={orgId} currentUserId={currentUserId} initialMessages={caseMessages} />
+        </div>
+      )}
     </div>
   );
 }
