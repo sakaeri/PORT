@@ -13,6 +13,7 @@ interface CustomerRow {
   creatorName: string | null;
   convertedOrg: { displayName: string; slug: string | null } | null;
   thread: { id: string; archived: boolean } | null;
+  lastMessagePreview: string | null;
 }
 
 const smallBtn: React.CSSProperties = {
@@ -72,7 +73,7 @@ export default function CustomersList({ rows: initialRows, isHq }: { rows: Custo
           <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", opacity: c.active ? 1 : 0.55 }}>
             <Link href={`/customers/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
               <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
-              <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{c.memberNo ?? "—"}</div>
+              <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.lastMessagePreview ?? "まだやり取りがありません"}</div>
             </Link>
             {!isHq && (
               <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>{c.creatorName ? `担当: ${c.creatorName}` : "未割り当て"}</div>

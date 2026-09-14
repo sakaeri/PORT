@@ -332,7 +332,10 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["messages"]["Row"]> & { thread_id: string; kind: MessageKind };
         Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
-        Relationships: [{ foreignKeyName: "messages_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "requests"; referencedColumns: ["id"] }];
+        Relationships: [
+          { foreignKeyName: "messages_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "requests"; referencedColumns: ["id"] },
+          { foreignKeyName: "messages_thread_id_fkey"; columns: ["thread_id"]; isOneToOne: false; referencedRelation: "threads"; referencedColumns: ["id"] },
+        ];
       };
       message_attachments: {
         Row: {
