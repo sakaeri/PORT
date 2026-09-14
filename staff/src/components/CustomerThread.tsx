@@ -9,12 +9,20 @@ import { createClient } from "@/lib/supabase/client";
 import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
+import { PHASE_LABEL } from "@/lib/stage";
+import type { RequestPhase } from "@/lib/supabase/types";
 
 export interface ThreadAttachment {
   id: string;
   file_name: string;
   mime: string | null;
   bytes: number | null;
+}
+
+export interface ThreadReport {
+  summary: string;
+  details: { label: string; value: string }[];
+  noteToCustomer: string | null;
 }
 
 export interface ThreadMessage {
@@ -27,6 +35,9 @@ export interface ThreadMessage {
   sent_at: string;
   deleted_at: string | null;
   attachments: ThreadAttachment[];
+  requestPhase?: RequestPhase | null;
+  requestAmount?: number | null;
+  report?: ThreadReport | null;
 }
 
 type Message = ThreadMessage;
@@ -51,6 +62,32 @@ const card: React.CSSProperties = {
   flexDirection: "column",
   gap: 12,
 };
+
+function TemplateRow({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+        padding: "7px 9px",
+        cursor: "pointer",
+        textAlign: "left",
+        fontSize: 12.5,
+        color: "var(--color-text)",
+        background: "transparent",
+        border: "none",
+        borderRadius: "var(--radius-sm)",
+      }}
+    >
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      <PaperPlaneTilt size={12} color="var(--color-neutral-500)" style={{ flex: "none" }} />
+    </button>
+  );
+}
 
 function summarize(m: Message): string {
   const p = m.payload as { title?: string; menuLabel?: string; total?: number; summary?: string; formLabel?: string };
@@ -78,6 +115,52 @@ function summarize(m: Message): string {
     default:
       return m.body ?? `［${m.kind}］`;
   }
+}
+
+const PHASE_BADGE_COLOR: Partial<Record<RequestPhase, { color: string; border: string }>> = {
+  quoted: { color: "var(--color-neutral-400)", border: "var(--color-divider)" },
+  preparing: { color: "var(--color-accent-300)", border: "var(--color-accent-700)" },
+  started: { color: "var(--color-accent-100)", border: "var(--color-accent-700)" },
+  approved: { color: "var(--color-accent-100)", border: "var(--color-accent-700)" },
+  completed: { color: "var(--color-accent)", border: "var(--color-accent)" },
+  cancelled: { color: "var(--color-neutral-400)", border: "var(--color-divider)" },
+  declined: { color: "var(--color-neutral-400)", border: "var(--color-divider)" },
+};
+
+function QuoteBubble({ msg }: { msg: Message }) {
+  const p = msg.payload as { title?: string; note?: string; due?: string };
+  const phase = msg.requestPhase;
+  const badge = phase ? (PHASE_BADGE_COLOR[phase] ?? PHASE_BADGE_COLOR.quoted) : null;
+
+  return (
+    <div style={{ width: "min(280px, 100%)", padding: "11px 13px", borderRadius: "var(--radius-lg)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent-800)", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--color-accent-200)" }}>見積もり</span>
+        {phase && badge && (
+          <span style={{ marginLeft: "auto", flex: "none", fontSize: 10, padding: "2px 8px", borderRadius: 6, border: `1px solid ${badge.border}`, color: badge.color, whiteSpace: "nowrap" }}>
+            {PHASE_LABEL[phase]}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: headingWeight, lineHeight: 1.3 }}>{p.title}</div>
+      {p.note && <div style={{ fontSize: 12, opacity: 0.85 }}>{p.note}</div>}
+      {msg.requestAmount != null && <div style={{ fontSize: 17, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{msg.requestAmount.toLocaleString("ja-JP")}</div>}
+      {p.due && <div style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>対応の目安：{p.due}</div>}
+
+      {phase === "completed" && msg.report && (
+        <div style={{ borderTop: "1px solid var(--color-accent-800)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ fontSize: 10.5, color: "var(--color-accent-200)" }}>完了報告</div>
+          <div style={{ fontSize: 12.5 }}>{msg.report.summary}</div>
+          {msg.report.details.map((d, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, fontSize: 12 }}>
+              <span style={{ width: 60, flex: "none", color: "var(--color-neutral-400)" }}>{d.label}</span>
+              <span style={{ minWidth: 0, flex: 1 }}>{d.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function CustomerThread({
@@ -126,10 +209,24 @@ export default function CustomerThread({
     const supabase = createClient(orgId);
     const { data } = await supabase
       .from("messages")
-      .select("*, message_attachments(*)")
+      .select("*, message_attachments(*), requests(phase, amount, completion_reports(summary, details, note_to_customer))")
       .eq("thread_id", thread.id)
       .order("sent_at", { ascending: true });
-    if (data) setMessages(data.map((m) => ({ ...m, attachments: m.message_attachments ?? [] })));
+    if (data) {
+      setMessages(
+        data.map((m) => {
+          const req = Array.isArray(m.requests) ? m.requests[0] : m.requests;
+          const reportRaw = req ? (Array.isArray(req.completion_reports) ? req.completion_reports[0] : req.completion_reports) : null;
+          return {
+            ...m,
+            attachments: m.message_attachments ?? [],
+            requestPhase: req?.phase ?? null,
+            requestAmount: req?.amount ?? null,
+            report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [], noteToCustomer: reportRaw.note_to_customer } : null,
+          };
+        }),
+      );
+    }
     // 開いている間に届いた分もその場で既読にする
     void markThreadRead(thread.id);
   }, [thread, orgId]);
@@ -229,6 +326,8 @@ export default function CustomerThread({
                 <div style={{ maxWidth: "70%", padding: "9px 13px", fontSize: 12.5, fontStyle: "italic", color: "var(--color-neutral-500)" }}>
                   削除されました
                 </div>
+              ) : m.kind === "quote" ? (
+                <QuoteBubble msg={m} />
               ) : (
                 <div
                   style={{
@@ -263,45 +362,49 @@ export default function CustomerThread({
       </div>
 
       {thread && templates.length > 0 && showTemplates && (
-        <div style={{ flex: "none", margin: "0 20px", padding: 8, display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
-          {templates.map((t) => (
-            <button
-              key={t.id}
-              disabled={busy}
-              onClick={async () => {
-                if (t.fieldCount > 0) {
-                  if (!thread) return;
-                  setBusy(true);
-                  try {
-                    await sendTemplateMessage(thread.id, t.id);
-                    setShowTemplates(false);
-                  } finally {
-                    setBusy(false);
-                  }
-                  return;
-                }
-                setDraft(t.note ?? t.label);
-                setShowTemplates(false);
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-                padding: "7px 9px",
-                cursor: "pointer",
-                textAlign: "left",
-                fontSize: 12.5,
-                color: "var(--color-text)",
-                background: "transparent",
-                border: "none",
-                borderRadius: "var(--radius-sm)",
-              }}
-            >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
-              {t.fieldCount > 0 && <span style={{ flex: "none", fontSize: 10.5, color: "var(--color-neutral-500)" }}>項目付き（{t.fieldCount}）</span>}
-            </button>
-          ))}
+        <div style={{ flex: "none", margin: "0 20px", padding: 8, display: "flex", flexDirection: "column", gap: 10, maxHeight: 240, overflowY: "auto", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+          {templates.some((t) => t.fieldCount > 0) && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.05em", color: "var(--color-neutral-500)", padding: "0 9px" }}>入力してもらう</div>
+              {templates
+                .filter((t) => t.fieldCount > 0)
+                .map((t) => (
+                  <TemplateRow
+                    key={t.id}
+                    label={`${t.label}（${t.fieldCount}項目）`}
+                    disabled={busy}
+                    onClick={async () => {
+                      if (!thread) return;
+                      setBusy(true);
+                      try {
+                        await sendTemplateMessage(thread.id, t.id);
+                        setShowTemplates(false);
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  />
+                ))}
+            </div>
+          )}
+          {templates.some((t) => t.fieldCount === 0) && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.05em", color: "var(--color-neutral-500)", padding: "0 9px" }}>送るだけ</div>
+              {templates
+                .filter((t) => t.fieldCount === 0)
+                .map((t) => (
+                  <TemplateRow
+                    key={t.id}
+                    label={t.label}
+                    disabled={busy}
+                    onClick={() => {
+                      setDraft(t.note ?? t.label);
+                      setShowTemplates(false);
+                    }}
+                  />
+                ))}
+            </div>
+          )}
         </div>
       )}
       {thread && (

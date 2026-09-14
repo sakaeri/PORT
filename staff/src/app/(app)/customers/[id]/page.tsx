@@ -54,10 +54,20 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   if (thread) {
     const { data } = await supabase
       .from("messages")
-      .select("*, message_attachments(*)")
+      .select("*, message_attachments(*), requests(phase, amount, completion_reports(summary, details, note_to_customer))")
       .eq("thread_id", thread.id)
       .order("sent_at", { ascending: true });
-    initialMessages = (data ?? []).map((m) => ({ ...m, attachments: m.message_attachments ?? [] }));
+    initialMessages = (data ?? []).map((m) => {
+      const req = Array.isArray(m.requests) ? m.requests[0] : m.requests;
+      const reportRaw = req ? (Array.isArray(req.completion_reports) ? req.completion_reports[0] : req.completion_reports) : null;
+      return {
+        ...m,
+        attachments: m.message_attachments ?? [],
+        requestPhase: req?.phase ?? null,
+        requestAmount: req?.amount ?? null,
+        report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [], noteToCustomer: reportRaw.note_to_customer } : null,
+      };
+    });
   }
 
   return (
