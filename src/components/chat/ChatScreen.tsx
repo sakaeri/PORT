@@ -98,7 +98,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
       .on("postgres_changes", { event: "*", schema: "public", table: "requests", filter: `customer_id=eq.${ctx.customerId}` }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "completion_reports" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "ratings", filter: `customer_id=eq.${ctx.customerId}` }, refresh)
-      .subscribe((status, err) => console.log("[realtime:client]", status, err ?? ""));
+      .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
