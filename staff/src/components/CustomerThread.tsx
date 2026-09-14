@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
-import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg } from "@/app/actions";
+import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
 export interface ThreadAttachment {
@@ -194,6 +195,12 @@ export default function CustomerThread({
         </div>
       )}
 
+      {!isHq && thread && (
+        <div style={{ padding: "14px 20px 0" }}>
+          <CreateCaseSection threadId={thread.id} customerId={customer.id} />
+        </div>
+      )}
+
       <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
         {!thread && <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>まだやり取りがありません。</div>}
         {messages.map((m) => {
@@ -275,7 +282,7 @@ export default function CustomerThread({
       {thread && (
         <div style={{ flex: "none", padding: "0 20px 12px", fontSize: 10.5, color: "var(--color-neutral-600)", display: "flex", alignItems: "center", gap: 5 }}>
           <Paperclip size={11} />
-          ファイルの添付・見積もり等の送信は次のフェーズで対応します。
+          ファイルの添付は次のフェーズで対応します。
         </div>
       )}
     </div>
@@ -354,3 +361,82 @@ function ConvertSection({ customerId, customerName }: { customerId: string; cust
     </div>
   );
 }
+
+function CreateCaseSection({ threadId, customerId }: { threadId: string; customerId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const [due, setDue] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit() {
+    if (saving) return;
+    setError("");
+    setSaving(true);
+    try {
+      const requestId = await createCaseRequest(threadId, customerId, { title, note, amount: Number(amount), due });
+      setOpen(false);
+      setTitle("");
+      setAmount("");
+      setDue("");
+      setNote("");
+      router.push(`/cases/${requestId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "作成できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} style={smallBtn}>
+        案件を作成（見積もりを送る）
+      </button>
+    );
+  }
+
+  return (
+    <div style={card}>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 14 }}>案件を作成</div>
+      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+        トークにお見積もりカードが届き、依頼主が決済すると案件が着手待ちになります。
+      </div>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="件名" className="vid-input" style={inputStyle} />
+      <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min={0} placeholder="金額（税込・円）" className="vid-input" style={inputStyle} />
+      <input value={due} onChange={(e) => setDue(e.target.value)} placeholder="対応の目安（例：3日後）任意" className="vid-input" style={inputStyle} />
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="補足メモ（依頼主にも表示されます）任意"
+        rows={2}
+        className="vid-input"
+        style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
+      />
+      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={submit} disabled={saving || !title.trim() || !amount} style={{ ...smallBtn, height: 36, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
+          {saving ? "送信中…" : "見積もりを送る"}
+        </button>
+        <button onClick={() => setOpen(false)} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+          キャンセル
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  height: 36,
+  padding: "0 10px",
+  font: "inherit",
+  fontSize: 13,
+  color: "var(--color-text)",
+  background: "var(--color-bg)",
+  border: "1px solid var(--color-divider)",
+  borderRadius: "var(--radius-md)",
+  outline: "none",
+};

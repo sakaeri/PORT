@@ -504,3 +504,104 @@ export async function deleteCustomer(customerId: string) {
   const { error } = await supabase.from("customers").delete().eq("id", customerId).eq("org_id", ctx.orgId);
   if (error) throw error;
 }
+
+// ============================================================
+// 案件（見積もり〜完了報告）。制作者への割り当ては次のフェーズで対応する
+// ため、今は受付が代わりに着手・完了報告まで進める。
+// ============================================================
+
+export async function createCaseRequest(
+  customerThreadId: string,
+  customerId: string,
+  input: { title: string; note: string; amount: number; due: string },
+) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const title = input.title.trim();
+  if (!title) throw new Error("件名を入力してください");
+  if (!Number.isFinite(input.amount) || input.amount < 0) throw new Error("金額が正しくありません");
+
+  const { data: request, error: reqError } = await supabase
+    .from("requests")
+    .insert({
+      org_id: ctx.orgId,
+      customer_id: customerId,
+      title,
+      note: input.note.trim() || null,
+      amount: Math.round(input.amount),
+      phase: "quoted",
+      quoted_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (reqError || !request) throw reqError ?? new Error("案件の作成に失敗しました");
+
+  const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: input.due.trim() || undefined };
+  const { error: msgError } = await supabase.from("messages").insert({
+    thread_id: customerThreadId,
+    sender_id: ctx.userId,
+    sender_role: ctx.role,
+    kind: "quote",
+    request_id: request.id,
+    payload,
+  });
+  if (msgError) throw msgError;
+  await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", customerThreadId);
+
+  // 制作者とのやり取り用の案件トーク（今は担当者未定のまま作る）
+  await supabase.from("threads").insert({ org_id: ctx.orgId, kind: "case", request_id: request.id, customer_id: customerId, last_msg_at: new Date().toISOString() });
+
+  return request.id as string;
+}
+
+export async function startCaseRequest(requestId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("requests")
+    .update({ phase: "started", started_at: new Date().toISOString() })
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId)
+    .eq("phase", "preparing")
+    .select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("着手できる状態ではありません");
+}
+
+export async function declineCaseRequest(requestId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("requests")
+    .update({ phase: "declined" })
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId)
+    .eq("phase", "quoted")
+    .select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("取り下げできる状態ではありません（すでに決済済みの可能性があります）");
+}
+
+export async function submitCaseReport(requestId: string, summary: string, noteToCustomer: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const trimmed = summary.trim();
+  if (!trimmed) throw new Error("完了報告の内容を入力してください");
+
+  const { data: request } = await supabase.from("requests").select("id, phase").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
+  if (!request) throw new Error("案件が見つかりません");
+  if (request.phase !== "started") throw new Error("着手中の案件のみ完了報告できます");
+
+  const now = new Date().toISOString();
+  const { error: reportError } = await supabase.from("completion_reports").insert({
+    request_id: requestId,
+    summary: trimmed,
+    note_to_customer: noteToCustomer.trim() || null,
+    submitted_at: now,
+    sent_at: now,
+  });
+  if (reportError) throw reportError;
+
+  const { error: reqError } = await supabase.from("requests").update({ phase: "completed", completed_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
+  if (reqError) throw reqError;
+}

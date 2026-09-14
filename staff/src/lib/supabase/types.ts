@@ -281,9 +281,9 @@ export interface Database {
           cancelled_at: string | null;
           created_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]>;
+        Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]> & { customer_id: string; title: string };
         Update: Partial<Database["public"]["Tables"]["requests"]["Row"]>;
-        Relationships: [];
+        Relationships: [{ foreignKeyName: "requests_customer_id_fkey"; columns: ["customer_id"]; isOneToOne: false; referencedRelation: "customers"; referencedColumns: ["id"] }];
       };
       request_items: {
         Row: {
