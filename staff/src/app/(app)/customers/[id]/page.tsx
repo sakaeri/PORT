@@ -33,6 +33,13 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     .order("sort", { ascending: true });
   const templates = (templateRows ?? []).map((t) => ({ id: t.id, label: t.label, note: t.note, fieldCount: (t.intake_fields ?? []).length }));
 
+  const { data: menuRows } = await supabase
+    .from("menus")
+    .select("id, label, note, price")
+    .eq("org_id", ctx.orgId)
+    .order("sort", { ascending: true });
+  const menus = (menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price }));
+
   let initialMessages: ThreadMessage[] = [];
   if (thread) {
     const { data } = await supabase
@@ -54,6 +61,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       isHq={ctx.isHq}
       convertedOrg={convertedOrg}
       templates={templates}
+      menus={menus}
     />
   );
 }

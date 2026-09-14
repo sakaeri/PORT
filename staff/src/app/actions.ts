@@ -513,13 +513,23 @@ export async function deleteCustomer(customerId: string) {
 export async function createCaseRequest(
   customerThreadId: string,
   customerId: string,
-  input: { title: string; note: string; amount: number; due: string },
+  input: { title: string; note: string; amount: number; due: string; saveAsMenu?: boolean },
 ) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const title = input.title.trim();
   if (!title) throw new Error("件名を入力してください");
   if (!Number.isFinite(input.amount) || input.amount < 0) throw new Error("金額が正しくありません");
+
+  if (input.saveAsMenu) {
+    const { error: menuError } = await supabase.from("menus").insert({
+      org_id: ctx.orgId,
+      label: title,
+      note: input.note.trim() || null,
+      price: Math.round(input.amount),
+    });
+    if (menuError) throw menuError;
+  }
 
   const { data: request, error: reqError } = await supabase
     .from("requests")

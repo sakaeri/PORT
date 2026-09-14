@@ -89,6 +89,7 @@ export default function CustomerThread({
   isHq,
   convertedOrg,
   templates,
+  menus,
 }: {
   customer: { id: string; name: string; memberNo: string | null };
   thread: { id: string; archived: boolean } | null;
@@ -99,6 +100,7 @@ export default function CustomerThread({
   isHq: boolean;
   convertedOrg: { displayName: string; slug: string | null } | null;
   templates: { id: string; label: string; note: string | null; fieldCount: number }[];
+  menus: { id: string; label: string; note: string | null; price: number }[];
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -205,7 +207,7 @@ export default function CustomerThread({
 
       {!isHq && thread && (
         <div style={{ padding: "14px 20px 0" }}>
-          <CreateCaseSection threadId={thread.id} customerId={customer.id} />
+          <CreateCaseSection threadId={thread.id} customerId={customer.id} menus={menus} />
         </div>
       )}
 
@@ -421,27 +423,50 @@ function ConvertSection({ customerId, customerName }: { customerId: string; cust
   );
 }
 
-function CreateCaseSection({ threadId, customerId }: { threadId: string; customerId: string }) {
+function CreateCaseSection({
+  threadId,
+  customerId,
+  menus,
+}: {
+  threadId: string;
+  customerId: string;
+  menus: { id: string; label: string; note: string | null; price: number }[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [menuId, setMenuId] = useState("");
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [due, setDue] = useState("");
   const [note, setNote] = useState("");
+  const [saveAsMenu, setSaveAsMenu] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  function pickMenu(id: string) {
+    setMenuId(id);
+    const menu = menus.find((m) => m.id === id);
+    if (menu) {
+      setTitle(menu.label);
+      setAmount(String(menu.price));
+      setNote(menu.note ?? "");
+      setSaveAsMenu(false);
+    }
+  }
 
   async function submit() {
     if (saving) return;
     setError("");
     setSaving(true);
     try {
-      const requestId = await createCaseRequest(threadId, customerId, { title, note, amount: Number(amount), due });
+      const requestId = await createCaseRequest(threadId, customerId, { title, note, amount: Number(amount), due, saveAsMenu: !menuId && saveAsMenu });
       setOpen(false);
+      setMenuId("");
       setTitle("");
       setAmount("");
       setDue("");
       setNote("");
+      setSaveAsMenu(false);
       router.push(`/cases/${requestId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "作成できませんでした");
@@ -464,6 +489,16 @@ function CreateCaseSection({ threadId, customerId }: { threadId: string; custome
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
         トークにお見積もりカードが届き、依頼主が決済すると案件が着手待ちになります。
       </div>
+      {menus.length > 0 && (
+        <select value={menuId} onChange={(e) => pickMenu(e.target.value)} className="vid-input" style={inputStyle}>
+          <option value="">受付メニューから選ぶ（任意）</option>
+          {menus.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}（¥{m.price.toLocaleString("ja-JP")}）
+            </option>
+          ))}
+        </select>
+      )}
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="件名" className="vid-input" style={inputStyle} />
       <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min={0} placeholder="金額（税込・円）" className="vid-input" style={inputStyle} />
       <input value={due} onChange={(e) => setDue(e.target.value)} placeholder="対応の目安（例：3日後）任意" className="vid-input" style={inputStyle} />
@@ -475,6 +510,12 @@ function CreateCaseSection({ threadId, customerId }: { threadId: string; custome
         className="vid-input"
         style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
       />
+      {!menuId && (
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-400)" }}>
+          <input type="checkbox" checked={saveAsMenu} onChange={(e) => setSaveAsMenu(e.target.checked)} />
+          この内容を受付メニューにも追加する
+        </label>
+      )}
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={submit} disabled={saving || !title.trim() || !amount} style={{ ...smallBtn, height: 36, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
