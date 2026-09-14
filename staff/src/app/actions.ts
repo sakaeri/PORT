@@ -493,12 +493,12 @@ export async function unarchiveThread(threadId: string) {
   await setCustomerActiveForThread(threadId, true);
 }
 
-// トークを丸ごと削除（メッセージ・添付も on delete cascade で連動削除）。
-// 依頼主データ自体は履歴として残すが、一覧からは外す。
-export async function deleteThread(threadId: string) {
-  await requireContext();
-  await setCustomerActiveForThread(threadId, false);
+// 依頼主を丸ごと完全削除する（一覧の「削除」用）。トーク・メッセージ・
+// 添付・案件・評価・作業メモ・紹介record も customers への on delete
+// cascade で連動して消える。アーカイブと違い元に戻せない。
+export async function deleteCustomer(customerId: string) {
+  const ctx = await requireContext();
   const supabase = await createClient();
-  const { error } = await supabase.from("threads").delete().eq("id", threadId);
+  const { error } = await supabase.from("customers").delete().eq("id", customerId).eq("org_id", ctx.orgId);
   if (error) throw error;
 }

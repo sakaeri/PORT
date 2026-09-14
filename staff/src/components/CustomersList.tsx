@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowSquareOut, Buildings, Archive, ArrowCounterClockwise, Trash } from "@phosphor-icons/react";
-import { archiveThread, unarchiveThread, deleteThread } from "@/app/actions";
+import { archiveThread, unarchiveThread, deleteCustomer } from "@/app/actions";
 
 interface CustomerRow {
   id: string;
@@ -29,10 +29,10 @@ const smallBtn: React.CSSProperties = {
 
 export default function CustomersList({ rows: initialRows, isHq }: { rows: CustomerRow[]; isHq: boolean }) {
   const [rows, setRows] = useState(initialRows);
-  const [showInactive, setShowInactive] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const visible = rows.filter((c) => c.active || showInactive);
-  const inactiveCount = rows.filter((c) => !c.active).length;
+  const visible = rows.filter((c) => c.active || showArchived);
+  const archivedCount = rows.filter((c) => !c.active).length;
 
   async function toggleArchive(c: CustomerRow) {
     if (!c.thread || busyId) return;
@@ -48,12 +48,12 @@ export default function CustomersList({ rows: initialRows, isHq }: { rows: Custo
   }
 
   async function handleDelete(c: CustomerRow) {
-    if (!c.thread || busyId) return;
-    if (!confirm(`「${c.name}」とのトーク履歴を完全に削除します。元に戻せません。よろしいですか？`)) return;
+    if (busyId) return;
+    if (!confirm(`「${c.name}」を完全に削除します。トーク・案件・評価など全ての履歴が元に戻せなくなります。よろしいですか？`)) return;
     setBusyId(c.id);
     try {
-      await deleteThread(c.thread.id);
-      setRows((r) => r.map((row) => (row.id === c.id ? { ...row, active: false, thread: null } : row)));
+      await deleteCustomer(c.id);
+      setRows((r) => r.filter((row) => row.id !== c.id));
     } finally {
       setBusyId(null);
     }
@@ -61,10 +61,10 @@ export default function CustomersList({ rows: initialRows, isHq }: { rows: Custo
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {inactiveCount > 0 && (
+      {archivedCount > 0 && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
-          <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
-          非表示・削除済みも表示（{inactiveCount}件）
+          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+          アーカイブ済みも表示（{archivedCount}件）
         </label>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -89,15 +89,13 @@ export default function CustomersList({ rows: initialRows, isHq }: { rows: Custo
               </div>
             )}
             {c.thread && (
-              <>
-                <button onClick={() => toggleArchive(c)} disabled={busyId === c.id} aria-label={c.thread.archived ? "一覧に戻す" : "アーカイブ"} style={smallBtn}>
-                  {c.thread.archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
-                </button>
-                <button onClick={() => handleDelete(c)} disabled={busyId === c.id} aria-label="トークを削除" style={{ ...smallBtn, color: "var(--color-accent-200)" }}>
-                  <Trash size={13} />
-                </button>
-              </>
+              <button onClick={() => toggleArchive(c)} disabled={busyId === c.id} aria-label={c.thread.archived ? "一覧に戻す" : "アーカイブ"} style={smallBtn}>
+                {c.thread.archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
+              </button>
             )}
+            <button onClick={() => handleDelete(c)} disabled={busyId === c.id} aria-label="削除" style={{ ...smallBtn, color: "var(--color-accent-200)" }}>
+              <Trash size={13} />
+            </button>
           </div>
         ))}
       </div>
