@@ -248,6 +248,7 @@ export interface Database {
           request_id: string | null;
           sent_at: string;
           edited_at: string | null;
+          hidden_at: string | null;
         };
         Insert: Partial<Database["public"]["Tables"]["messages"]["Row"]> & { thread_id: string; kind: MessageKind };
         Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;

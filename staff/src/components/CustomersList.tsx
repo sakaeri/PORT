@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ArrowSquareOut, Buildings, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { convertCustomerToOrg } from "@/app/actions";
@@ -56,10 +57,10 @@ export default function CustomersList({ rows: initialRows, isHq }: { rows: Custo
                   {open ? <CaretDown size={13} /> : <CaretRight size={13} />}
                 </button>
               )}
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <Link href={`/customers/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
                 <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
                 <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{c.memberNo ?? "—"}</div>
-              </div>
+              </Link>
               {!isHq && (
                 <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>
                   {c.creatorName ? `担当: ${c.creatorName}` : "未割り当て"}

@@ -1,0 +1,45 @@
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getStaffContext } from "@/lib/data";
+import CustomerThread, { type ThreadMessage } from "@/components/CustomerThread";
+
+export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const ctx = await getStaffContext();
+  if (!ctx) return null;
+
+  const supabase = await createClient();
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("id, name, member_no")
+    .eq("id", id)
+    .eq("org_id", ctx.orgId)
+    .maybeSingle();
+  if (!customer) notFound();
+
+  const { data: thread } = await supabase
+    .from("threads")
+    .select("id, archived_at")
+    .eq("customer_id", id)
+    .eq("kind", "customer")
+    .maybeSingle();
+
+  let initialMessages: ThreadMessage[] = [];
+  if (thread) {
+    const { data } = await supabase
+      .from("messages")
+      .select("*, message_attachments(*)")
+      .eq("thread_id", thread.id)
+      .order("sent_at", { ascending: true });
+    initialMessages = (data ?? []).map((m) => ({ ...m, attachments: m.message_attachments ?? [] }));
+  }
+
+  return (
+    <CustomerThread
+      customer={{ id: customer.id, name: customer.name, memberNo: customer.member_no }}
+      thread={thread ? { id: thread.id, archived: !!thread.archived_at } : null}
+      initialMessages={initialMessages}
+      role={ctx.role}
+    />
+  );
+}

@@ -431,3 +431,62 @@ export async function removeMyOrgLink(orgId: string) {
 
   await clearStaffOrgCookieIfCurrent(orgId);
 }
+
+// ============================================================
+// 依頼主とのトーク（受付側の閲覧・返信・整理）
+// ============================================================
+
+export async function sendStaffMessage(threadId: string, text: string) {
+  const ctx = await requireContext();
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("messages")
+    .insert({ thread_id: threadId, sender_id: ctx.userId, sender_role: ctx.role, kind: "text", body: trimmed });
+  if (error) throw error;
+  await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+}
+
+export async function hideMessage(messageId: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("messages").update({ hidden_at: new Date().toISOString() }).eq("id", messageId);
+  if (error) throw error;
+}
+
+export async function unhideMessage(messageId: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("messages").update({ hidden_at: null }).eq("id", messageId);
+  if (error) throw error;
+}
+
+export async function deleteMessage(messageId: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("messages").delete().eq("id", messageId);
+  if (error) throw error;
+}
+
+export async function archiveThread(threadId: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("threads").update({ archived_at: new Date().toISOString() }).eq("id", threadId);
+  if (error) throw error;
+}
+
+export async function unarchiveThread(threadId: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("threads").update({ archived_at: null }).eq("id", threadId);
+  if (error) throw error;
+}
+
+// トークを丸ごと削除（メッセージ・添付も on delete cascade で連動削除）。
+export async function deleteThread(threadId: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("threads").delete().eq("id", threadId);
+  if (error) throw error;
+}
