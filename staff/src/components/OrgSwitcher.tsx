@@ -103,8 +103,11 @@ function AddOrgDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
     setSaving(true);
     try {
       const result = await createOrgForCurrentUser(form);
-      onClose();
+      // onClose unmounts this dialog, so it must run last — calling it
+      // before onCreated (which navigates/refreshes) left this component's
+      // own promise chain still running after it was torn down.
       await onCreated(result.orgId);
+      onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "作成できませんでした");
       setSaving(false);
