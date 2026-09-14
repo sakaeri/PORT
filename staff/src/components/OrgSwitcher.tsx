@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "@phosphor-icons/react";
+import { Plus, Trash } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
-import { switchStaffOrg, createOrgForCurrentUser } from "@/app/actions";
+import { switchStaffOrg, createOrgForCurrentUser, removeMyOrgLink } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import type { StaffOrgOption } from "@/lib/data";
 
@@ -22,6 +22,8 @@ export default function OrgSwitcher({
   const router = useRouter();
   const [switching, setSwitching] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [showManage, setShowManage] = useState(false);
+  const removableOrgs = orgs.filter((o) => !o.isPrimary && o.role === "owner");
 
   async function handleSwitch(newOrgId: string) {
     if (newOrgId === orgId || switching) return;
@@ -33,6 +35,13 @@ export default function OrgSwitcher({
     } finally {
       setSwitching(false);
     }
+  }
+
+  function handleRemoved() {
+    // removeMyOrgLink already clears the staff_org_id cookie server-side if
+    // it pointed at the org just removed, falling back to the primary org.
+    router.push("/customers");
+    router.refresh();
   }
 
   return (
@@ -65,19 +74,104 @@ export default function OrgSwitcher({
       ) : (
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{orgDisplayName}</div>
       )}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, flexWrap: "wrap" }}>
         <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>受付画面</span>
-        {role === "owner" && (
-          <button
-            onClick={() => setShowAdd(true)}
-            style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer", fontSize: 10.5, color: "var(--color-accent)", background: "transparent", border: "none" }}
-          >
-            <Plus size={11} />
-            窓口を追加
-          </button>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {removableOrgs.length > 0 && (
+            <button
+              onClick={() => setShowManage(true)}
+              style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer", fontSize: 10.5, color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
+            >
+              窓口を整理
+            </button>
+          )}
+          {role === "owner" && (
+            <button
+              onClick={() => setShowAdd(true)}
+              style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer", fontSize: 10.5, color: "var(--color-accent)", background: "transparent", border: "none" }}
+            >
+              <Plus size={11} />
+              窓口を追加
+            </button>
+          )}
+        </div>
       </div>
       {showAdd && <AddOrgDialog onClose={() => setShowAdd(false)} onCreated={handleSwitch} />}
+      {showManage && <ManageOrgsDialog orgs={removableOrgs} onClose={() => setShowManage(false)} onRemoved={handleRemoved} />}
+    </div>
+  );
+}
+
+function ManageOrgsDialog({ orgs, onClose, onRemoved }: { orgs: StaffOrgOption[]; onClose: () => void; onRemoved: () => void }) {
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [rows, setRows] = useState(orgs);
+  const [error, setError] = useState("");
+
+  async function remove(o: StaffOrgOption) {
+    if (removingId) return;
+    if (!confirm(`「${o.displayName}」を完全に削除します。依頼主・案件・トーク履歴も含めて元に戻せません。よろしいですか？`)) return;
+    setError("");
+    setRemovingId(o.orgId);
+    try {
+      await removeMyOrgLink(o.orgId);
+      setRows((r) => r.filter((x) => x.orgId !== o.orgId));
+      onRemoved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "削除できませんでした");
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(420px, 100%)",
+          maxHeight: "85vh",
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          padding: 20,
+          borderRadius: "var(--radius-lg)",
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-divider)",
+          boxShadow: "var(--shadow-lg)",
+        }}
+      >
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>窓口を整理</div>
+        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+          自分のログインに追加した窓口を削除します。削除すると依頼主・案件・トーク履歴も含めて元に戻せません。
+        </div>
+        {rows.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>削除できる窓口はありません。</div>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {rows.map((o) => (
+            <div key={o.orgId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.displayName}</div>
+              <button
+                onClick={() => remove(o)}
+                disabled={removingId === o.orgId}
+                aria-label="削除"
+                style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+              >
+                <Trash size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+        {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+        <button
+          onClick={onClose}
+          style={{ alignSelf: "flex-start", height: 34, padding: "0 14px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+        >
+          閉じる
+        </button>
+      </div>
     </div>
   );
 }

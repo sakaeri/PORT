@@ -389,3 +389,45 @@ export async function switchStaffOrg(orgId: string) {
     maxAge: 60 * 60 * 24 * 365,
   });
 }
+
+// staff_org_id が今消した事業者を指していたら、次回そのまま見に行って
+// 「権限がありません」にならないよう、既定（自分のプロフィール本体の
+// 事業者）に戻す。
+async function clearStaffOrgCookieIfCurrent(orgId: string) {
+  const jar = await cookies();
+  if (jar.get("staff_org_id")?.value === orgId) jar.delete("staff_org_id");
+}
+
+// 事業者の完全削除（PORT本部のみ）。他社の事業者を丸ごと畳むためのもの。
+// organizations 以下は on delete cascade で依頼主・案件・トークなど全て
+// 連鎖削除される。専用のオーナーログイン（事業者管理・依頼主変換で作った
+// もの）があれば、その auth ユーザーごと削除して迷子のログインを残さない。
+export async function deleteOrgForHq(orgId: string) {
+  await requireHq();
+  const admin = createServiceRoleClient();
+
+  const { data: primaryProfile } = await admin.from("profiles").select("id").eq("org_id", orgId).maybeSingle();
+
+  const { error } = await admin.from("organizations").delete().eq("id", orgId);
+  if (error) throw error;
+
+  if (primaryProfile) await admin.auth.admin.deleteUser(primaryProfile.id);
+  await clearStaffOrgCookieIfCurrent(orgId);
+}
+
+// 「自分のログインで追加した窓口」をセルフサービスで削除する。今のログイン
+// の本来の事業者（primary）は対象外（削除するとそのログイン自体が
+// プロフィールを失って詰む）。staff_org_links 経由で追加した分だけ許可。
+export async function removeMyOrgLink(orgId: string) {
+  const ctx = await requireContext();
+  const target = ctx.orgs.find((o) => o.orgId === orgId);
+  if (!target || target.isPrimary || target.role !== "owner") {
+    throw new Error("この窓口は削除できません");
+  }
+
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("organizations").delete().eq("id", orgId);
+  if (error) throw error;
+
+  await clearStaffOrgCookieIfCurrent(orgId);
+}

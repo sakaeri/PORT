@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, ArrowSquareOut } from "@phosphor-icons/react";
+import { Plus, ArrowSquareOut, Trash } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
-import { createOrgAccount } from "@/app/actions";
+import { createOrgAccount, deleteOrgForHq } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
 interface Org {
@@ -52,6 +52,21 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{ displayName: string; slug: string; email: string; password: string } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDelete(o: Org) {
+    if (deletingId) return;
+    if (!confirm(`「${o.display_name}」を完全に削除します。依頼主・案件・トーク履歴も含めて元に戻せません。よろしいですか？`)) return;
+    setDeletingId(o.id);
+    try {
+      await deleteOrgForHq(o.id);
+      setOrgs((rows) => rows.filter((r) => r.id !== o.id));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "削除できませんでした");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   function set<K extends keyof OrgAccountFormState>(key: K, value: string) {
     setForm((f) => {
@@ -144,6 +159,14 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
                 <ArrowSquareOut size={15} />
               </a>
             )}
+            <button
+              onClick={() => handleDelete(o)}
+              disabled={deletingId === o.id}
+              aria-label="削除"
+              style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+            >
+              <Trash size={13} />
+            </button>
           </div>
         ))}
       </div>
