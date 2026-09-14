@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
 import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage } from "@/app/actions";
@@ -175,6 +175,8 @@ export default function CustomerThread({
   templates,
   menus,
   memos,
+  ratings,
+  latestRequest,
 }: {
   customer: { id: string; name: string; memberNo: string | null };
   thread: { id: string; archived: boolean } | null;
@@ -187,6 +189,8 @@ export default function CustomerThread({
   templates: { id: string; label: string; note: string | null; fieldCount: number }[];
   menus: { id: string; label: string; note: string | null; price: number }[];
   memos: WorkMemo[];
+  ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
+  latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -276,7 +280,8 @@ export default function CustomerThread({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", height: "100%" }}>
+    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", borderBottom: "1px solid var(--color-divider)" }}>
         <Link href="/customers" aria-label="依頼主一覧に戻る" style={{ display: "flex", color: "var(--color-neutral-400)" }}>
           <ArrowLeft size={17} />
@@ -285,10 +290,6 @@ export default function CustomerThread({
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{customer.name}</div>
           <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{customer.memberNo ?? "—"}</div>
         </div>
-      </div>
-
-      <div style={{ padding: "10px 20px 0" }}>
-        <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
       </div>
 
       {isHq && (
@@ -306,12 +307,6 @@ export default function CustomerThread({
           ) : (
             <ConvertSection customerId={customer.id} customerName={customer.name} />
           )}
-        </div>
-      )}
-
-      {!isHq && thread && (
-        <div style={{ padding: "14px 20px 0" }}>
-          <CreateCaseSection threadId={thread.id} customerId={customer.id} menus={menus} />
         </div>
       )}
 
@@ -457,6 +452,79 @@ export default function CustomerThread({
         </div>
       )}
     </div>
+
+    <div style={{ flex: "none", width: 300, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 18, borderLeft: "1px solid var(--color-divider)" }}>
+      {!isHq && <RatingsSummary ratings={ratings} />}
+      <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
+      {!isHq && <CaseSummarySection thread={thread} customerId={customer.id} menus={menus} latestRequest={latestRequest} />}
+    </div>
+    </div>
+  );
+}
+
+function RatingsSummary({ ratings }: { ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] } }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        disabled={ratings.count === 0}
+        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: ratings.count === 0 ? "default" : "pointer", padding: 0 }}
+      >
+        依頼主の評価{ratings.count > 0 ? `（平均★${ratings.average?.toFixed(1)}・${ratings.count}件）` : "（まだありません）"}
+      </button>
+      {open && ratings.items.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+          {ratings.items.map((r, i) => (
+            <div key={i} style={{ fontSize: 12 }}>
+              <div style={{ display: "flex", gap: 2 }}>
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <Star key={j} size={12} weight={r.stars != null && j < r.stars ? "fill" : "regular"} color="var(--color-accent-300)" />
+                ))}
+              </div>
+              {r.comment && <div style={{ marginTop: 2 }}>{r.comment}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CaseSummarySection({
+  thread,
+  customerId,
+  menus,
+  latestRequest,
+}: {
+  thread: { id: string; archived: boolean } | null;
+  customerId: string;
+  menus: { id: string; label: string; note: string | null; price: number }[];
+  latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-400)" }}>このトークの依頼</span>
+        {thread && <CreateCaseSection threadId={thread.id} customerId={customerId} menus={menus} />}
+      </div>
+      {latestRequest ? (
+        <Link
+          href={`/cases/${latestRequest.id}`}
+          style={{ display: "flex", flexDirection: "column", gap: 4, padding: 10, borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", background: "var(--color-surface)", textDecoration: "none", color: "inherit" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{latestRequest.title}</span>
+            <span style={{ flex: "none", fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)" }}>{PHASE_LABEL[latestRequest.phase]}</span>
+          </div>
+          <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{latestRequest.amount.toLocaleString("ja-JP")}</div>
+        </Link>
+      ) : (
+        <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+          まだ依頼はありません。会話の内容が正式な依頼になったら見積もりを発行してください。
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -587,8 +655,11 @@ function CreateCaseSection({
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} style={smallBtn}>
-        案件を作成（見積もりを送る）
+      <button
+        onClick={() => setOpen(true)}
+        style={{ flex: "none", height: 24, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)" }}
+      >
+        見積もり
       </button>
     );
   }

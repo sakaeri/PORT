@@ -50,6 +50,27 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     return { id: m.id, authorId: m.author_id, authorName: profile?.display_name ?? "スタッフ", body: m.body, createdAt: m.created_at };
   });
 
+  const { data: ratingRows } = await supabase
+    .from("ratings")
+    .select("stars, comment, skipped, created_at")
+    .eq("customer_id", id)
+    .order("created_at", { ascending: false });
+  const rated = (ratingRows ?? []).filter((r) => !r.skipped && r.stars != null);
+  const ratings = {
+    average: rated.length ? rated.reduce((sum, r) => sum + (r.stars ?? 0), 0) / rated.length : null,
+    count: rated.length,
+    items: rated.map((r) => ({ stars: r.stars, comment: r.comment })),
+  };
+
+  const { data: latestRequestRow } = await supabase
+    .from("requests")
+    .select("id, title, amount, phase")
+    .eq("customer_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const latestRequest = latestRequestRow ? { id: latestRequestRow.id, title: latestRequestRow.title, amount: latestRequestRow.amount, phase: latestRequestRow.phase } : null;
+
   let initialMessages: ThreadMessage[] = [];
   if (thread) {
     const { data } = await supabase
@@ -83,6 +104,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       templates={templates}
       menus={menus}
       memos={memos}
+      ratings={ratings}
+      latestRequest={latestRequest}
     />
   );
 }
