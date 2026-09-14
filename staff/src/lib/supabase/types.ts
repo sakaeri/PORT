@@ -114,11 +114,15 @@ export interface Database {
           member_no: string | null;
           creator_id: string | null;
           active: boolean;
+          converted_org_id: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
-        Relationships: [{ foreignKeyName: "customers_creator_fk"; columns: ["creator_id"]; isOneToOne: false; referencedRelation: "creators"; referencedColumns: ["id"] }];
+        Relationships: [
+          { foreignKeyName: "customers_creator_fk"; columns: ["creator_id"]; isOneToOne: false; referencedRelation: "creators"; referencedColumns: ["id"] },
+          { foreignKeyName: "customers_converted_org_id_fkey"; columns: ["converted_org_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
+        ];
       };
       creators: {
         Row: {

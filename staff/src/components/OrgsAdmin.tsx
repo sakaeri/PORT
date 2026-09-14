@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, ArrowSquareOut } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { createOrgAccount } from "@/app/actions";
+import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
 interface Org {
   id: string;
@@ -31,18 +32,6 @@ const card: React.CSSProperties = {
   flexDirection: "column",
   gap: 12,
 };
-const input: React.CSSProperties = {
-  width: "100%",
-  height: 36,
-  padding: "6px 10px",
-  fontSize: 13.5,
-  color: "var(--color-text)",
-  background: "var(--color-bg)",
-  border: "1px solid var(--color-divider)",
-  borderRadius: "var(--radius-md)",
-  outline: "none",
-};
-const label: React.CSSProperties = { fontSize: 12, color: "var(--color-neutral-500)" };
 const smallBtn: React.CSSProperties = {
   height: 36,
   padding: "0 14px",
@@ -55,42 +44,20 @@ const smallBtn: React.CSSProperties = {
   borderRadius: "var(--radius-md)",
 };
 
-function randomPassword() {
-  return Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6).toUpperCase();
-}
-
-function slugify(v: string) {
-  return v
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-const EMPTY_FORM = {
-  name: "",
-  display_name: "",
-  rep_name: "",
-  tel: "",
-  email: "",
-  slug: "",
-  owner_email: "",
-  owner_password: "",
-  owner_display_name: "",
-};
-
 export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org[]; loadError: boolean }) {
   const [orgs, setOrgs] = useState(initialOrgs);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<OrgAccountFormState>(EMPTY_ORG_FORM);
   const [slugTouched, setSlugTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{ displayName: string; slug: string; email: string; password: string } | null>(null);
 
-  function set<K extends keyof typeof form>(key: K, value: string) {
+  function set<K extends keyof OrgAccountFormState>(key: K, value: string) {
     setForm((f) => {
       const next = { ...f, [key]: value };
       if (key === "display_name" && !slugTouched) next.slug = slugify(value);
+      if (key === "slug") setSlugTouched(true);
       return next;
     });
   }
@@ -103,7 +70,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
       const result = await createOrgAccount(form);
       setCreated({ displayName: form.display_name, slug: result.slug, email: form.owner_email, password: form.owner_password });
       setOrgs((o) => [{ id: result.orgId, name: form.name, display_name: form.display_name, slug: result.slug, plan_status: "trial", created_at: new Date().toISOString() }, ...o]);
-      setForm(EMPTY_FORM);
+      setForm(EMPTY_ORG_FORM);
       setSlugTouched(false);
       setShowForm(false);
     } catch (e) {
@@ -125,7 +92,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
         )}
       </div>
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        PORT本部から、新しく使い始める事業者のアカウントを作成します。ここで作った事業者の受付は <code>port.s-stylegolf.com/合言葉</code> のURLでログインできます。
+        PORT本部から、新しく使い始める事業者のアカウントを作成します。ここで作った事業者の受付は <code>port.s-stylegolf.com/合言葉</code> のURLでログインできます。依頼主一覧からの問い合わせを事業者にする場合は「依頼主」タブから登録してください。
       </div>
 
       {created && (
@@ -144,31 +111,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
       {showForm && (
         <div style={card}>
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>新しい事業者の情報</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="正式名称" value={form.name} onChange={(v) => set("name", v)} />
-            <Field label="表示名（依頼主に見える）" value={form.display_name} onChange={(v) => set("display_name", v)} />
-            <Field label="代表者名" value={form.rep_name} onChange={(v) => set("rep_name", v)} />
-            <Field label="電話番号" value={form.tel} onChange={(v) => set("tel", v)} />
-            <Field label="連絡用メールアドレス" value={form.email} onChange={(v) => set("email", v)} />
-            <Field
-              label="URLの合言葉（半角英数字とハイフン）"
-              value={form.slug}
-              onChange={(v) => { setSlugTouched(true); set("slug", slugify(v)); }}
-            />
-          </div>
-
-          <div style={{ fontSize: 12, color: "var(--color-neutral-500)", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>この事業者のオーナーが受付画面に入るためのログイン情報</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="オーナーの表示名" value={form.owner_display_name} onChange={(v) => set("owner_display_name", v)} />
-            <Field label="ログインメールアドレス" value={form.owner_email} onChange={(v) => set("owner_email", v)} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <span style={label}>初期パスワード</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input value={form.owner_password} onChange={(e) => set("owner_password", e.target.value)} className="vid-input" style={input} />
-                <button onClick={() => set("owner_password", randomPassword())} style={{ ...smallBtn, flex: "none" }}>自動生成</button>
-              </div>
-            </div>
-          </div>
+          <OrgAccountFields form={form} set={set} />
 
           {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
 
@@ -204,15 +147,6 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function Field({ label: l, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <span style={label}>{l}</span>
-      <input value={value} onChange={(e) => onChange(e.target.value)} className="vid-input" style={input} />
     </div>
   );
 }

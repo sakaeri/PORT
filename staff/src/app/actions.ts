@@ -218,7 +218,7 @@ export async function updateRefundPolicy(orgId: string, stage: RefundStage, mode
 // ============================================================
 // 新規事業者アカウント作成（PORT本部のみ）
 // ============================================================
-export async function createOrgAccount(fields: {
+interface OrgAccountFields {
   name: string;
   display_name: string;
   rep_name: string;
@@ -228,9 +228,9 @@ export async function createOrgAccount(fields: {
   owner_email: string;
   owner_password: string;
   owner_display_name: string;
-}) {
-  await requireHq();
+}
 
+async function createOrgCore(fields: OrgAccountFields) {
   const slug = fields.slug.trim().toLowerCase();
   if (!/^[a-z0-9-]{2,40}$/.test(slug) || slug === "auth") {
     throw new Error("URLの合言葉は半角英数字とハイフンのみ・2〜40文字で入力してください");
@@ -298,4 +298,28 @@ export async function createOrgAccount(fields: {
   await admin.from("refund_policies").insert(defaults.map((d) => ({ org_id: org.id, ...d })));
 
   return { orgId: org.id as string, slug };
+}
+
+export async function createOrgAccount(fields: OrgAccountFields) {
+  await requireHq();
+  return createOrgCore(fields);
+}
+
+// 依頼主一覧の問い合わせ行から、そのままその依頼主を新しい事業者として
+// 登録する。作成ロジックは createOrgAccount と共通（createOrgCore）で、
+// 追加で customers.converted_org_id を紐付けて「どの問い合わせがどの事業者
+// になったか」を追跡できるようにする。
+export async function convertCustomerToOrg(customerId: string, fields: OrgAccountFields) {
+  const ctx = await requireHq();
+  const result = await createOrgCore(fields);
+
+  const admin = createServiceRoleClient();
+  const { error } = await admin
+    .from("customers")
+    .update({ converted_org_id: result.orgId })
+    .eq("id", customerId)
+    .eq("org_id", ctx.orgId);
+  if (error) throw error;
+
+  return result;
 }
