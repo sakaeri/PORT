@@ -310,6 +310,7 @@ export interface Database {
           creator_id: string | null;
           last_msg_at: string | null;
           archived_at: string | null;
+          last_read_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["threads"]["Row"]>;

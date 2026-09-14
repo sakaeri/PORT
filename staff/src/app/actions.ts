@@ -448,6 +448,14 @@ export async function sendStaffMessage(threadId: string, text: string) {
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
 }
 
+// 依頼主一覧の未読マーク用。スタッフ共有ログインなので個人別ではなく
+// スレッド単位で「最後に誰か見た時刻」を記録するだけでよい。
+export async function markThreadRead(threadId: string) {
+  await requireContext();
+  const supabase = await createClient();
+  await supabase.from("threads").update({ last_read_at: new Date().toISOString() }).eq("id", threadId);
+}
+
 // 自分が送ったメッセージだけ削除できる（RLS の messages_sender_delete でも
 // 強制されるが、他人の分は0件更新になるだけで気付きにくいのでここで検知する）。
 export async function deleteMessage(messageId: string) {

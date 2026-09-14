@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
-import { sendStaffMessage, deleteMessage, convertCustomerToOrg } from "@/app/actions";
+import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
 export interface ThreadAttachment {
@@ -98,6 +98,11 @@ export default function CustomerThread({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (thread) void markThreadRead(thread.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread?.id]);
 
   async function send() {
     if (!thread || sending || !draft.trim()) return;
