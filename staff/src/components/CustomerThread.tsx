@@ -126,7 +126,7 @@ export default function CustomerThread({
     const channel = supabase
       .channel(`staff-thread-${thread.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `thread_id=eq.${thread.id}` }, refresh)
-      .subscribe();
+      .subscribe((status, err) => console.log("[realtime:staff]", status, err ?? ""));
     return () => {
       supabase.removeChannel(channel);
     };
