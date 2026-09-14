@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/chat/Header";
 import Composer, { type PendingAttachment } from "@/components/chat/Composer";
-import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard } from "@/components/chat/Bubbles";
+import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, IntakeCard } from "@/components/chat/Bubbles";
 import { ProgressPanel, PayDialog, CancelDialog, ReportsDialog, MenuSheet } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
 import { createClient } from "@/lib/supabase/client";
@@ -50,6 +50,7 @@ function writeAcked(ids: Set<string>) {
 
 export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies, initialVault, companies }: Props) {
   const [messages, setMessages] = useState(initialMessages);
+  const [vault, setVault] = useState(initialVault);
   const [searchQuery, setSearchQuery] = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showReports, setShowReports] = useState(false);
@@ -222,6 +223,8 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
               return <NoticeBubble key={m.id} msg={m} />;
             case "menu_pick":
               return <MenuPickBubble key={m.id} msg={m} />;
+            case "intake_request":
+              return <IntakeCard key={m.id} msg={m} vault={vault} onAnswered={setVault} />;
             case "quote":
               return m.requestBundle ? (
                 <RequestCard
@@ -271,7 +274,7 @@ export default function ChatScreen({ ctx, initialMessages, menus, refundPolicies
           memberNo={ctx.memberNo}
           customerName={ctx.customerName}
           currentEmail={ctx.email}
-          vault={initialVault}
+          vault={vault}
           hasGuestActivity={messages.length > 0}
           isAnonymous={ctx.isAnonymous}
           avatarUrl={avatarUrl}

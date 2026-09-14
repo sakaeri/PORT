@@ -139,3 +139,13 @@ export async function getVaultItems(customerId: string) {
     .order("sort", { ascending: true });
   return data ?? [];
 }
+
+// 確認事項フォーム（intake_request）の既存回答。項目ごとに一度回答すると
+// 次回以降は自動で引き当てる（intake_forms.save_answers の説明どおり）。
+export async function getCustomerAnswers(customerId: string): Promise<Record<string, string>> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("customer_answers").select("field_key, value").eq("customer_id", customerId);
+  const map: Record<string, string> = {};
+  for (const row of data ?? []) map[row.field_key] = row.value;
+  return map;
+}

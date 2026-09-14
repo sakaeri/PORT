@@ -105,7 +105,7 @@ export async function deleteVaultItem(id: string) {
   if (error) throw error;
 }
 
-export async function submitInfoRequestAnswer(messageId: string, fields: { key: string; value: string }[]) {
+export async function submitInfoRequestAnswer(fields: { key: string; value: string }[]) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const filled = fields.filter((f) => f.value.trim());
@@ -125,11 +125,9 @@ export async function submitInfoRequestAnswer(messageId: string, fields: { key: 
     }
   }
 
-  const { data: msg } = await supabase.from("messages").select("payload").eq("id", messageId).single();
-  await supabase
-    .from("messages")
-    .update({ payload: { ...(msg?.payload as object), filled: true } })
-    .eq("id", messageId);
+  // 「回答済みかどうか」はこのメッセージの payload を書き換えるのではなく、
+  // vault に値があるかどうかで判定する（messages の RLS では、依頼主は
+  // 自分が送っていない行を更新できないため）。
 
   // sender_id なし = システム発。customer 自身の RLS では null 送信者を名乗れない
   // （customers_send は sender_id = auth.uid() を要求）ため、ここだけ service-role で書く。

@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
-import type { AttachmentRow, MessageWithExtras, RequestBundle } from "@/lib/chat-types";
+import type { AttachmentRow, MessageWithExtras, RequestBundle, VaultRow } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { stageInfoFor } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
 import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
+import { submitInfoRequestAnswer } from "@/app/actions";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 
@@ -374,6 +375,115 @@ export function RequestCard({
               </div>
             )}
           </div>
+        )}
+      </div>
+      <Meta isSelf={false} time={timeLabel(msg.sent_at)} />
+    </div>
+  );
+}
+
+interface IntakeFieldDef {
+  key: string;
+  label: string;
+  kind: string;
+  required: boolean;
+}
+
+const INPUT_TYPE: Record<string, string> = { text: "text", tel: "tel", email: "email", date: "date", select: "text" };
+
+export function IntakeCard({ msg, vault, onAnswered }: { msg: MessageWithExtras; vault: VaultRow[]; onAnswered: (items: VaultRow[]) => void }) {
+  const p = msg.payload as { formLabel?: string; note?: string; fields?: IntakeFieldDef[] };
+  const fields = p.fields ?? [];
+  const findValue = (label: string) => vault.find((v) => v.label === label)?.value ?? "";
+  const allAnswered = fields.length > 0 && fields.every((f) => findValue(f.label).trim());
+
+  const [editing, setEditing] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, findValue(f.label)])));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const showForm = !allAnswered || editing;
+
+  async function submit() {
+    if (saving) return;
+    const missing = fields.filter((f) => f.required && !values[f.key]?.trim());
+    if (missing.length) {
+      setError(`「${missing[0].label}」は必須です`);
+      return;
+    }
+    setError("");
+    setSaving(true);
+    try {
+      const filled = fields.filter((f) => values[f.key]?.trim()).map((f) => ({ key: f.label, value: values[f.key].trim() }));
+      await submitInfoRequestAnswer(filled);
+      const next = [...vault];
+      for (const f of filled) {
+        const idx = next.findIndex((v) => v.label === f.key);
+        if (idx >= 0) next[idx] = { ...next[idx], value: f.value };
+        else next.push({ id: `temp-${Date.now()}-${f.key}`, customer_id: "", label: f.key, value: f.value, sort: 0, updated_at: new Date().toISOString() });
+      }
+      onAnswered(next);
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "送信できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ ...bubbleShell, alignSelf: "flex-start" }}>
+      <div style={{ width: "min(300px, 100%)", display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: "var(--radius-md)", background: "var(--color-surface)", boxShadow: "0 0 0 1px var(--color-neutral-800)" }}>
+        <span style={kicker}>確認事項</span>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, lineHeight: 1.3 }}>{p.formLabel}</div>
+        {p.note && <p style={{ margin: 0, fontSize: 12.5, opacity: 0.8 }}>{p.note}</p>}
+
+        {showForm ? (
+          <>
+            {fields.map((f) => (
+              <div key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>
+                  {f.label}
+                  {f.required && <span style={{ color: "var(--color-accent)" }}> ＊</span>}
+                </span>
+                {f.kind === "textarea" ? (
+                  <textarea
+                    value={values[f.key] ?? ""}
+                    onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                    rows={2}
+                    className="vid-input"
+                    style={{ padding: "8px 10px", font: "inherit", fontSize: 13, borderRadius: "var(--radius-sm)", border: "1px solid var(--color-divider)", background: "var(--color-bg)", color: "var(--color-text)", resize: "none" }}
+                  />
+                ) : (
+                  <input
+                    value={values[f.key] ?? ""}
+                    onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                    type={INPUT_TYPE[f.kind] ?? "text"}
+                    className="vid-input"
+                    style={{ height: 34, padding: "0 10px", font: "inherit", fontSize: 13, borderRadius: "var(--radius-sm)", border: "1px solid var(--color-divider)", background: "var(--color-bg)", color: "var(--color-text)" }}
+                  />
+                )}
+              </div>
+            ))}
+            {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+            <button onClick={submit} disabled={saving} style={{ ...outlineBtn, height: 38 }}>
+              {saving ? "送信中…" : "この内容で送信"}
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 4 }}>
+              {fields.map((f) => (
+                <div key={f.key} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
+                  <span style={{ width: 88, flex: "none", color: "var(--color-neutral-500)" }}>{f.label}</span>
+                  <span style={{ minWidth: 0, flex: 1 }}>{findValue(f.label)}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setEditing(true)} style={{ alignSelf: "flex-start", fontSize: 11.5, color: "var(--color-accent)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+              内容を変更する
+            </button>
+          </>
         )}
       </div>
       <Meta isSelf={false} time={timeLabel(msg.sent_at)} />

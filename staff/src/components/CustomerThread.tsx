@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
-import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest } from "@/app/actions";
+import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
 export interface ThreadAttachment {
@@ -52,7 +52,7 @@ const card: React.CSSProperties = {
 };
 
 function summarize(m: Message): string {
-  const p = m.payload as { title?: string; menuLabel?: string; total?: number; summary?: string };
+  const p = m.payload as { title?: string; menuLabel?: string; total?: number; summary?: string; formLabel?: string };
   switch (m.kind) {
     case "text":
       return m.body ?? "";
@@ -71,7 +71,7 @@ function summarize(m: Message): string {
     case "off_choice":
       return `［選択］${m.body ?? ""}`;
     case "intake_request":
-      return `［確認事項］${m.body ?? ""}`;
+      return `［確認事項］${p.formLabel ?? m.body ?? ""}`;
     case "system":
       return m.body ?? "［システム］";
     default:
@@ -258,9 +258,17 @@ export default function CustomerThread({
           {templates.map((t) => (
             <button
               key={t.id}
-              onClick={() => {
+              disabled={busy}
+              onClick={async () => {
                 if (t.fieldCount > 0) {
-                  alert("項目付きのテンプレはまだトークから送れません（次のフェーズで対応します）");
+                  if (!thread) return;
+                  setBusy(true);
+                  try {
+                    await sendTemplateMessage(thread.id, t.id);
+                    setShowTemplates(false);
+                  } finally {
+                    setBusy(false);
+                  }
                   return;
                 }
                 setDraft(t.note ?? t.label);
@@ -275,14 +283,14 @@ export default function CustomerThread({
                 cursor: "pointer",
                 textAlign: "left",
                 fontSize: 12.5,
-                color: t.fieldCount > 0 ? "var(--color-neutral-500)" : "var(--color-text)",
+                color: "var(--color-text)",
                 background: "transparent",
                 border: "none",
                 borderRadius: "var(--radius-sm)",
               }}
             >
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
-              {t.fieldCount > 0 && <span style={{ flex: "none", fontSize: 10.5, color: "var(--color-neutral-600)" }}>項目付き・未対応</span>}
+              {t.fieldCount > 0 && <span style={{ flex: "none", fontSize: 10.5, color: "var(--color-neutral-500)" }}>項目付き（{t.fieldCount}）</span>}
             </button>
           ))}
         </div>

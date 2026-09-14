@@ -653,3 +653,36 @@ export async function sendCaseMessage(caseThreadId: string, text: string) {
   if (error) throw error;
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", caseThreadId);
 }
+
+// 項目付きテンプレ（intake_forms）を依頼主トークに intake_request として送る。
+// 依頼主側は回答すると customer_answers に保存され、次回以降は自動で
+// 引き当てられる（すでに全項目回答済みなら依頼主側は入力フォームの代わりに
+// 回答済み表示になる）。
+export async function sendTemplateMessage(threadId: string, templateId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+
+  const { data: form } = await supabase
+    .from("intake_forms")
+    .select("id, label, note, intake_fields(key, label, kind, required, sort)")
+    .eq("id", templateId)
+    .eq("org_id", ctx.orgId)
+    .maybeSingle();
+  if (!form) throw new Error("テンプレが見つかりません");
+
+  const fields = (form.intake_fields ?? [])
+    .slice()
+    .sort((a, b) => a.sort - b.sort)
+    .map((f) => ({ key: f.key, label: f.label, kind: f.kind, required: f.required }));
+  if (fields.length === 0) throw new Error("このテンプレには項目がありません");
+
+  const { error } = await supabase.from("messages").insert({
+    thread_id: threadId,
+    sender_id: ctx.userId,
+    sender_role: ctx.role,
+    kind: "intake_request",
+    payload: { formLabel: form.label, note: form.note ?? undefined, fields },
+  });
+  if (error) throw error;
+  await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+}

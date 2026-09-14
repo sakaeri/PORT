@@ -10,7 +10,7 @@ export interface PreviewMessage {
 // files は件数なしの表記にしている。
 export function previewMessage(m: PreviewMessage): string {
   if (m.deleted_at) return "削除されました";
-  const p = m.payload as { title?: string; menuLabel?: string; total?: number; summary?: string };
+  const p = m.payload as { title?: string; menuLabel?: string; total?: number; summary?: string; formLabel?: string };
   switch (m.kind) {
     case "text":
       return m.body ?? "";
@@ -29,7 +29,7 @@ export function previewMessage(m: PreviewMessage): string {
     case "off_choice":
       return `［選択］${m.body ?? ""}`;
     case "intake_request":
-      return `［確認事項］${m.body ?? ""}`;
+      return `［確認事項］${p.formLabel ?? m.body ?? ""}`;
     case "system":
       return m.body ?? "［システム］";
     default:
