@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { createClient } from "@/lib/supabase/client";
 import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
@@ -83,6 +84,7 @@ export default function CustomerThread({
   initialMessages,
   role,
   currentUserId,
+  orgId,
   isHq,
   convertedOrg,
 }: {
@@ -91,6 +93,7 @@ export default function CustomerThread({
   initialMessages: Message[];
   role: "owner" | "reception";
   currentUserId: string;
+  orgId: string;
   isHq: boolean;
   convertedOrg: { displayName: string; slug: string | null } | null;
 }) {
@@ -103,6 +106,31 @@ export default function CustomerThread({
     if (thread) void markThreadRead(thread.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?.id]);
+
+  const refresh = useCallback(async () => {
+    if (!thread) return;
+    const supabase = createClient(orgId);
+    const { data } = await supabase
+      .from("messages")
+      .select("*, message_attachments(*)")
+      .eq("thread_id", thread.id)
+      .order("sent_at", { ascending: true });
+    if (data) setMessages(data.map((m) => ({ ...m, attachments: m.message_attachments ?? [] })));
+    // 開いている間に届いた分もその場で既読にする
+    void markThreadRead(thread.id);
+  }, [thread, orgId]);
+
+  useEffect(() => {
+    if (!thread) return;
+    const supabase = createClient(orgId);
+    const channel = supabase
+      .channel(`staff-thread-${thread.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `thread_id=eq.${thread.id}` }, refresh)
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [thread, orgId, refresh]);
 
   async function send() {
     if (!thread || sending || !draft.trim()) return;

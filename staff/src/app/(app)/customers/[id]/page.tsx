@@ -43,6 +43,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       initialMessages={initialMessages}
       role={ctx.role}
       currentUserId={ctx.userId}
+      orgId={ctx.orgId}
       isHq={ctx.isHq}
       convertedOrg={convertedOrg}
     />
