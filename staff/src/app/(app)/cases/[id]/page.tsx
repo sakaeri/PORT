@@ -46,7 +46,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         createdAt: request.created_at,
       }}
       customer={customer ? { id: customer.id, name: customer.name } : null}
-      report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer } : null}
+      report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer, details: report.details ?? [] } : null}
       rating={rating ? { stars: rating.stars, comment: rating.comment, skipped: rating.skipped } : null}
       caseThread={caseThread ? { id: caseThread.id } : null}
       caseMessages={caseMessages}

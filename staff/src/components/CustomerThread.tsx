@@ -8,6 +8,7 @@ import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
 import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
+import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 
 export interface ThreadAttachment {
   id: string;
@@ -90,6 +91,7 @@ export default function CustomerThread({
   convertedOrg,
   templates,
   menus,
+  memos,
 }: {
   customer: { id: string; name: string; memberNo: string | null };
   thread: { id: string; archived: boolean } | null;
@@ -101,6 +103,7 @@ export default function CustomerThread({
   convertedOrg: { displayName: string; slug: string | null } | null;
   templates: { id: string; label: string; note: string | null; fieldCount: number }[];
   menus: { id: string; label: string; note: string | null; price: number }[];
+  memos: WorkMemo[];
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -185,6 +188,10 @@ export default function CustomerThread({
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{customer.name}</div>
           <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{customer.memberNo ?? "—"}</div>
         </div>
+      </div>
+
+      <div style={{ padding: "10px 20px 0" }}>
+        <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
       </div>
 
       {isHq && (

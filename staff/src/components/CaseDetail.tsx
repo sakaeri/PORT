@@ -53,7 +53,7 @@ export default function CaseDetail({
 }: {
   request: { id: string; title: string; note: string | null; amount: number; phase: RequestPhase; createdAt: string };
   customer: { id: string; name: string } | null;
-  report: { summary: string; noteToCustomer: string | null } | null;
+  report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[] } | null;
   rating: { stars: number | null; comment: string | null; skipped: boolean } | null;
   caseThread: { id: string } | null;
   caseMessages: CaseMessage[];
@@ -139,21 +139,35 @@ export default function CaseDetail({
           <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>完了報告</div>
             <div style={{ fontSize: 13, lineHeight: 1.6 }}>{report.summary}</div>
+            {report.details.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
+                {report.details.map((d, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
+                    <span style={{ width: 72, flex: "none", color: "var(--color-neutral-500)" }}>{d.label}</span>
+                    <span style={{ minWidth: 0, flex: 1 }}>{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {report.noteToCustomer && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{report.noteToCustomer}</div>}
           </div>
         )}
 
-        {rating && !rating.skipped && (
-          <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>依頼主からの評価</div>
-            <div style={{ display: "flex", gap: 2 }}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} size={14} weight={rating.stars != null && i < rating.stars ? "fill" : "regular"} color="var(--color-accent-300)" />
-              ))}
-            </div>
-            {rating.comment && <div style={{ fontSize: 13 }}>{rating.comment}</div>}
-          </div>
-        )}
+        <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>依頼主からの評価</div>
+          {rating && !rating.skipped ? (
+            <>
+              <div style={{ display: "flex", gap: 2 }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} size={14} weight={rating.stars != null && i < rating.stars ? "fill" : "regular"} color="var(--color-accent-300)" />
+                ))}
+              </div>
+              {rating.comment && <div style={{ fontSize: 13 }}>{rating.comment}</div>}
+            </>
+          ) : (
+            <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>まだ評価はありません。</div>
+          )}
+        </div>
       </div>
 
       {caseThread && (
@@ -169,6 +183,8 @@ function CompletionReportForm({ requestId }: { requestId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
+  const [deliverables, setDeliverables] = useState("");
+  const [delivery, setDelivery] = useState("");
   const [noteToCustomer, setNoteToCustomer] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -178,7 +194,7 @@ function CompletionReportForm({ requestId }: { requestId: string }) {
     setError("");
     setSaving(true);
     try {
-      await submitCaseReport(requestId, summary, noteToCustomer);
+      await submitCaseReport(requestId, summary, noteToCustomer, deliverables, delivery);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "送信できませんでした");
@@ -205,6 +221,8 @@ function CompletionReportForm({ requestId }: { requestId: string }) {
         className="vid-input"
         style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
       />
+      <input value={deliverables} onChange={(e) => setDeliverables(e.target.value)} placeholder="納品物（任意）" className="vid-input" style={inputStyle} />
+      <input value={delivery} onChange={(e) => setDelivery(e.target.value)} placeholder="受け渡し方法（任意）" className="vid-input" style={inputStyle} />
       <textarea
         value={noteToCustomer}
         onChange={(e) => setNoteToCustomer(e.target.value)}

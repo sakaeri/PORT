@@ -625,7 +625,13 @@ export async function declineCaseRequest(requestId: string) {
   await postCaseNotice(supabase, requestId, "見積もりを取り下げました");
 }
 
-export async function submitCaseReport(requestId: string, summary: string, noteToCustomer: string) {
+export async function submitCaseReport(
+  requestId: string,
+  summary: string,
+  noteToCustomer: string,
+  deliverables: string,
+  delivery: string,
+) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const trimmed = summary.trim();
@@ -635,10 +641,16 @@ export async function submitCaseReport(requestId: string, summary: string, noteT
   if (!request) throw new Error("案件が見つかりません");
   if (request.phase !== "started") throw new Error("着手中の案件のみ完了報告できます");
 
+  const details = [
+    ...(deliverables.trim() ? [{ label: "納品物", value: deliverables.trim() }] : []),
+    ...(delivery.trim() ? [{ label: "受け渡し", value: delivery.trim() }] : []),
+  ];
+
   const now = new Date().toISOString();
   const { error: reportError } = await supabase.from("completion_reports").insert({
     request_id: requestId,
     summary: trimmed,
+    details,
     note_to_customer: noteToCustomer.trim() || null,
     submitted_at: now,
     sent_at: now,
@@ -695,4 +707,23 @@ export async function sendTemplateMessage(threadId: string, templateId: string) 
   });
   if (error) throw error;
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+}
+
+// ============================================================
+// 社内メモ（依頼主には一切見せない。担当制作者・受付のみ）
+// ============================================================
+export async function addWorkMemo(customerId: string, body: string) {
+  const ctx = await requireContext();
+  const trimmed = body.trim();
+  if (!trimmed) return;
+  const supabase = await createClient();
+  const { error } = await supabase.from("work_memos").insert({ customer_id: customerId, author_id: ctx.userId, body: trimmed });
+  if (error) throw error;
+}
+
+export async function deleteWorkMemo(id: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("work_memos").delete().eq("id", id).eq("author_id", ctx.userId);
+  if (error) throw error;
 }

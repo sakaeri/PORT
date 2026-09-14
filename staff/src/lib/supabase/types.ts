@@ -391,6 +391,19 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["app_config"]["Row"]>;
         Relationships: [];
       };
+      work_memos: {
+        Row: {
+          id: string;
+          customer_id: string;
+          request_id: string | null;
+          author_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["work_memos"]["Row"]> & { customer_id: string; author_id: string; body: string };
+        Update: Partial<Database["public"]["Tables"]["work_memos"]["Row"]>;
+        Relationships: [{ foreignKeyName: "work_memos_author_id_fkey"; columns: ["author_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] }];
+      };
       referral_leads: {
         Row: {
           id: string;

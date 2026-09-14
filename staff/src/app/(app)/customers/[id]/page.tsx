@@ -40,6 +40,16 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     .order("sort", { ascending: true });
   const menus = (menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price }));
 
+  const { data: memoRows } = await supabase
+    .from("work_memos")
+    .select("id, author_id, body, created_at, profiles!work_memos_author_id_fkey(display_name)")
+    .eq("customer_id", id)
+    .order("created_at", { ascending: false });
+  const memos = (memoRows ?? []).map((m) => {
+    const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+    return { id: m.id, authorId: m.author_id, authorName: profile?.display_name ?? "スタッフ", body: m.body, createdAt: m.created_at };
+  });
+
   let initialMessages: ThreadMessage[] = [];
   if (thread) {
     const { data } = await supabase
@@ -62,6 +72,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       convertedOrg={convertedOrg}
       templates={templates}
       menus={menus}
+      memos={memos}
     />
   );
 }
