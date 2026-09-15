@@ -202,10 +202,65 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "login", label: "ログイン情報" },
 ];
 
-function CardHeader({ title, editing, onEdit }: { title: string; editing: boolean; onEdit: () => void }) {
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", flex: "none" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onBlur={() => setOpen(false)}
+        aria-label="説明を表示"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 16,
+          height: 16,
+          padding: 0,
+          cursor: "pointer",
+          fontSize: 10.5,
+          lineHeight: 1,
+          color: "var(--color-neutral-500)",
+          background: "transparent",
+          border: "1px solid var(--color-neutral-500)",
+          borderRadius: "50%",
+        }}
+      >
+        i
+      </button>
+      {open && (
+        <div
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            zIndex: 20,
+            width: 260,
+            padding: "10px 12px",
+            fontSize: 11.5,
+            lineHeight: 1.6,
+            color: "var(--color-text)",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-divider)",
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--shadow-md)",
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </span>
+  );
+}
+
+function CardHeader({ title, info, editing, onEdit }: { title: string; info?: string; editing: boolean; onEdit: () => void }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>{title}</div>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>{title}</div>
+      {info && <InfoTooltip text={info} />}
+      <div style={{ flex: 1 }} />
       {!editing && (
         <button onClick={onEdit} style={{ ...smallBtn, height: 28 }}>
           変更
@@ -258,8 +313,7 @@ function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | n
 
   return (
     <div style={card}>
-      <CardHeader title="会社情報" editing={editing} onEdit={startEdit} />
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>契約書の「甲」・依頼主への表示名・見積書と請求書に使います</div>
+      <CardHeader title="会社情報" info="契約書の「甲」・依頼主への表示名・見積書と請求書に使います" editing={editing} onEdit={startEdit} />
       {slug && (
         <div style={{ fontSize: 12, color: "var(--color-neutral-400)" }}>
           依頼主用URL：
@@ -346,10 +400,12 @@ function PaymentSettingsCard({
 
   return (
     <div style={card}>
-      <CardHeader title="決済設定" editing={editing} onEdit={startEdit} />
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        見積もり作成時に選べる支払い方法と、銀行振込のデフォルトの振込先です（見積もりごとにその場で変更もできます）。カード決済のリンクは見積もり作成のたびに入力します。
-      </div>
+      <CardHeader
+        title="決済設定"
+        info="見積もり作成時に選べる支払い方法と、銀行振込のデフォルトの振込先です（見積もりごとにその場で変更もできます）。カード決済のリンクは見積もり作成のたびに入力します。"
+        editing={editing}
+        onEdit={startEdit}
+      />
       {!editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <InfoRow label="カード決済" value={saved.cardEnabled ? "使う" : "使わない"} />
@@ -434,9 +490,9 @@ function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[
 
   return (
     <div style={card}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>カード決済のリンク一覧</div>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        見積もり作成時に入力したリンクがここに並びます。URLは変更できません（タイトルの変更・削除のみ）。
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>カード決済のリンク一覧</div>
+        <InfoTooltip text="見積もり作成時に入力したリンクがここに並びます。URLは変更できません（タイトルの変更・削除のみ）。" />
       </div>
       {links.length === 0 ? (
         <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだリンクはありません。</div>
@@ -495,9 +551,9 @@ function StaffModeCard({ initialSolo }: { initialSolo: boolean }) {
 
   return (
     <div style={card}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>スタッフ連携</div>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        オンにすると、左メニューに「スタッフ」が表示され、案件ごとに担当者を割り当てられるようになります。オフのままなら、受付が1人で全ての案件に対応する運用になります。
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>スタッフ連携</div>
+        <InfoTooltip text="オンにすると、左メニューに「スタッフ」が表示され、案件ごとに担当者を割り当てられるようになります。オフのままなら、受付が1人で全ての案件に対応する運用になります。" />
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <button
@@ -562,14 +618,15 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
 
   return (
     <div style={card}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>受付メニュー</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>受付メニュー</div>
+        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます" />
+        <div style={{ flex: 1 }} />
         <button onClick={handleAdd} style={smallBtn}>
           <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
           メニューを追加
         </button>
       </div>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます</div>
 
       {menus.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだメニューがありません。</div>}
 
@@ -735,8 +792,10 @@ function LoginInfoCard({ initialEmail }: { initialEmail: string }) {
 
   return (
     <div style={card}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>ログイン情報</div>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>この管理画面に入るためのメールアドレスとパスワードです。書類には使いません。</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>ログイン情報</div>
+        <InfoTooltip text="この管理画面に入るためのメールアドレスとパスワードです。書類には使いません。" />
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
@@ -824,14 +883,15 @@ function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemp
 
   return (
     <div style={card}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>返信テンプレ</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>返信テンプレ</div>
+        <InfoTooltip text="受付がトークからワンタップで送る定型の返信です。項目を付けると入力フォームになり、「回答を依頼主データに残す」をオンにすると次回以降は自動で引き当てます。" />
+        <div style={{ flex: 1 }} />
         <button onClick={handleAdd} style={smallBtn}>
           <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
           テンプレを追加
         </button>
       </div>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>受付がトークからワンタップで送る定型の返信です。項目を付けると入力フォームになり、「回答を依頼主データに残す」をオンにすると次回以降は自動で引き当てます。</div>
 
       {templates.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだテンプレがありません。</div>}
 
@@ -994,8 +1054,12 @@ function RefundPolicyCard({ orgId, initialPolicy }: { orgId: string; initialPoli
 
   return (
     <div style={card}>
-      <CardHeader title="キャンセル・返金ポリシー" editing={editing} onEdit={() => { setRows(saved); setEditing(true); }} />
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>段階は依頼の進み方で決まるため固定です。受付が決めるのは、それぞれの段階の返金の扱いと割合だけです。</div>
+      <CardHeader
+        title="キャンセル・返金ポリシー"
+        info="段階は依頼の進み方で決まるため固定です。受付が決めるのは、それぞれの段階の返金の扱いと割合だけです。"
+        editing={editing}
+        onEdit={() => { setRows(saved); setEditing(true); }}
+      />
 
       {!editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
