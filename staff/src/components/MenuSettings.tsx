@@ -238,7 +238,7 @@ function InfoTooltip({ text }: { text: string }) {
             left: 0,
             zIndex: 20,
             width: "max-content",
-            maxWidth: 480,
+            maxWidth: 520,
             padding: "10px 12px",
             fontSize: 11.5,
             lineHeight: 1.6,
