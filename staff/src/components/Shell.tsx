@@ -83,6 +83,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           flexDirection: "column",
           gap: 4,
           padding: "var(--space-4)",
+          background: "var(--color-surface)",
           borderRight: "1px solid var(--color-divider)",
         }}
       >
@@ -109,10 +110,12 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
                 height: 38,
                 padding: "0 10px",
                 borderRadius: "var(--radius-md)",
+                borderLeft: active ? "3px solid var(--color-accent)" : "3px solid transparent",
                 fontSize: 13.5,
+                fontWeight: active ? 600 : 400,
                 textDecoration: "none",
-                color: active ? "var(--color-accent-100)" : "var(--color-text)",
-                background: active ? "var(--color-accent-900)" : "transparent",
+                color: active ? "var(--color-accent)" : "var(--color-text)",
+                background: active ? "color-mix(in srgb, var(--color-accent) 14%, transparent)" : "transparent",
               }}
             >
               <Icon size={16} />
