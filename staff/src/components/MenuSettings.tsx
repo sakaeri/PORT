@@ -205,7 +205,7 @@ const TABS: { key: TabKey; label: string }[] = [
 function InfoTooltip({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <span style={{ position: "relative", display: "inline-flex", flex: "none" }}>
+    <span style={{ position: "relative", display: "inline-flex", flex: "none", alignSelf: "flex-start" }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -215,11 +215,11 @@ function InfoTooltip({ text }: { text: string }) {
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 16,
-          height: 16,
+          width: 13,
+          height: 13,
           padding: 0,
           cursor: "pointer",
-          fontSize: 10.5,
+          fontSize: 9,
           lineHeight: 1,
           color: "var(--color-neutral-500)",
           background: "transparent",
@@ -237,7 +237,8 @@ function InfoTooltip({ text }: { text: string }) {
             top: "calc(100% + 6px)",
             left: 0,
             zIndex: 20,
-            width: 260,
+            width: "max-content",
+            maxWidth: 320,
             padding: "10px 12px",
             fontSize: 11.5,
             lineHeight: 1.6,
