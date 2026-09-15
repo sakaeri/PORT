@@ -671,6 +671,11 @@ interface CardPaymentLink {
   url: string;
 }
 
+function hoursToDueLabel(hours: number): string {
+  if (hours <= 24) return "24時間以内";
+  return `${Math.ceil(hours / 24)}日後`;
+}
+
 const PAYMENT_TIMING_OPTIONS: { value: PaymentTiming; label: string }[] = [
   { value: "prepay_full", label: "先払い" },
   { value: "deposit", label: "予約金の先払い" },
@@ -718,7 +723,6 @@ function QuoteDialog({
   const [customLabel, setCustomLabel] = useState("");
   const [customPrice, setCustomPrice] = useState("");
   const [customLeadHours, setCustomLeadHours] = useState("24");
-  const [due, setDue] = useState("");
   const [note, setNote] = useState("");
   const [saveAsMenu, setSaveAsMenu] = useState(false);
   const [paymentTiming, setPaymentTiming] = useState<PaymentTiming>("prepay_full");
@@ -753,13 +757,14 @@ function QuoteDialog({
     setCustomLeadHours("24");
   }
 
-  const menuItems = menus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id] }));
+  const menuItems = menus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id], leadHours: m.leadHours }));
   const allItems = [
     ...menuItems,
     ...customItems.map((c) => ({ menuId: null as string | null, label: c.label, price: c.price, payout: 0, qty: c.qty, leadHours: c.leadHours })),
   ];
   const total = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
   const depositAmount = paymentTiming === "deposit" ? Math.round((total * (Number(depositPercent) || 0)) / 100) : null;
+  const due = allItems.length > 0 ? hoursToDueLabel(Math.max(...allItems.map((it) => it.leadHours))) : "";
 
   async function submit() {
     if (saving || allItems.length === 0) return;
@@ -829,10 +834,19 @@ function QuoteDialog({
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {showCustomForm && (
-            <div style={{ display: "flex", gap: 6 }}>
-              <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder="件名" className="vid-input" style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
-              <input value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} type="number" min={0} placeholder="金額" className="vid-input" style={{ ...inputStyle, width: 100 }} />
-              <input value={customLeadHours} onChange={(e) => setCustomLeadHours(e.target.value)} type="number" min={1} placeholder="納期(h)" className="vid-input" style={{ ...inputStyle, width: 90 }} />
+            <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>件名</span>
+                <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} className="vid-input" style={inputStyle} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 100 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>金額</span>
+                <input value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} type="number" min={0} className="vid-input" style={inputStyle} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 90 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間(h)</span>
+                <input value={customLeadHours} onChange={(e) => setCustomLeadHours(e.target.value)} type="number" min={1} className="vid-input" style={inputStyle} />
+              </div>
               <button onClick={addCustomItem} style={{ ...smallBtn, height: 36 }}>
                 追加
               </button>
@@ -952,7 +966,12 @@ function QuoteDialog({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
-          <input value={due} onChange={(e) => setDue(e.target.value)} placeholder="対応の目安（例：3日後）任意" className="vid-input" style={inputStyle} />
+          {due && (
+            <div style={{ fontSize: 12.5 }}>
+              対応の目安：{due}
+              <span style={{ marginLeft: 6, fontSize: 10.5, color: "var(--color-neutral-500)" }}>（選んだ項目の目安時間から自動計算）</span>
+            </div>
+          )}
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
