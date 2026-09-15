@@ -561,7 +561,7 @@ export async function createCaseRequest(
   customerThreadId: string,
   customerId: string,
   input: {
-    items: { menuId: string | null; label: string; price: number; payout: number; qty: number }[];
+    items: { menuId: string | null; label: string; price: number; payout: number; qty: number; leadHours?: number }[];
     note: string;
     due: string;
     saveAsMenu?: boolean;
@@ -590,7 +590,7 @@ export async function createCaseRequest(
     if (customItems.length > 0) {
       const { error: menuError } = await supabase
         .from("menus")
-        .insert(customItems.map((it) => ({ org_id: ctx.orgId, label: it.label, price: it.price, payout: it.payout })));
+        .insert(customItems.map((it) => ({ org_id: ctx.orgId, label: it.label, price: it.price, payout: it.payout, lead_hours: it.leadHours ?? 24 })));
       if (menuError) throw menuError;
     }
   }
