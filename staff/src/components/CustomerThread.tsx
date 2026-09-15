@@ -798,7 +798,7 @@ function QuoteDialog({
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ flex: 1, fontSize: 11, color: "var(--color-neutral-500)" }}>受付メニュー</span>
             <button onClick={() => setShowCustomForm((v) => !v)} style={{ ...smallBtn, height: 26 }}>
-              ＋メニュー作成（または新規見積もり）
+              ＋メニュー作成
             </button>
           </div>
           {menus.map((m) => (
@@ -846,16 +846,6 @@ function QuoteDialog({
             </label>
           )}
         </div>
-
-        <input value={due} onChange={(e) => setDue(e.target.value)} placeholder="対応の目安（例：3日後）任意" className="vid-input" style={inputStyle} />
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="補足メモ（依頼主にも表示されます）任意"
-          rows={2}
-          className="vid-input"
-          style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
-        />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
           <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払いタイミング</span>
@@ -949,6 +939,18 @@ function QuoteDialog({
               )}
             </div>
           )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
+          <input value={due} onChange={(e) => setDue(e.target.value)} placeholder="対応の目安（例：3日後）任意" className="vid-input" style={inputStyle} />
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="補足メモ（依頼主にも表示されます）任意"
+            rows={2}
+            className="vid-input"
+            style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
+          />
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
