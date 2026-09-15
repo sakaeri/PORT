@@ -42,6 +42,9 @@ export interface ThreadMessage {
 
 type Message = ThreadMessage;
 
+// 会話が長くなっても初回表示・ポーリングが遅くならないよう、一度に読み込むメッセージ件数を絞る。
+export const MESSAGE_PAGE_SIZE = 60;
+
 const smallBtn: React.CSSProperties = {
   height: 30,
   padding: "0 12px",
@@ -181,10 +184,12 @@ export default function CustomerThread({
   cardPaymentEnabled,
   defaultBankInfo,
   cardPaymentLinks,
+  initialHasMoreOlder,
 }: {
   customer: { id: string; name: string; memberNo: string | null };
   thread: { id: string; archived: boolean } | null;
   initialMessages: Message[];
+  initialHasMoreOlder?: boolean;
   role: "owner" | "reception";
   currentUserId: string;
   orgId: string;
@@ -204,7 +209,11 @@ export default function CustomerThread({
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
+  const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const skipAutoScrollRef = useRef(false);
 
   useEffect(() => {
     if (thread) void markThreadRead(thread.id);
@@ -212,20 +221,27 @@ export default function CustomerThread({
   }, [thread?.id]);
 
   useEffect(() => {
+    if (skipAutoScrollRef.current) {
+      skipAutoScrollRef.current = false;
+      return;
+    }
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
+  const MESSAGE_SELECT = "*, message_attachments(*), requests(phase, amount, completion_reports(summary, details, note_to_customer))";
+
+  // 開いている間に届いた新着分だけを取りに行く（既に読み込んだ最古の時点以降のみ）。
+  // 会話全体を毎回取り直すと、履歴が長い依頼主ほどポーリングのたびに重くなるため。
   const refresh = useCallback(async () => {
     if (!thread) return;
     const supabase = createClient(orgId);
-    const { data } = await supabase
-      .from("messages")
-      .select("*, message_attachments(*), requests(phase, amount, completion_reports(summary, details, note_to_customer))")
-      .eq("thread_id", thread.id)
-      .order("sent_at", { ascending: true });
+    const { data } = oldestLoadedAt
+      ? await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", thread.id).gte("sent_at", oldestLoadedAt).order("sent_at", { ascending: true })
+      : await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", thread.id).order("sent_at", { ascending: false }).limit(MESSAGE_PAGE_SIZE);
     if (data) {
+      const rows = oldestLoadedAt ? data : data.slice().reverse();
       setMessages(
-        data.map((m) => {
+        rows.map((m) => {
           const req = Array.isArray(m.requests) ? m.requests[0] : m.requests;
           const reportRaw = req ? (Array.isArray(req.completion_reports) ? req.completion_reports[0] : req.completion_reports) : null;
           return {
@@ -237,10 +253,54 @@ export default function CustomerThread({
           };
         }),
       );
+      if (!oldestLoadedAt && rows.length > 0) setOldestLoadedAt(rows[0].sent_at);
     }
     // 開いている間に届いた分もその場で既読にする
     void markThreadRead(thread.id);
-  }, [thread, orgId]);
+  }, [thread, orgId, oldestLoadedAt]);
+
+  async function loadOlder() {
+    if (!thread || loadingOlder || !hasMoreOlder || !oldestLoadedAt) return;
+    setLoadingOlder(true);
+    try {
+      const supabase = createClient(orgId);
+      const { data } = await supabase
+        .from("messages")
+        .select(MESSAGE_SELECT)
+        .eq("thread_id", thread.id)
+        .lt("sent_at", oldestLoadedAt)
+        .order("sent_at", { ascending: false })
+        .limit(MESSAGE_PAGE_SIZE);
+      const rows = data ?? [];
+      if (rows.length > 0) {
+        const older = rows
+          .slice()
+          .reverse()
+          .map((m) => {
+            const req = Array.isArray(m.requests) ? m.requests[0] : m.requests;
+            const reportRaw = req ? (Array.isArray(req.completion_reports) ? req.completion_reports[0] : req.completion_reports) : null;
+            return {
+              ...m,
+              attachments: m.message_attachments ?? [],
+              requestPhase: req?.phase ?? null,
+              requestAmount: req?.amount ?? null,
+              report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [], noteToCustomer: reportRaw.note_to_customer } : null,
+            };
+          });
+        const container = scrollRef.current;
+        const prevScrollHeight = container?.scrollHeight ?? 0;
+        skipAutoScrollRef.current = true;
+        setMessages((prev) => [...older, ...prev]);
+        setOldestLoadedAt(older[0].sent_at);
+        requestAnimationFrame(() => {
+          if (container) container.scrollTop = container.scrollHeight - prevScrollHeight;
+        });
+      }
+      setHasMoreOlder(rows.length === MESSAGE_PAGE_SIZE);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
 
   useEffect(() => {
     if (!thread) return;
@@ -319,6 +379,15 @@ export default function CustomerThread({
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
         {!thread && <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>まだやり取りがありません。</div>}
+        {hasMoreOlder && (
+          <button
+            onClick={loadOlder}
+            disabled={loadingOlder}
+            style={{ alignSelf: "center", height: 30, padding: "0 14px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+          >
+            {loadingOlder ? "読み込み中…" : "過去のメッセージを読み込む"}
+          </button>
+        )}
         {messages.map((m) => {
           const isStaff = m.sender_role === "owner" || m.sender_role === "reception";
           const isOwn = m.sender_id === currentUserId;
