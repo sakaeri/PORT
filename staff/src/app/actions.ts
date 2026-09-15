@@ -502,12 +502,12 @@ export async function deleteMessage(messageId: string) {
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("自分が送ったメッセージのみ削除できます");
 
-  // 見積もりチャットを削除したら、まだ決済前（quoted）ならその見積もり自体も完全に削除する
-  // （request_items・案件トーク・そのメッセージまでDBのon delete cascadeで一緒に消える）。
-  // 決済済み・対応中・完了済みのものは、実績が残っているため削除しても消さない。
+  // 見積もりチャットを削除したら、フェーズに関わらずその見積もり自体も完全に削除する
+  // （request_items・完了報告・評価・案件トーク・そのメッセージまでDBのon delete cascadeで一緒に消える）。
+  // 削除の判断はチャット側で行う想定のため、ここでは残り実績の有無を問わない。
   const deleted = data[0];
   if (deleted.kind === "quote" && deleted.request_id) {
-    await supabase.from("requests").delete().eq("id", deleted.request_id).eq("phase", "quoted");
+    await supabase.from("requests").delete().eq("id", deleted.request_id);
   }
 }
 
@@ -780,21 +780,6 @@ export async function confirmFinalPayment(requestId: string) {
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
   await postCaseNotice(supabase, requestId, data[0].payment_timing === "deposit" ? "残金の入金を確認しました" : "入金を確認しました");
-}
-
-export async function declineCaseRequest(requestId: string) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("requests")
-    .update({ phase: "declined" })
-    .eq("id", requestId)
-    .eq("org_id", ctx.orgId)
-    .eq("phase", "quoted")
-    .select("id");
-  if (error) throw error;
-  if (!data || data.length === 0) throw new Error("取り下げできる状態ではありません（すでに決済済みの可能性があります）");
-  await postCaseNotice(supabase, requestId, "見積もりを取り下げました");
 }
 
 export async function submitCaseReport(

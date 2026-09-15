@@ -12,7 +12,6 @@ import {
   confirmFinalPayment,
   approveToStart,
   startCaseRequest,
-  declineCaseRequest,
   submitCaseReport,
   archiveCaseThread,
   unarchiveCaseThread,
@@ -106,7 +105,6 @@ export default function CaseDetail({
   }
 
   const handleStart = () => runAction(() => startCaseRequest(request.id));
-  const handleDecline = () => runAction(() => declineCaseRequest(request.id), "この見積もりを取り下げます。よろしいですか？");
   const handleConfirmPayment = () => runAction(() => confirmPayment(request.id), "入金を確認しましたか？この操作で着手できるようになります。");
   const handleConfirmDeposit = () => runAction(() => confirmDeposit(request.id), "予約金の入金を確認しましたか？この操作で着手できるようになります。");
   const handleApproveToStart = () => runAction(() => approveToStart(request.id), "入金なしでこの見積もりを承認し、着手できるようにします。よろしいですか？");
@@ -172,40 +170,25 @@ export default function CaseDetail({
             {request.paymentTiming === "prepay_full" && (
               <>
                 <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金待ちです。チャットで送った決済案内の着金を確認したら押してください。</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={handleConfirmPayment} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
-                    {busy ? "処理中…" : "入金を確認した"}
-                  </button>
-                  <button onClick={handleDecline} disabled={busy} style={{ ...btn, alignSelf: "flex-start", color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
-                    見積もりを取り下げる
-                  </button>
-                </div>
+                <button onClick={handleConfirmPayment} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
+                  {busy ? "処理中…" : "入金を確認した"}
+                </button>
               </>
             )}
             {request.paymentTiming === "deposit" && (
               <>
                 <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>予約金の入金待ちです。着金を確認したら押してください。</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={handleConfirmDeposit} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
-                    {busy ? "処理中…" : "予約金の入金を確認した"}
-                  </button>
-                  <button onClick={handleDecline} disabled={busy} style={{ ...btn, alignSelf: "flex-start", color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
-                    見積もりを取り下げる
-                  </button>
-                </div>
+                <button onClick={handleConfirmDeposit} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
+                  {busy ? "処理中…" : "予約金の入金を確認した"}
+                </button>
               </>
             )}
             {(request.paymentTiming === "before_shipping" || request.paymentTiming === "postpay") && (
               <>
                 <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金なしで着手できます。承認すると着手できるようになります。</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={handleApproveToStart} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
-                    {busy ? "処理中…" : "承認する"}
-                  </button>
-                  <button onClick={handleDecline} disabled={busy} style={{ ...btn, alignSelf: "flex-start", color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
-                    見積もりを取り下げる
-                  </button>
-                </div>
+                <button onClick={handleApproveToStart} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
+                  {busy ? "処理中…" : "承認する"}
+                </button>
               </>
             )}
           </div>
