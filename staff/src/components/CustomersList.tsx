@@ -12,7 +12,6 @@ interface CustomerRow {
   name: string;
   memberNo: string | null;
   active: boolean;
-  creatorName: string | null;
   convertedOrg: { displayName: string; slug: string | null } | null;
   thread: { id: string; archived: boolean } | null;
   lastMessagePreview: string | null;
@@ -110,9 +109,6 @@ export default function CustomersList({ rows: initialRows, isHq, orgId }: { rows
               </div>
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.lastMessagePreview ?? "まだやり取りがありません"}</div>
             </Link>
-            {!isHq && (
-              <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>{c.creatorName ? `担当: ${c.creatorName}` : "未割り当て"}</div>
-            )}
             {isHq && c.convertedOrg && (
               <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: "var(--color-accent-200)" }}>
                 <Buildings size={14} />

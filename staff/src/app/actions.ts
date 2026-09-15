@@ -502,19 +502,12 @@ export async function deleteMessage(messageId: string) {
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("自分が送ったメッセージのみ削除できます");
 
-  // 見積もりチャットを削除したら、まだ決済前（quoted）ならその見積もり自体も取り下げる
-  // （決済済み・対応中のものは削除しても取り下げない）。
+  // 見積もりチャットを削除したら、まだ決済前（quoted）ならその見積もり自体も完全に削除する
+  // （request_items・案件トーク・そのメッセージまでDBのon delete cascadeで一緒に消える）。
+  // 決済済み・対応中・完了済みのものは、実績が残っているため削除しても消さない。
   const deleted = data[0];
   if (deleted.kind === "quote" && deleted.request_id) {
-    const { data: declined } = await supabase
-      .from("requests")
-      .update({ phase: "declined" })
-      .eq("id", deleted.request_id)
-      .eq("phase", "quoted")
-      .select("id");
-    if (declined && declined.length > 0) {
-      await postCaseNotice(supabase, deleted.request_id, "見積もりチャットが削除されたため取り下げました");
-    }
+    await supabase.from("requests").delete().eq("id", deleted.request_id).eq("phase", "quoted");
   }
 }
 
@@ -542,6 +535,21 @@ export async function unarchiveThread(threadId: string) {
   await setCustomerActiveForThread(threadId, true);
 }
 
+// 案件トーク（kind='case'）のアーカイブ。依頼主のアーカイブと違い customers.active には触れない。
+export async function archiveCaseThread(threadId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("threads").update({ archived_at: new Date().toISOString() }).eq("id", threadId).eq("org_id", ctx.orgId).eq("kind", "case");
+  if (error) throw error;
+}
+
+export async function unarchiveCaseThread(threadId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("threads").update({ archived_at: null }).eq("id", threadId).eq("org_id", ctx.orgId).eq("kind", "case");
+  if (error) throw error;
+}
+
 // 依頼主を丸ごと完全削除する（一覧の「削除」用）。トーク・メッセージ・
 // 添付・案件・評価・作業メモ・紹介record も customers への on delete
 // cascade で連動して消える。アーカイブと違い元に戻せない。
@@ -561,7 +569,7 @@ export async function createCaseRequest(
   customerThreadId: string,
   customerId: string,
   input: {
-    items: { menuId: string | null; label: string; price: number; payout: number; qty: number; leadHours?: number }[];
+    items: { menuId: string | null; label: string; price: number; payout: number; qty: number; leadHours?: number | null }[];
     note: string;
     due: string;
     saveAsMenu?: boolean;

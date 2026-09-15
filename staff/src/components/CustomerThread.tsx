@@ -731,7 +731,7 @@ interface CustomItem {
   label: string;
   price: number;
   qty: number;
-  leadHours: number;
+  leadHours: number | null;
 }
 
 interface CardPaymentLink {
@@ -791,7 +791,7 @@ function QuoteDialog({
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customLabel, setCustomLabel] = useState("");
   const [customPrice, setCustomPrice] = useState("");
-  const [customLeadHours, setCustomLeadHours] = useState("24");
+  const [customLeadHours, setCustomLeadHours] = useState("");
   const [note, setNote] = useState("");
   const [saveAsMenu, setSaveAsMenu] = useState(false);
   const [paymentTiming, setPaymentTiming] = useState<PaymentTiming>("prepay_full");
@@ -818,22 +818,23 @@ function QuoteDialog({
 
   function addCustomItem() {
     const price = Number(customPrice);
-    const leadHours = Math.max(1, Math.round(Number(customLeadHours) || 24));
+    const leadHours = customLeadHours.trim() ? Math.max(1, Math.round(Number(customLeadHours))) : null;
     if (!customLabel.trim() || !Number.isFinite(price) || price < 0) return;
     setCustomItems((rows) => [...rows, { label: customLabel.trim(), price, qty: 1, leadHours }]);
     setCustomLabel("");
     setCustomPrice("");
-    setCustomLeadHours("24");
+    setCustomLeadHours("");
   }
 
-  const menuItems = menus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id], leadHours: m.leadHours }));
+  const menuItems = menus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id], leadHours: m.leadHours as number | null }));
   const allItems = [
     ...menuItems,
     ...customItems.map((c) => ({ menuId: null as string | null, label: c.label, price: c.price, payout: 0, qty: c.qty, leadHours: c.leadHours })),
   ];
   const total = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
   const depositAmount = paymentTiming === "deposit" ? Math.round((total * (Number(depositPercent) || 0)) / 100) : null;
-  const due = allItems.length > 0 ? hoursToDueLabel(Math.max(...allItems.map((it) => it.leadHours))) : "";
+  const knownLeadHours = allItems.map((it) => it.leadHours).filter((h): h is number => h != null);
+  const due = knownLeadHours.length > 0 ? hoursToDueLabel(Math.max(...knownLeadHours)) : "";
 
   async function submit() {
     if (saving || allItems.length === 0) return;
@@ -879,7 +880,7 @@ function QuoteDialog({
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ flex: 1, fontSize: 11, color: "var(--color-neutral-500)" }}>受付メニュー</span>
             <button onClick={() => setShowCustomForm((v) => !v)} style={{ ...smallBtn, height: 26 }}>
-              ＋メニュー作成
+              ＋項目を追加
             </button>
           </div>
           {menus.map((m) => (
@@ -913,8 +914,8 @@ function QuoteDialog({
                 <input value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} type="number" min={0} className="vid-input" style={inputStyle} />
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 90 }}>
-                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間(h)</span>
-                <input value={customLeadHours} onChange={(e) => setCustomLeadHours(e.target.value)} type="number" min={1} className="vid-input" style={inputStyle} />
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間(h)・任意</span>
+                <input value={customLeadHours} onChange={(e) => setCustomLeadHours(e.target.value)} type="number" min={1} placeholder="なし" className="vid-input" style={inputStyle} />
               </div>
               <button onClick={addCustomItem} style={{ ...smallBtn, height: 36 }}>
                 追加
@@ -925,7 +926,8 @@ function QuoteDialog({
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
               <span style={{ flex: 1, minWidth: 0 }}>{c.label}</span>
               <span style={{ color: "var(--color-neutral-500)" }}>
-                ¥{c.price.toLocaleString("ja-JP")}・納期{c.leadHours}時間
+                ¥{c.price.toLocaleString("ja-JP")}
+                {c.leadHours != null && `・納期${c.leadHours}時間`}
               </span>
               <button onClick={() => setCustomItems((rows) => rows.filter((_, j) => j !== i))} style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
                 <Trash size={12} />

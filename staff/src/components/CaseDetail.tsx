@@ -3,10 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Star } from "@phosphor-icons/react";
+import { ArrowLeft, Archive, ArrowCounterClockwise, Star } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
-import { confirmPayment, confirmDeposit, confirmFinalPayment, approveToStart, startCaseRequest, declineCaseRequest, submitCaseReport } from "@/app/actions";
+import {
+  confirmPayment,
+  confirmDeposit,
+  confirmFinalPayment,
+  approveToStart,
+  startCaseRequest,
+  declineCaseRequest,
+  submitCaseReport,
+  archiveCaseThread,
+  unarchiveCaseThread,
+} from "@/app/actions";
 import type { BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
 
@@ -71,7 +81,7 @@ export default function CaseDetail({
   customer: { id: string; name: string } | null;
   report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[] } | null;
   rating: { stars: number | null; comment: string | null; skipped: boolean } | null;
-  caseThread: { id: string } | null;
+  caseThread: { id: string; archived: boolean } | null;
   caseMessages: CaseMessage[];
   orgId: string;
   currentUserId: string;
@@ -101,6 +111,8 @@ export default function CaseDetail({
   const handleConfirmDeposit = () => runAction(() => confirmDeposit(request.id), "予約金の入金を確認しましたか？この操作で着手できるようになります。");
   const handleApproveToStart = () => runAction(() => approveToStart(request.id), "入金なしでこの見積もりを承認し、着手できるようにします。よろしいですか？");
   const handleConfirmFinal = () => runAction(() => confirmFinalPayment(request.id), request.paymentTiming === "deposit" ? "残金の入金を確認しましたか？" : "入金を確認しましたか？");
+  const handleToggleArchive = () =>
+    runAction(() => (caseThread?.archived ? unarchiveCaseThread(caseThread.id) : archiveCaseThread(caseThread!.id)));
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 640, width: "100%", margin: "0 auto" }}>
@@ -108,7 +120,17 @@ export default function CaseDetail({
         <Link href="/cases" aria-label="案件一覧に戻る" style={{ display: "flex", color: "var(--color-neutral-400)" }}>
           <ArrowLeft size={17} />
         </Link>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>{request.title}</div>
+        <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>{request.title}</div>
+        {caseThread && (
+          <button
+            onClick={handleToggleArchive}
+            disabled={busy}
+            style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+          >
+            {caseThread.archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
+            {caseThread.archived ? "一覧に戻す" : "アーカイブ"}
+          </button>
+        )}
       </div>
 
       <div style={card}>

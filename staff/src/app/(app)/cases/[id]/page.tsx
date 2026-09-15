@@ -23,7 +23,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
 
-  const { data: caseThread } = await supabase.from("threads").select("id").eq("kind", "case").eq("request_id", id).maybeSingle();
+  const { data: caseThread } = await supabase.from("threads").select("id, archived_at").eq("kind", "case").eq("request_id", id).maybeSingle();
   let caseMessages: { id: string; sender_id: string | null; sender_role: "owner" | "reception" | "creator" | "client" | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null; senderName: string | null }[] = [];
   if (caseThread) {
     const { data } = await supabase
@@ -58,7 +58,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       customer={customer ? { id: customer.id, name: customer.name } : null}
       report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer, details: report.details ?? [] } : null}
       rating={rating ? { stars: rating.stars, comment: rating.comment, skipped: rating.skipped } : null}
-      caseThread={caseThread ? { id: caseThread.id } : null}
+      caseThread={caseThread ? { id: caseThread.id, archived: !!caseThread.archived_at } : null}
       caseMessages={caseMessages}
       orgId={ctx.orgId}
       currentUserId={ctx.userId}
