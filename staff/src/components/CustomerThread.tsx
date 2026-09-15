@@ -794,33 +794,33 @@ function QuoteDialog({
           このトークの内容を正式な依頼にします。発行するとトークに見積もりカードが入ります。
         </div>
 
-        {menus.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>受付メニュー</span>
-            {menus.map((m) => (
-              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</div>
-                  <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>
-                    ¥{m.price.toLocaleString("ja-JP")}・納期{m.leadHours}時間
-                  </div>
-                </div>
-                <button onClick={() => bump(m.id, -1)} disabled={!qty[m.id]} style={stepperBtn}>
-                  −
-                </button>
-                <span style={{ width: 20, textAlign: "center", fontSize: 13 }}>{qty[m.id] ?? 0}</span>
-                <button onClick={() => bump(m.id, 1)} style={stepperBtn}>
-                  ＋
-                </button>
-              </div>
-            ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ flex: 1, fontSize: 11, color: "var(--color-neutral-500)" }}>受付メニュー</span>
+            <button onClick={() => setShowCustomForm((v) => !v)} style={{ ...smallBtn, height: 26 }}>
+              ＋メニュー作成（または新規見積もり）
+            </button>
           </div>
-        )}
+          {menus.map((m) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</div>
+                <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>
+                  ¥{m.price.toLocaleString("ja-JP")}・納期{m.leadHours}時間
+                </div>
+              </div>
+              <button onClick={() => bump(m.id, -1)} disabled={!qty[m.id]} style={stepperBtn}>
+                −
+              </button>
+              <span style={{ width: 20, textAlign: "center", fontSize: 13 }}>{qty[m.id] ?? 0}</span>
+              <button onClick={() => bump(m.id, 1)} style={stepperBtn}>
+                ＋
+              </button>
+            </div>
+          ))}
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <button onClick={() => setShowCustomForm((v) => !v)} style={{ alignSelf: "flex-start", fontSize: 11.5, color: "var(--color-accent)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-            白紙から見積もる（メニュー外）
-          </button>
           {showCustomForm && (
             <div style={{ display: "flex", gap: 6 }}>
               <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder="件名" className="vid-input" style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
@@ -935,8 +935,14 @@ function QuoteDialog({
               )}
               {newLinkMode ? (
                 <>
-                  <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="リンクのタイトル（例：Stripe決済リンクA）" className="vid-input" style={inputStyle} />
-                  <input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="カード決済のリンク（依頼主に直接表示されます）" className="vid-input" style={inputStyle} />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>リンクのタイトル（一覧での表示名）</span>
+                    <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="例：Stripe決済リンクA" className="vid-input" style={inputStyle} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>決済リンクのURL（依頼主に直接表示されます）</span>
+                    <input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="vid-input" style={inputStyle} />
+                  </div>
                 </>
               ) : (
                 selectedLink && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedLink.url}</div>
