@@ -28,6 +28,7 @@ const card: React.CSSProperties = {
   borderRadius: "var(--radius-md)",
   background: "var(--color-surface)",
   border: "1px solid var(--color-divider)",
+  boxShadow: "var(--shadow-sm)",
   display: "flex",
   flexDirection: "column",
   gap: 12,

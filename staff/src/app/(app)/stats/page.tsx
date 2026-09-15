@@ -105,7 +105,7 @@ async function OrgStats({ orgId }: { orgId: string }) {
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ flex: "1 1 160px", padding: "14px 16px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+    <div style={{ flex: "1 1 160px", padding: "14px 16px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}>
       <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{label}</div>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20, marginTop: 4 }}>{value}</div>
     </div>
