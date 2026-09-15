@@ -1,6 +1,14 @@
 import type { RequestRow } from "@/lib/chat-types";
+import type { PaymentTiming } from "@/lib/supabase/types";
 
 export const STAGE_LABELS = ["見積もり・受付", "制作の着手", "制作中", "納品"] as const;
+
+export const PAYMENT_TIMING_LABEL: Record<PaymentTiming, string> = {
+  prepay_full: "先払い",
+  deposit: "予約金の先払い",
+  before_shipping: "発送前入金",
+  postpay: "後払い",
+};
 
 export interface StageStep {
   label: string;

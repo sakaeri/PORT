@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
-import type { RefundMode, RefundStage } from "@/lib/supabase/types";
+import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage } from "@/lib/supabase/types";
 
 async function requireContext() {
   const ctx = await getStaffContext();
@@ -43,6 +43,19 @@ export async function updateCompanyInfo(fields: {
     .select("id");
   if (error) throw error;
   if (!data?.length) throw new Error("会社情報の変更はオーナーのみ行えます");
+}
+
+// org_write ポリシーは owner のみ更新可（reception は不可）。
+export async function updatePaymentSettings(fields: { cardPaymentEnabled: boolean; bankInfo: BankTransferInfo }) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("organizations")
+    .update({ card_payment_enabled: fields.cardPaymentEnabled, bank_transfer_info: fields.bankInfo })
+    .eq("id", ctx.orgId)
+    .select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("決済設定の変更はオーナーのみ行えます");
 }
 
 // solo=true が「1人運用（スタッフ機能を隠す）」。トグルのラベルは
@@ -533,6 +546,10 @@ export async function createCaseRequest(
     note: string;
     due: string;
     saveAsMenu?: boolean;
+    paymentTiming: PaymentTiming;
+    depositPercent?: number;
+    payMethod: PaymentMethod;
+    bankInfo?: BankTransferInfo;
   },
 ) {
   const ctx = await requireContext();
@@ -542,6 +559,10 @@ export async function createCaseRequest(
 
   const amount = items.reduce((sum, it) => sum + it.price * it.qty, 0);
   const title = items.length > 2 ? `${items[0].label}ほか${items.length - 1}件` : items.map((it) => it.label).join("・");
+
+  const depositPercent = input.paymentTiming === "deposit" ? Math.min(100, Math.max(1, Math.round(input.depositPercent ?? 0))) : null;
+  if (input.paymentTiming === "deposit" && !depositPercent) throw new Error("予約金の割合を入力してください");
+  const depositAmount = depositPercent ? Math.round((amount * depositPercent) / 100) : null;
 
   if (input.saveAsMenu) {
     const customItems = items.filter((it) => !it.menuId);
@@ -563,6 +584,11 @@ export async function createCaseRequest(
       amount,
       phase: "quoted",
       quoted_at: new Date().toISOString(),
+      payment_timing: input.paymentTiming,
+      deposit_percent: depositPercent,
+      deposit_amount: depositAmount,
+      pay_method: input.payMethod,
+      bank_transfer_info: input.payMethod === "bank" ? (input.bankInfo ?? {}) : null,
     })
     .select("id")
     .single();
@@ -637,6 +663,7 @@ export async function startCaseRequest(requestId: string) {
   await postCaseNotice(supabase, requestId, "着手しました");
 }
 
+// 先払い：着手前に全額の入金確認が必要。quoted → preparing。
 export async function confirmPayment(requestId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
@@ -646,7 +673,6 @@ export async function confirmPayment(requestId: string) {
     .update({
       phase: "preparing",
       accepted_at: now,
-      pay_method: "bank",
       pay_status: "paid",
       paid_at: now,
       paid_marked_by: ctx.userId,
@@ -654,10 +680,69 @@ export async function confirmPayment(requestId: string) {
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
     .eq("phase", "quoted")
+    .eq("payment_timing", "prepay_full")
     .select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
   await postCaseNotice(supabase, requestId, "入金を確認しました");
+}
+
+// 予約金：予約金分だけの入金確認で着手できるようにする。quoted → preparing、pay_statusはprocessing止まり。
+export async function confirmDeposit(requestId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("requests")
+    .update({
+      phase: "preparing",
+      accepted_at: now,
+      pay_status: "processing",
+      deposit_paid_at: now,
+      deposit_paid_marked_by: ctx.userId,
+    })
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId)
+    .eq("phase", "quoted")
+    .eq("payment_timing", "deposit")
+    .select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
+  await postCaseNotice(supabase, requestId, "予約金の入金を確認しました");
+}
+
+// 発送前入金・後払い：入金なしで着手できるようにする。quoted → preparing。
+export async function approveToStart(requestId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("requests")
+    .update({ phase: "preparing", accepted_at: new Date().toISOString() })
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId)
+    .eq("phase", "quoted")
+    .in("payment_timing", ["before_shipping", "postpay"])
+    .select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("承認できる状態ではありません");
+  await postCaseNotice(supabase, requestId, "見積もりを承認しました（入金は完了後にご案内します）");
+}
+
+// 残金（予約金の場合）・全額（発送前入金・後払いの場合）の入金確認。フェーズは変えない。
+export async function confirmFinalPayment(requestId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("requests")
+    .update({ pay_status: "paid", paid_at: now, paid_marked_by: ctx.userId })
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId)
+    .neq("pay_status", "paid")
+    .select("id, payment_timing");
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
+  await postCaseNotice(supabase, requestId, data[0].payment_timing === "deposit" ? "残金の入金を確認しました" : "入金を確認しました");
 }
 
 export async function declineCaseRequest(requestId: string) {

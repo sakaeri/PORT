@@ -10,7 +10,7 @@ import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, 
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import { PHASE_LABEL } from "@/lib/stage";
-import type { RequestPhase } from "@/lib/supabase/types";
+import type { BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
 
 export interface ThreadAttachment {
   id: string;
@@ -177,6 +177,8 @@ export default function CustomerThread({
   memos,
   ratings,
   latestRequest,
+  cardPaymentEnabled,
+  defaultBankInfo,
 }: {
   customer: { id: string; name: string; memberNo: string | null };
   thread: { id: string; archived: boolean } | null;
@@ -191,6 +193,8 @@ export default function CustomerThread({
   memos: WorkMemo[];
   ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
+  cardPaymentEnabled: boolean;
+  defaultBankInfo: BankTransferInfo;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -456,7 +460,16 @@ export default function CustomerThread({
     <div style={{ flex: "none", width: 300, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 18, borderLeft: "1px solid var(--color-divider)" }}>
       {!isHq && <RatingsSummary ratings={ratings} />}
       <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
-      {!isHq && <CaseSummarySection thread={thread} customerId={customer.id} menus={menus} latestRequest={latestRequest} />}
+      {!isHq && (
+        <CaseSummarySection
+          thread={thread}
+          customerId={customer.id}
+          menus={menus}
+          latestRequest={latestRequest}
+          cardPaymentEnabled={cardPaymentEnabled}
+          defaultBankInfo={defaultBankInfo}
+        />
+      )}
     </div>
     </div>
   );
@@ -496,11 +509,15 @@ function CaseSummarySection({
   customerId,
   menus,
   latestRequest,
+  cardPaymentEnabled,
+  defaultBankInfo,
 }: {
   thread: { id: string; archived: boolean } | null;
   customerId: string;
   menus: MenuOption[];
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
+  cardPaymentEnabled: boolean;
+  defaultBankInfo: BankTransferInfo;
 }) {
   const router = useRouter();
   const [showDialog, setShowDialog] = useState(false);
@@ -523,6 +540,8 @@ function CaseSummarySection({
           threadId={thread.id}
           customerId={customerId}
           menus={menus}
+          cardPaymentEnabled={cardPaymentEnabled}
+          defaultBankInfo={defaultBankInfo}
           onClose={() => setShowDialog(false)}
           onCreated={(requestId) => {
             setShowDialog(false);
@@ -638,16 +657,42 @@ interface CustomItem {
   qty: number;
 }
 
+const PAYMENT_TIMING_OPTIONS: { value: PaymentTiming; label: string }[] = [
+  { value: "prepay_full", label: "先払い" },
+  { value: "deposit", label: "予約金の先払い" },
+  { value: "before_shipping", label: "発送前入金" },
+  { value: "postpay", label: "後払い" },
+];
+
+function pillStyle(active: boolean): React.CSSProperties {
+  return {
+    height: 30,
+    padding: "0 12px",
+    cursor: "pointer",
+    fontSize: 12,
+    whiteSpace: "nowrap",
+    color: active ? "var(--color-accent-100)" : "var(--color-neutral-400)",
+    background: active ? "var(--color-accent-900)" : "transparent",
+    border: "1px solid",
+    borderColor: active ? "var(--color-accent-800)" : "var(--color-divider)",
+    borderRadius: "var(--radius-md)",
+  };
+}
+
 function QuoteDialog({
   threadId,
   customerId,
   menus,
+  cardPaymentEnabled,
+  defaultBankInfo,
   onClose,
   onCreated,
 }: {
   threadId: string;
   customerId: string;
   menus: MenuOption[];
+  cardPaymentEnabled: boolean;
+  defaultBankInfo: BankTransferInfo;
   onClose: () => void;
   onCreated: (requestId: string) => void;
 }) {
@@ -659,8 +704,16 @@ function QuoteDialog({
   const [due, setDue] = useState("");
   const [note, setNote] = useState("");
   const [saveAsMenu, setSaveAsMenu] = useState(false);
+  const [paymentTiming, setPaymentTiming] = useState<PaymentTiming>("prepay_full");
+  const [depositPercent, setDepositPercent] = useState("30");
+  const [payMethod, setPayMethod] = useState<PaymentMethod>("bank");
+  const [bankInfo, setBankInfo] = useState<BankTransferInfo>(defaultBankInfo);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  function setBankField<K extends keyof BankTransferInfo>(key: K, value: string) {
+    setBankInfo((b) => ({ ...b, [key]: value }));
+  }
 
   function bump(menuId: string, delta: number) {
     setQty((q) => ({ ...q, [menuId]: Math.max(0, (q[menuId] ?? 0) + delta) }));
@@ -677,13 +730,23 @@ function QuoteDialog({
   const menuItems = menus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id] }));
   const allItems = [...menuItems, ...customItems.map((c) => ({ menuId: null as string | null, label: c.label, price: c.price, payout: 0, qty: c.qty }))];
   const total = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const depositAmount = paymentTiming === "deposit" ? Math.round((total * (Number(depositPercent) || 0)) / 100) : null;
 
   async function submit() {
     if (saving || allItems.length === 0) return;
     setError("");
     setSaving(true);
     try {
-      const requestId = await createCaseRequest(threadId, customerId, { items: allItems, note, due, saveAsMenu });
+      const requestId = await createCaseRequest(threadId, customerId, {
+        items: allItems,
+        note,
+        due,
+        saveAsMenu,
+        paymentTiming,
+        depositPercent: paymentTiming === "deposit" ? Number(depositPercent) || 0 : undefined,
+        payMethod,
+        bankInfo: payMethod === "bank" ? bankInfo : undefined,
+      });
       onCreated(requestId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "作成できませんでした");
@@ -765,6 +828,66 @@ function QuoteDialog({
           className="vid-input"
           style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
         />
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
+          <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払いタイミング</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {PAYMENT_TIMING_OPTIONS.map((opt) => (
+              <button key={opt.value} onClick={() => setPaymentTiming(opt.value)} style={pillStyle(paymentTiming === opt.value)}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {paymentTiming === "deposit" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12.5 }}>予約金</span>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={depositPercent}
+                onChange={(e) => setDepositPercent(e.target.value)}
+                className="vid-input"
+                style={{ ...inputStyle, width: 64 }}
+              />
+              <span style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>%（¥{(depositAmount ?? 0).toLocaleString("ja-JP")}）・残金は完了後にご案内します</span>
+            </div>
+          )}
+          {(paymentTiming === "before_shipping" || paymentTiming === "postpay") && (
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+              入金確認なしで着手できます。{paymentTiming === "before_shipping" ? "発送前" : "対応完了後"}に入金をご案内ください。
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払い方法</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setPayMethod("bank")} style={pillStyle(payMethod === "bank")}>
+              銀行振込
+            </button>
+            {cardPaymentEnabled && (
+              <button onClick={() => setPayMethod("card")} style={pillStyle(payMethod === "card")}>
+                カード決済
+              </button>
+            )}
+          </div>
+          {payMethod === "bank" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <input value={bankInfo.holder ?? ""} onChange={(e) => setBankField("holder", e.target.value)} placeholder="口座名義" className="vid-input" style={inputStyle} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                <input value={bankInfo.bankName ?? ""} onChange={(e) => setBankField("bankName", e.target.value)} placeholder="銀行名" className="vid-input" style={inputStyle} />
+                <input value={bankInfo.branchName ?? ""} onChange={(e) => setBankField("branchName", e.target.value)} placeholder="支店名" className="vid-input" style={inputStyle} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                <input value={bankInfo.accountType ?? ""} onChange={(e) => setBankField("accountType", e.target.value)} placeholder="口座種別（普通・当座）" className="vid-input" style={inputStyle} />
+                <input value={bankInfo.accountNumber ?? ""} onChange={(e) => setBankField("accountNumber", e.target.value)} placeholder="口座番号" className="vid-input" style={inputStyle} />
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>カード決済のリンクは、見積もり送信後に別途チャットでお送りください。</div>
+          )}
+        </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
           <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>請求額（依頼主に表示）</span>

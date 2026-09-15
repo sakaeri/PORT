@@ -72,6 +72,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     .maybeSingle();
   const latestRequest = latestRequestRow ? { id: latestRequestRow.id, title: latestRequestRow.title, amount: latestRequestRow.amount, phase: latestRequestRow.phase } : null;
 
+  const { data: orgPayment } = await supabase
+    .from("organizations")
+    .select("card_payment_enabled, bank_transfer_info")
+    .eq("id", ctx.orgId)
+    .single();
+
   let initialMessages: ThreadMessage[] = [];
   if (thread) {
     const { data } = await supabase
@@ -107,6 +113,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       memos={memos}
       ratings={ratings}
       latestRequest={latestRequest}
+      cardPaymentEnabled={orgPayment?.card_payment_enabled ?? false}
+      defaultBankInfo={orgPayment?.bank_transfer_info ?? {}}
     />
   );
 }

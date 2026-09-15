@@ -34,6 +34,15 @@ export type RefundStage = "prequote" | "accepted" | "started" | "delivered" | "t
 export type RefundMode = "nocharge" | "full" | "partial" | "none";
 export type PaymentMethod = "card" | "bank";
 export type PaymentStatus = "unpaid" | "processing" | "paid" | "refunded" | "failed";
+export type PaymentTiming = "prepay_full" | "deposit" | "before_shipping" | "postpay";
+
+export interface BankTransferInfo {
+  holder?: string;
+  bankName?: string;
+  branchName?: string;
+  accountType?: string;
+  accountNumber?: string;
+}
 
 export interface QuotePayloadItem {
   label: string;
@@ -82,6 +91,8 @@ export interface Database {
           domain: string | null;
           slug: string | null;
           is_hq: boolean;
+          card_payment_enabled: boolean;
+          bank_transfer_info: BankTransferInfo;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["organizations"]["Row"]>;
@@ -200,6 +211,12 @@ export interface Database {
           started_at: string | null;
           completed_at: string | null;
           cancelled_at: string | null;
+          payment_timing: PaymentTiming;
+          deposit_percent: number | null;
+          deposit_amount: number | null;
+          deposit_paid_at: string | null;
+          deposit_paid_marked_by: string | null;
+          bank_transfer_info: BankTransferInfo | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]>;

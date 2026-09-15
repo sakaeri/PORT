@@ -11,7 +11,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const supabase = await createClient();
   const { data: request } = await supabase
     .from("requests")
-    .select("id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, customers(id, name), completion_reports(*), ratings(*)")
+    .select(
+      "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, customers(id, name), completion_reports(*), ratings(*)",
+    )
     .eq("id", id)
     .eq("org_id", ctx.orgId)
     .maybeSingle();
@@ -44,6 +46,13 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         amount: request.amount,
         phase: request.phase,
         createdAt: request.created_at,
+        paymentTiming: request.payment_timing,
+        depositPercent: request.deposit_percent,
+        depositAmount: request.deposit_amount,
+        depositPaidAt: request.deposit_paid_at,
+        payMethod: request.pay_method,
+        payStatus: request.pay_status,
+        bankTransferInfo: request.bank_transfer_info,
       }}
       customer={customer ? { id: customer.id, name: customer.name } : null}
       report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer, details: report.details ?? [] } : null}

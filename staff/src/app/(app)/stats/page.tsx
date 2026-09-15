@@ -71,24 +71,33 @@ async function HqStats() {
 
 async function OrgStats({ orgId }: { orgId: string }) {
   const supabase = await createClient();
-  const { data: requests, error } = await supabase.from("requests").select("phase, amount").eq("org_id", orgId);
+  const { data: requests, error } = await supabase
+    .from("requests")
+    .select("phase, amount, pay_status, deposit_amount")
+    .eq("org_id", orgId);
 
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
 
-  const billable = (requests ?? []).filter((r) => ["preparing", "started", "approved", "completed"].includes(r.phase));
-  const total = billable.reduce((s, r) => s + r.amount, 0);
-  const quoted = (requests ?? []).filter((r) => r.phase === "quoted").length;
-  const completed = billable.filter((r) => r.phase === "completed").length;
+  const rows = requests ?? [];
+  // 実際に着金確認できた金額だけを合計する（見積もり金額ではない）。
+  // pay_status='paid'なら全額、'processing'（予約金のみ確認済み）ならdeposit_amountの分だけ数える。
+  const total = rows.reduce((s, r) => {
+    if (r.pay_status === "paid") return s + r.amount;
+    if (r.pay_status === "processing") return s + (r.deposit_amount ?? 0);
+    return s;
+  }, 0);
+  const quoted = rows.filter((r) => r.phase === "quoted").length;
+  const completed = rows.filter((r) => r.phase === "completed").length;
 
   return (
     <>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <StatTile label="累計売上（決済済み）" value={yen(total)} />
+        <StatTile label="累計入金額（確認済み）" value={yen(total)} />
         <StatTile label="完了件数" value={`${completed}件`} />
         <StatTile label="見積もり回答待ち" value={`${quoted}件`} />
       </div>
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        月別の内訳やスタッフごとの実績は次のフェーズで対応します。
+        入金額は受付が「入金を確認した」を押した分だけ反映されます。月別の内訳やスタッフごとの実績は次のフェーズで対応します。
       </div>
     </>
   );

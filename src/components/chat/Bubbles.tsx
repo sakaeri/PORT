@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
-import type { AttachmentRow, MessageWithExtras, RequestBundle, VaultRow } from "@/lib/chat-types";
+import type { AttachmentRow, MessageWithExtras, RequestBundle, RequestRow, VaultRow } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
-import { stageInfoFor } from "@/lib/stage";
+import { PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
 import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
@@ -193,6 +193,19 @@ export function MenuPickBubble({ msg }: { msg: MessageWithExtras }) {
 }
 
 const kicker: React.CSSProperties = { fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-accent)" };
+
+function paymentTimingNote(r: RequestRow): string {
+  switch (r.payment_timing) {
+    case "deposit":
+      return "着手前に予約金をお支払いください（残金は完了後にご案内します）。";
+    case "before_shipping":
+      return "対応完了後、発送前にお支払いください。";
+    case "postpay":
+      return "対応完了後にお支払いください。";
+    default:
+      return "着手前にお支払いください。";
+  }
+}
 const outlineBtn: React.CSSProperties = { height: 40, cursor: "pointer", fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 14, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
 
 export function RequestCard({
@@ -215,7 +228,6 @@ export function RequestCard({
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState("");
 
-  const isPending = r.phase === "quoted";
   const showProgress = !["quoted", "declined"].includes(r.phase);
   const showReport = r.phase === "completed" && !!report?.sent_at;
   const stage = stageInfoFor(r);
@@ -258,15 +270,42 @@ export function RequestCard({
               <span style={{ color: "var(--color-accent-300)" }}>{payload.due} ごろ</span>
             </div>
           )}
-          {isPending && (
-            <div style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-neutral-400)", padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-              受付からのご案内に沿ってお支払いください。入金確認後、対応を開始します。
-            </div>
-          )}
-          {!isPending && r.phase !== "declined" && (
-            <span style={{ display: "inline-flex", marginTop: 10, fontSize: 11, padding: "3px 10px", borderRadius: 6, background: "var(--color-accent-800)", color: "var(--color-accent-100)", width: "fit-content" }}>
-              承認済み・決済完了
-            </span>
+          {!["declined", "cancelled"].includes(r.phase) && (
+            r.pay_status === "paid" ? (
+              <span style={{ display: "inline-flex", marginTop: 10, fontSize: 11, padding: "3px 10px", borderRadius: 6, background: "var(--color-accent-800)", color: "var(--color-accent-100)", width: "fit-content" }}>
+                決済完了
+              </span>
+            ) : (
+              <div style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-neutral-300)", padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={kicker}>お支払いについて</div>
+                <div>
+                  {PAYMENT_TIMING_LABEL[r.payment_timing]}
+                  {r.payment_timing === "deposit" && r.deposit_amount != null && `・予約金 ${yen(r.deposit_amount)}`}
+                </div>
+                <div style={{ color: "var(--color-neutral-500)" }}>{paymentTimingNote(r)}</div>
+                {r.payment_timing === "deposit" && r.deposit_paid_at && (
+                  <div style={{ color: "var(--color-accent-300)" }}>予約金は入金済みです。残金は対応完了後にご案内します。</div>
+                )}
+                {r.pay_method === "bank" && r.bank_transfer_info && (
+                  <div style={{ marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 2 }}>
+                    {(r.bank_transfer_info.bankName || r.bank_transfer_info.branchName) && (
+                      <div>
+                        {r.bank_transfer_info.bankName} {r.bank_transfer_info.branchName}
+                      </div>
+                    )}
+                    {(r.bank_transfer_info.accountType || r.bank_transfer_info.accountNumber) && (
+                      <div>
+                        {r.bank_transfer_info.accountType} {r.bank_transfer_info.accountNumber}
+                      </div>
+                    )}
+                    {r.bank_transfer_info.holder && <div>{r.bank_transfer_info.holder}</div>}
+                  </div>
+                )}
+                {r.pay_method === "card" && (
+                  <div style={{ marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>カード決済のリンクは、このトークで追ってお送りします。</div>
+                )}
+              </div>
+            )
           )}
         </div>
 
