@@ -37,7 +37,7 @@ export default async function Home() {
     );
   }
 
-  const [messages, menus, refundPolicies, vault, companies] = await Promise.all([
+  const [{ messages, hasMoreOlder }, menus, refundPolicies, vault, companies] = await Promise.all([
     getThreadMessages(ctx.threadId),
     getMenus(ctx.orgId),
     getRefundPolicies(ctx.orgId),
@@ -49,6 +49,7 @@ export default async function Home() {
     <ChatScreen
       ctx={ctx}
       initialMessages={messages}
+      initialHasMoreOlder={hasMoreOlder}
       menus={menus}
       refundPolicies={refundPolicies}
       initialVault={vault}

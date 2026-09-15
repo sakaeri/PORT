@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle } from "@/lib/chat-types";
+import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle } from "@/lib/chat-types";
 
 export type { CustomerContext, MessageWithExtras, RequestBundle };
 
@@ -93,7 +93,8 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
   };
 });
 
-export async function getThreadMessages(threadId: string): Promise<MessageWithExtras[]> {
+// 画面に必要な最新分だけ取得する（会話が長くなっても初回表示は遅くならない）。
+export async function getThreadMessages(threadId: string): Promise<{ messages: MessageWithExtras[]; hasMoreOlder: boolean }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("messages")
@@ -102,9 +103,11 @@ export async function getThreadMessages(threadId: string): Promise<MessageWithEx
     )
     .eq("thread_id", threadId)
     .is("deleted_at", null)
-    .order("sent_at", { ascending: true });
-  if (error || !data) return [];
-  return (data as RawMessageRow[]).map(mapMessageRow);
+    .order("sent_at", { ascending: false })
+    .limit(MESSAGE_PAGE_SIZE);
+  if (error || !data) return { messages: [], hasMoreOlder: false };
+  const rows = (data as RawMessageRow[]).slice().reverse();
+  return { messages: rows.map(mapMessageRow), hasMoreOlder: data.length === MESSAGE_PAGE_SIZE };
 }
 
 export async function getMenus(orgId: string) {

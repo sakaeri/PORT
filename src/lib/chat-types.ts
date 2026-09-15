@@ -35,6 +35,9 @@ export type RawMessageRow = MessageRow & {
     | null;
 };
 
+// 会話が長くなっても初回表示・ポーリングが遅くならないよう、一度に読み込むメッセージ件数を絞る。
+export const MESSAGE_PAGE_SIZE = 60;
+
 export function mapMessageRow(row: RawMessageRow): MessageWithExtras {
   const { message_attachments, requests, ...msg } = row;
   const requestBundle: RequestBundle | null = requests

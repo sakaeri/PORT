@@ -7,7 +7,7 @@ import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, Int
 import { ProgressPanel, CancelDialog, ReportsDialog, MenuSheet } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
 import { createClient } from "@/lib/supabase/client";
-import { mapMessageRow, type CustomerContext, type MenuRow, type MessageWithExtras, type RawMessageRow, type RequestBundle, type VaultRow } from "@/lib/chat-types";
+import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MenuRow, type MessageWithExtras, type RawMessageRow, type RequestBundle, type VaultRow } from "@/lib/chat-types";
 import type { Database } from "@/lib/supabase/types";
 import {
   sendMessage as sendMessageAction,
@@ -22,6 +22,7 @@ type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 interface Props {
   ctx: CustomerContext;
   initialMessages: MessageWithExtras[];
+  initialHasMoreOlder?: boolean;
   menus: MenuRow[];
   refundPolicies: RefundPolicyRow[];
   initialVault: VaultRow[];
@@ -48,8 +49,12 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, menus: initialMenus, refundPolicies, initialVault, companies }: Props) {
+export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, menus: initialMenus, refundPolicies, initialVault, companies }: Props) {
   const [messages, setMessages] = useState(initialMessages);
+  const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
+  const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const skipAutoScrollRef = useRef(false);
   const [menus, setMenus] = useState(initialMenus);
   const [vault, setVault] = useState(initialVault);
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,19 +82,59 @@ export default function ChatScreen({ ctx, initialMessages, menus: initialMenus, 
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (skipAutoScrollRef.current) {
+      skipAutoScrollRef.current = false;
+      return;
+    }
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
+  const MESSAGE_SELECT = "*, message_attachments(*), requests(*, request_items(*), completion_reports(*), ratings(*))";
+
+  // 開いている間に届いた新着分だけを取りに行く（既に読み込んだ最古の時点以降のみ）。
+  // 会話全体を毎回取り直すと、やり取りが長い依頼主ほどポーリングのたびに重くなるため。
   const refresh = useCallback(async () => {
     const supabase = createClient(ctx.orgId);
-    const { data } = await supabase
-      .from("messages")
-      .select("*, message_attachments(*), requests(*, request_items(*), completion_reports(*), ratings(*))")
-      .eq("thread_id", ctx.threadId)
-      .is("deleted_at", null)
-      .order("sent_at", { ascending: true });
-    if (data) setMessages((data as RawMessageRow[]).map(mapMessageRow));
-  }, [ctx.threadId, ctx.orgId]);
+    const { data } = oldestLoadedAt
+      ? await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", ctx.threadId).is("deleted_at", null).gte("sent_at", oldestLoadedAt).order("sent_at", { ascending: true })
+      : await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", ctx.threadId).is("deleted_at", null).order("sent_at", { ascending: false }).limit(MESSAGE_PAGE_SIZE);
+    if (data) {
+      const rows = (oldestLoadedAt ? data : data.slice().reverse()) as RawMessageRow[];
+      setMessages(rows.map(mapMessageRow));
+      if (!oldestLoadedAt && rows.length > 0) setOldestLoadedAt(rows[0].sent_at);
+    }
+  }, [ctx.threadId, ctx.orgId, oldestLoadedAt]);
+
+  async function loadOlderMessages() {
+    if (loadingOlder || !hasMoreOlder || !oldestLoadedAt) return;
+    setLoadingOlder(true);
+    try {
+      const supabase = createClient(ctx.orgId);
+      const { data } = await supabase
+        .from("messages")
+        .select(MESSAGE_SELECT)
+        .eq("thread_id", ctx.threadId)
+        .is("deleted_at", null)
+        .lt("sent_at", oldestLoadedAt)
+        .order("sent_at", { ascending: false })
+        .limit(MESSAGE_PAGE_SIZE);
+      const rows = (data ?? []) as RawMessageRow[];
+      if (rows.length > 0) {
+        const older = rows.slice().reverse().map(mapMessageRow);
+        const container = scrollRef.current;
+        const prevScrollHeight = container?.scrollHeight ?? 0;
+        skipAutoScrollRef.current = true;
+        setMessages((prev) => [...older, ...prev]);
+        setOldestLoadedAt(older[0].sent_at);
+        requestAnimationFrame(() => {
+          if (container) container.scrollTop = container.scrollHeight - prevScrollHeight;
+        });
+      }
+      setHasMoreOlder(rows.length === MESSAGE_PAGE_SIZE);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
 
   useEffect(() => {
     const supabase = createClient(ctx.orgId);
@@ -220,6 +265,15 @@ export default function ChatScreen({ ctx, initialMessages, menus: initialMenus, 
       />
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "var(--space-6) var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        {hasMoreOlder && (
+          <button
+            onClick={loadOlderMessages}
+            disabled={loadingOlder}
+            style={{ alignSelf: "center", height: 30, padding: "0 14px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+          >
+            {loadingOlder ? "読み込み中…" : "過去のやり取りを読み込む"}
+          </button>
+        )}
         <div style={{ textAlign: "center", fontSize: 11, color: "var(--color-neutral-600)", letterSpacing: "0.04em" }}>今日</div>
         {visible.map((m) => {
           const highlight = !!q;
