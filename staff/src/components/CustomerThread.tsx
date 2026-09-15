@@ -833,7 +833,9 @@ function QuoteDialog({
   ];
   const total = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
   const depositAmount = paymentTiming === "deposit" ? Math.round((total * (Number(depositPercent) || 0)) / 100) : null;
-  const knownLeadHours = allItems.map((it) => it.leadHours).filter((h): h is number => h != null);
+  // 同じ項目を複数個頼むと、その分準備に時間がかかる想定で数量に比例させる
+  // （項目ごとの目安時間 × 数量）。違う項目同士は並行して進む前提でmaxを取る。
+  const knownLeadHours = allItems.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
   const due = knownLeadHours.length > 0 ? hoursToDueLabel(Math.max(...knownLeadHours)) : "";
 
   async function submit() {
