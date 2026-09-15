@@ -10,7 +10,6 @@ import {
   confirmPayment,
   confirmDeposit,
   confirmFinalPayment,
-  approveToStart,
   startCaseRequest,
   submitCaseReport,
   archiveCaseThread,
@@ -104,10 +103,13 @@ export default function CaseDetail({
     }
   }
 
-  const handleStart = () => runAction(() => startCaseRequest(request.id));
+  const handleStart = () =>
+    runAction(
+      () => startCaseRequest(request.id),
+      request.phase === "quoted" ? "入金なしでこの案件に着手します。よろしいですか？" : undefined,
+    );
   const handleConfirmPayment = () => runAction(() => confirmPayment(request.id), "入金を確認しましたか？この操作で着手できるようになります。");
   const handleConfirmDeposit = () => runAction(() => confirmDeposit(request.id), "予約金の入金を確認しましたか？この操作で着手できるようになります。");
-  const handleApproveToStart = () => runAction(() => approveToStart(request.id), "入金なしでこの見積もりを承認し、着手できるようにします。よろしいですか？");
   const handleConfirmFinal = () => runAction(() => confirmFinalPayment(request.id), request.paymentTiming === "deposit" ? "残金の入金を確認しましたか？" : "入金を確認しましたか？");
   const handleToggleArchive = () =>
     runAction(() => (caseThread?.archived ? unarchiveCaseThread(caseThread.id) : archiveCaseThread(caseThread!.id)));
@@ -185,9 +187,9 @@ export default function CaseDetail({
             )}
             {(request.paymentTiming === "before_shipping" || request.paymentTiming === "postpay") && (
               <>
-                <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金なしで着手できます。承認すると着手できるようになります。</div>
-                <button onClick={handleApproveToStart} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
-                  {busy ? "処理中…" : "承認する"}
+                <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金なしで着手できます。</div>
+                <button onClick={handleStart} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
+                  {busy ? "処理中…" : "着手する"}
                 </button>
               </>
             )}

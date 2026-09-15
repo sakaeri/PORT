@@ -685,15 +685,28 @@ async function postCaseNotice(supabase: Awaited<ReturnType<typeof createClient>>
   await admin.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", caseThreadId);
 }
 
+// preparing（入金確認済み）からの着手に加え、発送前入金・後払いなら入金なしで quoted から直接着手できる。
 export async function startCaseRequest(requestId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data: current, error: fetchError } = await supabase
     .from("requests")
-    .update({ phase: "started", started_at: new Date().toISOString() })
+    .select("phase, payment_timing")
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
-    .eq("phase", "preparing")
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  const canStartFromQuoted =
+    current?.phase === "quoted" && (current.payment_timing === "before_shipping" || current.payment_timing === "postpay");
+  const fromPhase = canStartFromQuoted ? "quoted" : "preparing";
+
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("requests")
+    .update(canStartFromQuoted ? { phase: "started", started_at: now, accepted_at: now } : { phase: "started", started_at: now })
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId)
+    .eq("phase", fromPhase)
     .select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("着手できる状態ではありません");
@@ -746,23 +759,6 @@ export async function confirmDeposit(requestId: string) {
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
   await postCaseNotice(supabase, requestId, "予約金の入金を確認しました");
-}
-
-// 発送前入金・後払い：入金なしで着手できるようにする。quoted → preparing。
-export async function approveToStart(requestId: string) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("requests")
-    .update({ phase: "preparing", accepted_at: new Date().toISOString() })
-    .eq("id", requestId)
-    .eq("org_id", ctx.orgId)
-    .eq("phase", "quoted")
-    .in("payment_timing", ["before_shipping", "postpay"])
-    .select("id");
-  if (error) throw error;
-  if (!data || data.length === 0) throw new Error("承認できる状態ではありません");
-  await postCaseNotice(supabase, requestId, "見積もりを承認しました（入金は完了後にご案内します）");
 }
 
 // 残金（予約金の場合）・全額（発送前入金・後払いの場合）の入金確認。フェーズは変えない。
