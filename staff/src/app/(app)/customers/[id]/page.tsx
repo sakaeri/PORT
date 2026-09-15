@@ -74,7 +74,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   const { data: orgPayment } = await supabase
     .from("organizations")
-    .select("card_payment_enabled, bank_transfer_info")
+    .select("card_payment_enabled, bank_transfer_info, card_payment_link")
     .eq("id", ctx.orgId)
     .single();
 
@@ -115,6 +115,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       latestRequest={latestRequest}
       cardPaymentEnabled={orgPayment?.card_payment_enabled ?? false}
       defaultBankInfo={orgPayment?.bank_transfer_info ?? {}}
+      defaultCardPaymentLink={orgPayment?.card_payment_link ?? ""}
     />
   );
 }

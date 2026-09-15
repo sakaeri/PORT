@@ -12,7 +12,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const { data: request } = await supabase
     .from("requests")
     .select(
-      "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, customers(id, name), completion_reports(*), ratings(*)",
+      "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, customers(id, name), completion_reports(*), ratings(*)",
     )
     .eq("id", id)
     .eq("org_id", ctx.orgId)
@@ -53,6 +53,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         payMethod: request.pay_method,
         payStatus: request.pay_status,
         bankTransferInfo: request.bank_transfer_info,
+        cardPaymentLink: request.card_payment_link,
       }}
       customer={customer ? { id: customer.id, name: customer.name } : null}
       report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer, details: report.details ?? [] } : null}

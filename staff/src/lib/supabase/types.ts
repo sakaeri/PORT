@@ -96,6 +96,7 @@ export interface Database {
           is_hq: boolean;
           card_payment_enabled: boolean;
           bank_transfer_info: BankTransferInfo;
+          card_payment_link: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["organizations"]["Row"]>;
@@ -296,6 +297,7 @@ export interface Database {
           deposit_paid_at: string | null;
           deposit_paid_marked_by: string | null;
           bank_transfer_info: BankTransferInfo | null;
+          card_payment_link: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]> & { customer_id: string; title: string };

@@ -46,12 +46,16 @@ export async function updateCompanyInfo(fields: {
 }
 
 // org_write ポリシーは owner のみ更新可（reception は不可）。
-export async function updatePaymentSettings(fields: { cardPaymentEnabled: boolean; bankInfo: BankTransferInfo }) {
+export async function updatePaymentSettings(fields: { cardPaymentEnabled: boolean; bankInfo: BankTransferInfo; cardPaymentLink: string }) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("organizations")
-    .update({ card_payment_enabled: fields.cardPaymentEnabled, bank_transfer_info: fields.bankInfo })
+    .update({
+      card_payment_enabled: fields.cardPaymentEnabled,
+      bank_transfer_info: fields.bankInfo,
+      card_payment_link: fields.cardPaymentLink.trim() || null,
+    })
     .eq("id", ctx.orgId)
     .select("id");
   if (error) throw error;
@@ -550,6 +554,7 @@ export async function createCaseRequest(
     depositPercent?: number;
     payMethod: PaymentMethod;
     bankInfo?: BankTransferInfo;
+    cardPaymentLink?: string;
   },
 ) {
   const ctx = await requireContext();
@@ -589,6 +594,7 @@ export async function createCaseRequest(
       deposit_amount: depositAmount,
       pay_method: input.payMethod,
       bank_transfer_info: input.payMethod === "bank" ? (input.bankInfo ?? {}) : null,
+      card_payment_link: input.payMethod === "card" ? (input.cardPaymentLink?.trim() || null) : null,
     })
     .select("id")
     .single();

@@ -65,6 +65,7 @@ export default function CaseDetail({
     payMethod: PaymentMethod | null;
     payStatus: string;
     bankTransferInfo: BankTransferInfo | null;
+    cardPaymentLink: string | null;
   };
   customer: { id: string; name: string } | null;
   report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[] } | null;
@@ -132,6 +133,13 @@ export default function CaseDetail({
         {request.payMethod === "bank" && request.bankTransferInfo && (
           <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.7 }}>
             {request.bankTransferInfo.bankName} {request.bankTransferInfo.branchName}　{request.bankTransferInfo.accountType} {request.bankTransferInfo.accountNumber}　{request.bankTransferInfo.holder}
+          </div>
+        )}
+        {request.payMethod === "card" && request.cardPaymentLink && (
+          <div style={{ fontSize: 11.5, lineHeight: 1.7 }}>
+            <a href={request.cardPaymentLink} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
+              {request.cardPaymentLink}
+            </a>
           </div>
         )}
         {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}

@@ -122,6 +122,7 @@ export default function MenuSettings({
   slug,
   initialCardPaymentEnabled,
   initialBankInfo,
+  initialCardPaymentLink,
 }: {
   orgId: string;
   initialCompany: Company;
@@ -133,6 +134,7 @@ export default function MenuSettings({
   slug: string | null;
   initialCardPaymentEnabled: boolean;
   initialBankInfo: BankTransferInfo;
+  initialCardPaymentLink: string;
 }) {
   const [tab, setTab] = useState<TabKey>("company");
 
@@ -169,7 +171,11 @@ export default function MenuSettings({
       {tab === "company" && (
         <>
           <CompanyInfoCard initial={initialCompany} slug={slug} />
-          <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} />
+          <PaymentSettingsCard
+            initialCardPaymentEnabled={initialCardPaymentEnabled}
+            initialBankInfo={initialBankInfo}
+            initialCardPaymentLink={initialCardPaymentLink}
+          />
           <StaffModeCard initialSolo={initialSolo} />
         </>
       )}
@@ -191,15 +197,44 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "login", label: "ログイン情報" },
 ];
 
+function CardHeader({ title, editing, onEdit }: { title: string; editing: boolean; onEdit: () => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>{title}</div>
+      {!editing && (
+        <button onClick={onEdit} style={{ ...smallBtn, height: 28 }}>
+          変更
+        </button>
+      )}
+    </div>
+  );
+}
+
+function InfoRow({ label: l, value }: { label: string; value: string }) {
+  if (!value) return null;
+  return (
+    <div style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
+      <span style={{ width: 90, flex: "none", color: "var(--color-neutral-500)" }}>{l}</span>
+      <span style={{ minWidth: 0, flex: 1 }}>{value}</span>
+    </div>
+  );
+}
+
 function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | null }) {
+  const [saved, setSaved] = useState(initial);
   const [form, setForm] = useState(initial);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
 
   function set<K extends keyof Company>(key: K, value: Company[K]) {
     setForm((f) => ({ ...f, [key]: value }));
-    setDone(false);
+  }
+
+  function startEdit() {
+    setForm(saved);
+    setError("");
+    setEditing(true);
   }
 
   async function save() {
@@ -208,7 +243,8 @@ function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | n
     setError("");
     try {
       await updateCompanyInfo(form);
-      setDone(true);
+      setSaved(form);
+      setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存できませんでした");
     } finally {
@@ -218,7 +254,7 @@ function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | n
 
   return (
     <div style={card}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>会社情報</div>
+      <CardHeader title="会社情報" editing={editing} onEdit={startEdit} />
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>契約書の「甲」・依頼主への表示名・見積書と請求書に使います</div>
       {slug && (
         <div style={{ fontSize: 12, color: "var(--color-neutral-400)" }}>
@@ -229,35 +265,68 @@ function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | n
           （ホームページ等に載せてご利用ください）
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="正式名称" value={form.name} onChange={(v) => set("name", v)} />
-        <Field label="表示名（依頼主に見える）" value={form.display_name} onChange={(v) => set("display_name", v)} />
-        <Field label="代表者名" value={form.rep_name} onChange={(v) => set("rep_name", v)} />
-        <Field label="電話番号" value={form.tel} onChange={(v) => set("tel", v)} />
-        <Field label="メールアドレス" value={form.email} onChange={(v) => set("email", v)} />
-        <Field label="住所" value={form.address} onChange={(v) => set("address", v)} />
-      </div>
-      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <button onClick={save} disabled={saving} style={{ ...smallBtn, height: 36 }}>
-          {saving ? "保存中…" : "保存"}
-        </button>
-        {done && <span style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>保存しました</span>}
-      </div>
+      {!editing ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <InfoRow label="正式名称" value={saved.name} />
+          <InfoRow label="表示名" value={saved.display_name} />
+          <InfoRow label="代表者名" value={saved.rep_name} />
+          <InfoRow label="電話番号" value={saved.tel} />
+          <InfoRow label="メールアドレス" value={saved.email} />
+          <InfoRow label="住所" value={saved.address} />
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="正式名称" value={form.name} onChange={(v) => set("name", v)} />
+            <Field label="表示名（依頼主に見える）" value={form.display_name} onChange={(v) => set("display_name", v)} />
+            <Field label="代表者名" value={form.rep_name} onChange={(v) => set("rep_name", v)} />
+            <Field label="電話番号" value={form.tel} onChange={(v) => set("tel", v)} />
+            <Field label="メールアドレス" value={form.email} onChange={(v) => set("email", v)} />
+            <Field label="住所" value={form.address} onChange={(v) => set("address", v)} />
+          </div>
+          {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={save} disabled={saving} style={{ ...smallBtn, height: 36 }}>
+              {saving ? "保存中…" : "保存して閉じる"}
+            </button>
+            <button onClick={() => setEditing(false)} disabled={saving} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+              キャンセル
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function PaymentSettingsCard({ initialCardPaymentEnabled, initialBankInfo }: { initialCardPaymentEnabled: boolean; initialBankInfo: BankTransferInfo }) {
-  const [cardEnabled, setCardEnabled] = useState(initialCardPaymentEnabled);
-  const [bankInfo, setBankInfo] = useState(initialBankInfo);
+function PaymentSettingsCard({
+  initialCardPaymentEnabled,
+  initialBankInfo,
+  initialCardPaymentLink,
+}: {
+  initialCardPaymentEnabled: boolean;
+  initialBankInfo: BankTransferInfo;
+  initialCardPaymentLink: string;
+}) {
+  const savedInitial = { cardEnabled: initialCardPaymentEnabled, bankInfo: initialBankInfo, cardPaymentLink: initialCardPaymentLink };
+  const [saved, setSaved] = useState(savedInitial);
+  const [cardEnabled, setCardEnabled] = useState(saved.cardEnabled);
+  const [bankInfo, setBankInfo] = useState(saved.bankInfo);
+  const [cardPaymentLink, setCardPaymentLink] = useState(saved.cardPaymentLink);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
 
   function setBankField<K extends keyof BankTransferInfo>(key: K, value: string) {
     setBankInfo((b) => ({ ...b, [key]: value }));
-    setDone(false);
+  }
+
+  function startEdit() {
+    setCardEnabled(saved.cardEnabled);
+    setBankInfo(saved.bankInfo);
+    setCardPaymentLink(saved.cardPaymentLink);
+    setError("");
+    setEditing(true);
   }
 
   async function save() {
@@ -265,8 +334,9 @@ function PaymentSettingsCard({ initialCardPaymentEnabled, initialBankInfo }: { i
     setSaving(true);
     setError("");
     try {
-      await updatePaymentSettings({ cardPaymentEnabled: cardEnabled, bankInfo });
-      setDone(true);
+      await updatePaymentSettings({ cardPaymentEnabled: cardEnabled, bankInfo, cardPaymentLink });
+      setSaved({ cardEnabled, bankInfo, cardPaymentLink });
+      setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存できませんでした");
     } finally {
@@ -276,40 +346,50 @@ function PaymentSettingsCard({ initialCardPaymentEnabled, initialBankInfo }: { i
 
   return (
     <div style={card}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>決済設定</div>
+      <CardHeader title="決済設定" editing={editing} onEdit={startEdit} />
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        見積もり作成時に選べる支払い方法と、銀行振込のデフォルトの振込先です（見積もりごとにその場で変更もできます）。
+        見積もり作成時に選べる支払い方法と、銀行振込のデフォルトの振込先・カード決済のリンクです（見積もりごとにその場で変更もできます）。
       </div>
-      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
-        <input
-          type="checkbox"
-          checked={cardEnabled}
-          onChange={(e) => {
-            setCardEnabled(e.target.checked);
-            setDone(false);
-          }}
-        />
-        カード決済を見積もりで選べるようにする（決済リンクは受付がチャットで送ります）
-      </label>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <span style={label}>銀行振込のデフォルト振込先</span>
-        <Field label="口座名義" value={bankInfo.holder ?? ""} onChange={(v) => setBankField("holder", v)} />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Field label="銀行名" value={bankInfo.bankName ?? ""} onChange={(v) => setBankField("bankName", v)} />
-          <Field label="支店名" value={bankInfo.branchName ?? ""} onChange={(v) => setBankField("branchName", v)} />
+      {!editing ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <InfoRow label="カード決済" value={saved.cardEnabled ? "使う" : "使わない"} />
+          {saved.cardEnabled && <InfoRow label="決済リンク" value={saved.cardPaymentLink || "（未設定）"} />}
+          <InfoRow label="口座名義" value={saved.bankInfo.holder ?? ""} />
+          <InfoRow label="銀行・支店" value={[saved.bankInfo.bankName, saved.bankInfo.branchName].filter(Boolean).join(" ")} />
+          <InfoRow label="口座番号" value={[saved.bankInfo.accountType, saved.bankInfo.accountNumber].filter(Boolean).join(" ")} />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Field label="口座種別（普通・当座）" value={bankInfo.accountType ?? ""} onChange={(v) => setBankField("accountType", v)} />
-          <Field label="口座番号" value={bankInfo.accountNumber ?? ""} onChange={(v) => setBankField("accountNumber", v)} />
-        </div>
-      </div>
-      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <button onClick={save} disabled={saving} style={{ ...smallBtn, height: 36 }}>
-          {saving ? "保存中…" : "保存"}
-        </button>
-        {done && <span style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>保存しました</span>}
-      </div>
+      ) : (
+        <>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+            <input type="checkbox" checked={cardEnabled} onChange={(e) => setCardEnabled(e.target.checked)} />
+            カード決済を見積もりで選べるようにする
+          </label>
+          {cardEnabled && (
+            <Field label="カード決済のリンク（Stripe決済リンク等・依頼主に直接表示されます）" value={cardPaymentLink} onChange={setCardPaymentLink} />
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={label}>銀行振込のデフォルト振込先</span>
+            <Field label="口座名義" value={bankInfo.holder ?? ""} onChange={(v) => setBankField("holder", v)} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Field label="銀行名" value={bankInfo.bankName ?? ""} onChange={(v) => setBankField("bankName", v)} />
+              <Field label="支店名" value={bankInfo.branchName ?? ""} onChange={(v) => setBankField("branchName", v)} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Field label="口座種別（普通・当座）" value={bankInfo.accountType ?? ""} onChange={(v) => setBankField("accountType", v)} />
+              <Field label="口座番号" value={bankInfo.accountNumber ?? ""} onChange={(v) => setBankField("accountNumber", v)} />
+            </div>
+          </div>
+          {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={save} disabled={saving} style={{ ...smallBtn, height: 36 }}>
+              {saving ? "保存中…" : "保存して閉じる"}
+            </button>
+            <button onClick={() => setEditing(false)} disabled={saving} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+              キャンセル
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

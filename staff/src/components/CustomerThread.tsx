@@ -179,6 +179,7 @@ export default function CustomerThread({
   latestRequest,
   cardPaymentEnabled,
   defaultBankInfo,
+  defaultCardPaymentLink,
 }: {
   customer: { id: string; name: string; memberNo: string | null };
   thread: { id: string; archived: boolean } | null;
@@ -195,6 +196,7 @@ export default function CustomerThread({
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
   cardPaymentEnabled: boolean;
   defaultBankInfo: BankTransferInfo;
+  defaultCardPaymentLink: string;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -468,6 +470,7 @@ export default function CustomerThread({
           latestRequest={latestRequest}
           cardPaymentEnabled={cardPaymentEnabled}
           defaultBankInfo={defaultBankInfo}
+          defaultCardPaymentLink={defaultCardPaymentLink}
         />
       )}
     </div>
@@ -511,6 +514,7 @@ function CaseSummarySection({
   latestRequest,
   cardPaymentEnabled,
   defaultBankInfo,
+  defaultCardPaymentLink,
 }: {
   thread: { id: string; archived: boolean } | null;
   customerId: string;
@@ -518,6 +522,7 @@ function CaseSummarySection({
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
   cardPaymentEnabled: boolean;
   defaultBankInfo: BankTransferInfo;
+  defaultCardPaymentLink: string;
 }) {
   const router = useRouter();
   const [showDialog, setShowDialog] = useState(false);
@@ -542,6 +547,7 @@ function CaseSummarySection({
           menus={menus}
           cardPaymentEnabled={cardPaymentEnabled}
           defaultBankInfo={defaultBankInfo}
+          defaultCardPaymentLink={defaultCardPaymentLink}
           onClose={() => setShowDialog(false)}
           onCreated={(requestId) => {
             setShowDialog(false);
@@ -685,6 +691,7 @@ function QuoteDialog({
   menus,
   cardPaymentEnabled,
   defaultBankInfo,
+  defaultCardPaymentLink,
   onClose,
   onCreated,
 }: {
@@ -693,6 +700,7 @@ function QuoteDialog({
   menus: MenuOption[];
   cardPaymentEnabled: boolean;
   defaultBankInfo: BankTransferInfo;
+  defaultCardPaymentLink: string;
   onClose: () => void;
   onCreated: (requestId: string) => void;
 }) {
@@ -708,6 +716,7 @@ function QuoteDialog({
   const [depositPercent, setDepositPercent] = useState("30");
   const [payMethod, setPayMethod] = useState<PaymentMethod>("bank");
   const [bankInfo, setBankInfo] = useState<BankTransferInfo>(defaultBankInfo);
+  const [cardPaymentLink, setCardPaymentLink] = useState(defaultCardPaymentLink);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -746,6 +755,7 @@ function QuoteDialog({
         depositPercent: paymentTiming === "deposit" ? Number(depositPercent) || 0 : undefined,
         payMethod,
         bankInfo: payMethod === "bank" ? bankInfo : undefined,
+        cardPaymentLink: payMethod === "card" ? cardPaymentLink : undefined,
       });
       onCreated(requestId);
     } catch (e) {
@@ -885,7 +895,13 @@ function QuoteDialog({
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>カード決済のリンクは、見積もり送信後に別途チャットでお送りください。</div>
+            <input
+              value={cardPaymentLink}
+              onChange={(e) => setCardPaymentLink(e.target.value)}
+              placeholder="カード決済のリンク（依頼主に直接表示されます）"
+              className="vid-input"
+              style={inputStyle}
+            />
           )}
         </div>
 

@@ -10,7 +10,7 @@ export default async function MenuSettingsPage() {
   const [{ data: org }, { data: menus }, { data: templates }, { data: policy }, { data: userData }] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, display_name, rep_name, address, tel, email, slug, card_payment_enabled, bank_transfer_info")
+      .select("name, display_name, rep_name, address, tel, email, slug, card_payment_enabled, bank_transfer_info, card_payment_link")
       .eq("id", ctx.orgId)
       .single(),
     supabase
@@ -46,6 +46,7 @@ export default async function MenuSettingsPage() {
       slug={org?.slug ?? null}
       initialCardPaymentEnabled={org?.card_payment_enabled ?? false}
       initialBankInfo={org?.bank_transfer_info ?? {}}
+      initialCardPaymentLink={org?.card_payment_link ?? ""}
     />
   );
 }

@@ -302,7 +302,15 @@ export function RequestCard({
                   </div>
                 )}
                 {r.pay_method === "card" && (
-                  <div style={{ marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>カード決済のリンクは、このトークで追ってお送りします。</div>
+                  <div style={{ marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
+                    {r.card_payment_link ? (
+                      <a href={r.card_payment_link} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
+                        こちらからカード決済へ進む
+                      </a>
+                    ) : (
+                      "カード決済のリンクは、このトークで追ってお送りします。"
+                    )}
+                  </div>
                 )}
               </div>
             )
