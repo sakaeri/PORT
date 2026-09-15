@@ -114,6 +114,8 @@ function summarize(m: Message): string {
       return `［選択］${m.body ?? ""}`;
     case "intake_request":
       return `［確認事項］${p.formLabel ?? m.body ?? ""}`;
+    case "intake_answer":
+      return `［確認事項への回答］${p.formLabel ?? ""}`;
     case "system":
       return m.body ?? "［システム］";
     default:
@@ -184,6 +186,23 @@ function MenuPickBubble({ msg }: { msg: Message }) {
         </div>
       )}
       {p.note && <div style={{ fontSize: 12.5, paddingTop: 6, borderTop: p.rows?.length ? "none" : "1px solid var(--color-divider)" }}>{p.note}</div>}
+    </div>
+  );
+}
+
+function IntakeAnswerBubble({ msg }: { msg: Message }) {
+  const p = msg.payload as { formLabel?: string; rows?: { label: string; value: string }[] };
+  return (
+    <div style={{ width: "min(280px, 100%)", padding: "11px 13px", borderRadius: "var(--radius-lg)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 6 }}>
+      <span style={{ fontSize: 10, letterSpacing: "0.05em", color: "var(--color-neutral-500)" }}>{p.formLabel ?? "確認事項"}への回答</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {(p.rows ?? []).map((rw, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
+            <span style={{ width: 88, flex: "none", color: "var(--color-neutral-500)" }}>{rw.label}</span>
+            <span style={{ minWidth: 0, flex: 1 }}>{rw.value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -423,6 +442,8 @@ export default function CustomerThread({
                 <QuoteBubble msg={m} />
               ) : m.kind === "menu_pick" ? (
                 <MenuPickBubble msg={m} />
+              ) : m.kind === "intake_answer" ? (
+                <IntakeAnswerBubble msg={m} />
               ) : (
                 <div
                   style={{

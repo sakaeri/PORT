@@ -27,7 +27,8 @@ export type MessageKind =
   | "report"
   | "rating"
   | "system"
-  | "menu_pick";
+  | "menu_pick"
+  | "intake_answer";
 
 export type ThreadKind = "customer" | "case" | "internal";
 export type RefundStage = "prequote" | "accepted" | "started" | "delivered" | "terminate";

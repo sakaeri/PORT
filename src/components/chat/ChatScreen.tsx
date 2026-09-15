@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/chat/Header";
 import Composer, { type PendingAttachment } from "@/components/chat/Composer";
-import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, IntakeCard } from "@/components/chat/Bubbles";
+import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, IntakeCard, IntakeAnswerBubble } from "@/components/chat/Bubbles";
 import { ProgressPanel, CancelDialog, ReportsDialog, MenuSheet } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
 import { createClient } from "@/lib/supabase/client";
@@ -56,7 +56,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
   const [loadingOlder, setLoadingOlder] = useState(false);
   const skipAutoScrollRef = useRef(false);
   const [menus, setMenus] = useState(initialMenus);
-  const [vault, setVault] = useState(initialVault);
+  const vault = initialVault;
   const [searchQuery, setSearchQuery] = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showReports, setShowReports] = useState(false);
@@ -288,7 +288,9 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
             case "menu_pick":
               return <MenuPickBubble key={m.id} msg={m} />;
             case "intake_request":
-              return <IntakeCard key={m.id} msg={m} vault={vault} onAnswered={setVault} />;
+              return <IntakeCard key={m.id} msg={m} />;
+            case "intake_answer":
+              return <IntakeAnswerBubble key={m.id} msg={m} />;
             case "quote":
               return m.requestBundle ? (
                 <RequestCard

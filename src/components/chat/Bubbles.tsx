@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
-import type { AttachmentRow, MessageWithExtras, RequestBundle, RequestRow, VaultRow } from "@/lib/chat-types";
+import type { AttachmentRow, MessageWithExtras, RequestBundle, RequestRow } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
@@ -436,18 +436,14 @@ interface IntakeFieldDef {
 
 const INPUT_TYPE: Record<string, string> = { text: "text", tel: "tel", email: "email", date: "date", select: "text" };
 
-export function IntakeCard({ msg, vault, onAnswered }: { msg: MessageWithExtras; vault: VaultRow[]; onAnswered: (items: VaultRow[]) => void }) {
+export function IntakeCard({ msg }: { msg: MessageWithExtras }) {
   const p = msg.payload as { formLabel?: string; note?: string; fields?: IntakeFieldDef[] };
   const fields = p.fields ?? [];
-  const findValue = (label: string) => vault.find((v) => v.label === label)?.value ?? "";
-  const allAnswered = fields.length > 0 && fields.every((f) => findValue(f.label).trim());
 
-  const [editing, setEditing] = useState(false);
-  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, findValue(f.label)])));
+  const [submitted, setSubmitted] = useState<{ label: string; value: string }[] | null>(null);
+  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, ""])));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const showForm = !allAnswered || editing;
 
   async function submit() {
     if (saving) return;
@@ -459,16 +455,9 @@ export function IntakeCard({ msg, vault, onAnswered }: { msg: MessageWithExtras;
     setError("");
     setSaving(true);
     try {
-      const filled = fields.filter((f) => values[f.key]?.trim()).map((f) => ({ key: f.label, value: values[f.key].trim() }));
-      await submitInfoRequestAnswer(filled);
-      const next = [...vault];
-      for (const f of filled) {
-        const idx = next.findIndex((v) => v.label === f.key);
-        if (idx >= 0) next[idx] = { ...next[idx], value: f.value };
-        else next.push({ id: `temp-${Date.now()}-${f.key}`, customer_id: "", label: f.key, value: f.value, sort: 0, updated_at: new Date().toISOString() });
-      }
-      onAnswered(next);
-      setEditing(false);
+      const filled = fields.filter((f) => values[f.key]?.trim()).map((f) => ({ label: f.label, value: values[f.key].trim() }));
+      await submitInfoRequestAnswer(p.formLabel ?? "", filled);
+      setSubmitted(filled);
     } catch (e) {
       setError(e instanceof Error ? e.message : "送信できませんでした");
     } finally {
@@ -483,7 +472,7 @@ export function IntakeCard({ msg, vault, onAnswered }: { msg: MessageWithExtras;
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, lineHeight: 1.3 }}>{p.formLabel}</div>
         {p.note && <p style={{ margin: 0, fontSize: 12.5, opacity: 0.8 }}>{p.note}</p>}
 
-        {showForm ? (
+        {!submitted ? (
           <>
             {fields.map((f) => (
               <div key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -516,22 +505,28 @@ export function IntakeCard({ msg, vault, onAnswered }: { msg: MessageWithExtras;
             </button>
           </>
         ) : (
-          <>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 4 }}>
-              {fields.map((f) => (
-                <div key={f.key} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
-                  <span style={{ width: 88, flex: "none", color: "var(--color-neutral-500)" }}>{f.label}</span>
-                  <span style={{ minWidth: 0, flex: 1 }}>{findValue(f.label)}</span>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => setEditing(true)} style={{ alignSelf: "flex-start", fontSize: 11.5, color: "var(--color-accent)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-              内容を変更する
-            </button>
-          </>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 4, fontSize: 12.5, color: "var(--color-neutral-500)" }}>送信しました。</div>
         )}
       </div>
       <Meta isSelf={false} time={timeLabel(msg.sent_at)} />
+    </div>
+  );
+}
+
+export function IntakeAnswerBubble({ msg }: { msg: MessageWithExtras }) {
+  const p = msg.payload as { formLabel?: string; rows?: { label: string; value: string }[] };
+  return (
+    <div style={{ ...bubbleShell, alignSelf: "flex-end" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-bubble-self-bg)", color: "var(--color-bubble-self-text)" }}>
+        <span style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.8 }}>{p.formLabel ?? "確認事項"}への回答</span>
+        {(p.rows ?? []).map((rw, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5, lineHeight: 1.5 }}>
+            <span style={{ width: 88, flex: "none", opacity: 0.75 }}>{rw.label}</span>
+            <span style={{ minWidth: 0, flex: 1 }}>{rw.value}</span>
+          </div>
+        ))}
+      </div>
+      <Meta isSelf time={timeLabel(msg.sent_at)} />
     </div>
   );
 }

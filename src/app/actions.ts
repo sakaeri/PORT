@@ -105,40 +105,23 @@ export async function deleteVaultItem(id: string) {
   if (error) throw error;
 }
 
-export async function submitInfoRequestAnswer(fields: { key: string; value: string }[]) {
+// 見積もりの「はじめの質問」（menu_pick）と同じく、その場のメッセージとしてのみ残す。
+// 依頼主ごとの永続データ（customer_vault_items＝マイページの「よく使う情報」）には繋げない
+// —— 確認事項テンプレはあくまで一回きりのやり取りとして扱う。
+export async function submitInfoRequestAnswer(formLabel: string, fields: { label: string; value: string }[]) {
   const ctx = await requireContext();
-  const supabase = await createClient();
   const filled = fields.filter((f) => f.value.trim());
   if (!filled.length) return;
-
-  for (const f of filled) {
-    const { data: existing } = await supabase
-      .from("customer_vault_items")
-      .select("id")
-      .eq("customer_id", ctx.customerId)
-      .eq("label", f.key)
-      .maybeSingle();
-    if (existing) {
-      await supabase.from("customer_vault_items").update({ value: f.value.trim() }).eq("id", existing.id);
-    } else {
-      await supabase.from("customer_vault_items").insert({ customer_id: ctx.customerId, label: f.key, value: f.value.trim() });
-    }
-  }
-
-  // 「回答済みかどうか」はこのメッセージの payload を書き換えるのではなく、
-  // vault に値があるかどうかで判定する（messages の RLS では、依頼主は
-  // 自分が送っていない行を更新できないため）。
-
-  // sender_id なし = システム発。customer 自身の RLS では null 送信者を名乗れない
-  // （customers_send は sender_id = auth.uid() を要求）ため、ここだけ service-role で書く。
-  const admin = createServiceRoleClient();
-  await admin.from("messages").insert({
+  const supabase = await createClient();
+  const { error } = await supabase.from("messages").insert({
     thread_id: ctx.threadId,
-    sender_id: null,
-    sender_role: null,
-    kind: "notice",
-    body: `${filled.map((f) => f.key).join("・")}を登録しました（トークには残りません）`,
+    sender_id: ctx.userId,
+    sender_role: "client",
+    kind: "intake_answer",
+    payload: { formLabel, rows: filled },
   });
+  if (error) throw error;
+  await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
 }
 
 // 受付への依頼として本人発言のまま投稿する（自動応答は作らない — 実際の返信は

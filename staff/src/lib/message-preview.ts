@@ -30,6 +30,8 @@ export function previewMessage(m: PreviewMessage): string {
       return `［選択］${m.body ?? ""}`;
     case "intake_request":
       return `［確認事項］${p.formLabel ?? m.body ?? ""}`;
+    case "intake_answer":
+      return `［確認事項への回答］${p.formLabel ?? ""}`;
     case "system":
       return m.body ?? "［システム］";
     default:
