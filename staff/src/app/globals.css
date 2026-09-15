@@ -66,7 +66,7 @@
 
 /* Light theme override — default is dark; opt in with data-vid-theme="light" */
 html[data-vid-theme="light"] {
-  --color-bg: #eef1f0;
+  --color-bg: #eaf6f0;
   --color-surface: #ffffff;
   --color-text: #10231d;
   --color-divider: color-mix(in srgb, #10231d 26%, transparent);
