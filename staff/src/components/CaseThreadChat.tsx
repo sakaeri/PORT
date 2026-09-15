@@ -126,8 +126,9 @@ export default function CaseThreadChat({
                     fontSize: 13,
                     lineHeight: 1.5,
                     whiteSpace: "pre-wrap",
-                    background: isOwn ? "var(--color-accent-900)" : "var(--color-surface)",
-                    border: isOwn ? "1px solid var(--color-accent-800)" : "1px solid var(--color-divider)",
+                    background: isOwn ? "var(--color-bubble-self-bg)" : "var(--color-bubble-other-bg)",
+                    color: isOwn ? "var(--color-bubble-self-text)" : "var(--color-bubble-other-text)",
+                    border: isOwn ? "none" : "1px solid var(--color-divider)",
                   }}
                 >
                   {m.body}

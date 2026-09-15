@@ -432,8 +432,9 @@ export default function CustomerThread({
                     fontSize: 13.5,
                     lineHeight: 1.5,
                     whiteSpace: "pre-wrap",
-                    background: isStaff ? "var(--color-accent-900)" : "var(--color-surface)",
-                    border: isStaff ? "1px solid var(--color-accent-800)" : "1px solid var(--color-divider)",
+                    background: isStaff ? "var(--color-bubble-self-bg)" : "var(--color-bubble-other-bg)",
+                    color: isStaff ? "var(--color-bubble-self-text)" : "var(--color-bubble-other-text)",
+                    border: isStaff ? "none" : "1px solid var(--color-divider)",
                   }}
                 >
                   {summarize(m)}
