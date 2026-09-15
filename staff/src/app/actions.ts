@@ -46,20 +46,35 @@ export async function updateCompanyInfo(fields: {
 }
 
 // org_write ポリシーは owner のみ更新可（reception は不可）。
-export async function updatePaymentSettings(fields: { cardPaymentEnabled: boolean; bankInfo: BankTransferInfo; cardPaymentLink: string }) {
+export async function updatePaymentSettings(fields: { cardPaymentEnabled: boolean; bankInfo: BankTransferInfo }) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("organizations")
-    .update({
-      card_payment_enabled: fields.cardPaymentEnabled,
-      bank_transfer_info: fields.bankInfo,
-      card_payment_link: fields.cardPaymentLink.trim() || null,
-    })
+    .update({ card_payment_enabled: fields.cardPaymentEnabled, bank_transfer_info: fields.bankInfo })
     .eq("id", ctx.orgId)
     .select("id");
   if (error) throw error;
   if (!data?.length) throw new Error("決済設定の変更はオーナーのみ行えます");
+}
+
+// カード決済のリンクは見積作成のたびに入力する運用にし、使ったリンクだけ一覧に残す
+// （URLは事後編集不可・タイトル変更と削除のみ）。card_payment_links_write は is_office() なので
+// 受付でも操作できる（決済ON/OFF・銀行口座はオーナー限定だが、こちらは日常運用寄りのため）。
+export async function renameCardPaymentLink(id: string, title: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const trimmed = title.trim();
+  if (!trimmed) throw new Error("タイトルを入力してください");
+  const { error } = await supabase.from("card_payment_links").update({ title: trimmed }).eq("id", id).eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
+export async function deleteCardPaymentLink(id: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("card_payment_links").delete().eq("id", id).eq("org_id", ctx.orgId);
+  if (error) throw error;
 }
 
 // solo=true が「1人運用（スタッフ機能を隠す）」。トグルのラベルは
@@ -555,6 +570,7 @@ export async function createCaseRequest(
     payMethod: PaymentMethod;
     bankInfo?: BankTransferInfo;
     cardPaymentLink?: string;
+    saveCardPaymentLink?: { title: string; url: string };
   },
 ) {
   const ctx = await requireContext();
@@ -577,6 +593,13 @@ export async function createCaseRequest(
         .insert(customItems.map((it) => ({ org_id: ctx.orgId, label: it.label, price: it.price, payout: it.payout })));
       if (menuError) throw menuError;
     }
+  }
+
+  if (input.payMethod === "card" && input.saveCardPaymentLink?.url.trim()) {
+    const { error: linkError } = await supabase
+      .from("card_payment_links")
+      .insert({ org_id: ctx.orgId, title: input.saveCardPaymentLink.title.trim() || "決済リンク", url: input.saveCardPaymentLink.url.trim() });
+    if (linkError) throw linkError;
   }
 
   const { data: request, error: reqError } = await supabase

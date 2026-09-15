@@ -179,7 +179,7 @@ export default function CustomerThread({
   latestRequest,
   cardPaymentEnabled,
   defaultBankInfo,
-  defaultCardPaymentLink,
+  cardPaymentLinks,
 }: {
   customer: { id: string; name: string; memberNo: string | null };
   thread: { id: string; archived: boolean } | null;
@@ -196,7 +196,7 @@ export default function CustomerThread({
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
   cardPaymentEnabled: boolean;
   defaultBankInfo: BankTransferInfo;
-  defaultCardPaymentLink: string;
+  cardPaymentLinks: CardPaymentLink[];
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -470,7 +470,7 @@ export default function CustomerThread({
           latestRequest={latestRequest}
           cardPaymentEnabled={cardPaymentEnabled}
           defaultBankInfo={defaultBankInfo}
-          defaultCardPaymentLink={defaultCardPaymentLink}
+          cardPaymentLinks={cardPaymentLinks}
         />
       )}
     </div>
@@ -514,7 +514,7 @@ function CaseSummarySection({
   latestRequest,
   cardPaymentEnabled,
   defaultBankInfo,
-  defaultCardPaymentLink,
+  cardPaymentLinks,
 }: {
   thread: { id: string; archived: boolean } | null;
   customerId: string;
@@ -522,7 +522,7 @@ function CaseSummarySection({
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
   cardPaymentEnabled: boolean;
   defaultBankInfo: BankTransferInfo;
-  defaultCardPaymentLink: string;
+  cardPaymentLinks: CardPaymentLink[];
 }) {
   const router = useRouter();
   const [showDialog, setShowDialog] = useState(false);
@@ -547,7 +547,7 @@ function CaseSummarySection({
           menus={menus}
           cardPaymentEnabled={cardPaymentEnabled}
           defaultBankInfo={defaultBankInfo}
-          defaultCardPaymentLink={defaultCardPaymentLink}
+          cardPaymentLinks={cardPaymentLinks}
           onClose={() => setShowDialog(false)}
           onCreated={(requestId) => {
             setShowDialog(false);
@@ -663,6 +663,12 @@ interface CustomItem {
   qty: number;
 }
 
+interface CardPaymentLink {
+  id: string;
+  title: string;
+  url: string;
+}
+
 const PAYMENT_TIMING_OPTIONS: { value: PaymentTiming; label: string }[] = [
   { value: "prepay_full", label: "先払い" },
   { value: "deposit", label: "予約金の先払い" },
@@ -691,7 +697,7 @@ function QuoteDialog({
   menus,
   cardPaymentEnabled,
   defaultBankInfo,
-  defaultCardPaymentLink,
+  cardPaymentLinks,
   onClose,
   onCreated,
 }: {
@@ -700,7 +706,7 @@ function QuoteDialog({
   menus: MenuOption[];
   cardPaymentEnabled: boolean;
   defaultBankInfo: BankTransferInfo;
-  defaultCardPaymentLink: string;
+  cardPaymentLinks: CardPaymentLink[];
   onClose: () => void;
   onCreated: (requestId: string) => void;
 }) {
@@ -716,9 +722,15 @@ function QuoteDialog({
   const [depositPercent, setDepositPercent] = useState("30");
   const [payMethod, setPayMethod] = useState<PaymentMethod>("bank");
   const [bankInfo, setBankInfo] = useState<BankTransferInfo>(defaultBankInfo);
-  const [cardPaymentLink, setCardPaymentLink] = useState(defaultCardPaymentLink);
+  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(cardPaymentLinks[0]?.id ?? null);
+  const [newLinkMode, setNewLinkMode] = useState(cardPaymentLinks.length === 0);
+  const [newLinkTitle, setNewLinkTitle] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const selectedLink = cardPaymentLinks.find((l) => l.id === selectedLinkId) ?? null;
+  const resolvedCardPaymentLink = newLinkMode ? newLinkUrl.trim() : selectedLink?.url ?? "";
 
   function setBankField<K extends keyof BankTransferInfo>(key: K, value: string) {
     setBankInfo((b) => ({ ...b, [key]: value }));
@@ -743,6 +755,10 @@ function QuoteDialog({
 
   async function submit() {
     if (saving || allItems.length === 0) return;
+    if (payMethod === "card" && !resolvedCardPaymentLink) {
+      setError("カード決済のリンクを選ぶか入力してください");
+      return;
+    }
     setError("");
     setSaving(true);
     try {
@@ -755,7 +771,8 @@ function QuoteDialog({
         depositPercent: paymentTiming === "deposit" ? Number(depositPercent) || 0 : undefined,
         payMethod,
         bankInfo: payMethod === "bank" ? bankInfo : undefined,
-        cardPaymentLink: payMethod === "card" ? cardPaymentLink : undefined,
+        cardPaymentLink: payMethod === "card" ? resolvedCardPaymentLink : undefined,
+        saveCardPaymentLink: payMethod === "card" && newLinkMode ? { title: newLinkTitle, url: newLinkUrl } : undefined,
       });
       onCreated(requestId);
     } catch (e) {
@@ -895,13 +912,35 @@ function QuoteDialog({
               </div>
             </div>
           ) : (
-            <input
-              value={cardPaymentLink}
-              onChange={(e) => setCardPaymentLink(e.target.value)}
-              placeholder="カード決済のリンク（依頼主に直接表示されます）"
-              className="vid-input"
-              style={inputStyle}
-            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {cardPaymentLinks.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {cardPaymentLinks.map((l) => (
+                    <button
+                      key={l.id}
+                      onClick={() => {
+                        setSelectedLinkId(l.id);
+                        setNewLinkMode(false);
+                      }}
+                      style={pillStyle(!newLinkMode && selectedLinkId === l.id)}
+                    >
+                      {l.title}
+                    </button>
+                  ))}
+                  <button onClick={() => setNewLinkMode(true)} style={pillStyle(newLinkMode)}>
+                    ＋新しいリンク
+                  </button>
+                </div>
+              )}
+              {newLinkMode ? (
+                <>
+                  <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="リンクのタイトル（例：Stripe決済リンクA）" className="vid-input" style={inputStyle} />
+                  <input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="カード決済のリンク（依頼主に直接表示されます）" className="vid-input" style={inputStyle} />
+                </>
+              ) : (
+                selectedLink && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedLink.url}</div>
+              )}
+            </div>
           )}
         </div>
 
@@ -939,6 +978,7 @@ const stepperBtn: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
+  width: "100%",
   height: 36,
   padding: "0 10px",
   font: "inherit",

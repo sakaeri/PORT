@@ -74,9 +74,15 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   const { data: orgPayment } = await supabase
     .from("organizations")
-    .select("card_payment_enabled, bank_transfer_info, card_payment_link")
+    .select("card_payment_enabled, bank_transfer_info")
     .eq("id", ctx.orgId)
     .single();
+
+  const { data: cardPaymentLinks } = await supabase
+    .from("card_payment_links")
+    .select("id, title, url")
+    .eq("org_id", ctx.orgId)
+    .order("created_at", { ascending: false });
 
   let initialMessages: ThreadMessage[] = [];
   if (thread) {
@@ -115,7 +121,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       latestRequest={latestRequest}
       cardPaymentEnabled={orgPayment?.card_payment_enabled ?? false}
       defaultBankInfo={orgPayment?.bank_transfer_info ?? {}}
-      defaultCardPaymentLink={orgPayment?.card_payment_link ?? ""}
+      cardPaymentLinks={cardPaymentLinks ?? []}
     />
   );
 }

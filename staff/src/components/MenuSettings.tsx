@@ -8,6 +8,8 @@ import {
   updateCompanyInfo,
   updateStaffMode,
   updatePaymentSettings,
+  renameCardPaymentLink,
+  deleteCardPaymentLink,
   createMenu,
   updateMenu,
   deleteMenu,
@@ -78,6 +80,12 @@ interface RefundPolicyRow {
   pct: number;
 }
 
+interface CardPaymentLink {
+  id: string;
+  title: string;
+  url: string;
+}
+
 const input: React.CSSProperties = {
   width: "100%",
   height: 36,
@@ -122,7 +130,7 @@ export default function MenuSettings({
   slug,
   initialCardPaymentEnabled,
   initialBankInfo,
-  initialCardPaymentLink,
+  initialCardPaymentLinks,
 }: {
   orgId: string;
   initialCompany: Company;
@@ -134,7 +142,7 @@ export default function MenuSettings({
   slug: string | null;
   initialCardPaymentEnabled: boolean;
   initialBankInfo: BankTransferInfo;
-  initialCardPaymentLink: string;
+  initialCardPaymentLinks: CardPaymentLink[];
 }) {
   const [tab, setTab] = useState<TabKey>("company");
 
@@ -171,11 +179,8 @@ export default function MenuSettings({
       {tab === "company" && (
         <>
           <CompanyInfoCard initial={initialCompany} slug={slug} />
-          <PaymentSettingsCard
-            initialCardPaymentEnabled={initialCardPaymentEnabled}
-            initialBankInfo={initialBankInfo}
-            initialCardPaymentLink={initialCardPaymentLink}
-          />
+          <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} />
+          <CardPaymentLinksCard initialLinks={initialCardPaymentLinks} />
           <StaffModeCard initialSolo={initialSolo} />
         </>
       )}
@@ -211,11 +216,10 @@ function CardHeader({ title, editing, onEdit }: { title: string; editing: boolea
 }
 
 function InfoRow({ label: l, value }: { label: string; value: string }) {
-  if (!value) return null;
   return (
     <div style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
       <span style={{ width: 90, flex: "none", color: "var(--color-neutral-500)" }}>{l}</span>
-      <span style={{ minWidth: 0, flex: 1 }}>{value}</span>
+      <span style={{ minWidth: 0, flex: 1, color: value ? "inherit" : "var(--color-neutral-500)" }}>{value || "（未設定）"}</span>
     </div>
   );
 }
@@ -302,17 +306,14 @@ function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | n
 function PaymentSettingsCard({
   initialCardPaymentEnabled,
   initialBankInfo,
-  initialCardPaymentLink,
 }: {
   initialCardPaymentEnabled: boolean;
   initialBankInfo: BankTransferInfo;
-  initialCardPaymentLink: string;
 }) {
-  const savedInitial = { cardEnabled: initialCardPaymentEnabled, bankInfo: initialBankInfo, cardPaymentLink: initialCardPaymentLink };
+  const savedInitial = { cardEnabled: initialCardPaymentEnabled, bankInfo: initialBankInfo };
   const [saved, setSaved] = useState(savedInitial);
   const [cardEnabled, setCardEnabled] = useState(saved.cardEnabled);
   const [bankInfo, setBankInfo] = useState(saved.bankInfo);
-  const [cardPaymentLink, setCardPaymentLink] = useState(saved.cardPaymentLink);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -324,7 +325,6 @@ function PaymentSettingsCard({
   function startEdit() {
     setCardEnabled(saved.cardEnabled);
     setBankInfo(saved.bankInfo);
-    setCardPaymentLink(saved.cardPaymentLink);
     setError("");
     setEditing(true);
   }
@@ -334,8 +334,8 @@ function PaymentSettingsCard({
     setSaving(true);
     setError("");
     try {
-      await updatePaymentSettings({ cardPaymentEnabled: cardEnabled, bankInfo, cardPaymentLink });
-      setSaved({ cardEnabled, bankInfo, cardPaymentLink });
+      await updatePaymentSettings({ cardPaymentEnabled: cardEnabled, bankInfo });
+      setSaved({ cardEnabled, bankInfo });
       setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存できませんでした");
@@ -348,12 +348,11 @@ function PaymentSettingsCard({
     <div style={card}>
       <CardHeader title="決済設定" editing={editing} onEdit={startEdit} />
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        見積もり作成時に選べる支払い方法と、銀行振込のデフォルトの振込先・カード決済のリンクです（見積もりごとにその場で変更もできます）。
+        見積もり作成時に選べる支払い方法と、銀行振込のデフォルトの振込先です（見積もりごとにその場で変更もできます）。カード決済のリンクは見積もり作成のたびに入力します。
       </div>
       {!editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <InfoRow label="カード決済" value={saved.cardEnabled ? "使う" : "使わない"} />
-          {saved.cardEnabled && <InfoRow label="決済リンク" value={saved.cardPaymentLink || "（未設定）"} />}
           <InfoRow label="口座名義" value={saved.bankInfo.holder ?? ""} />
           <InfoRow label="銀行・支店" value={[saved.bankInfo.bankName, saved.bankInfo.branchName].filter(Boolean).join(" ")} />
           <InfoRow label="口座番号" value={[saved.bankInfo.accountType, saved.bankInfo.accountNumber].filter(Boolean).join(" ")} />
@@ -364,9 +363,6 @@ function PaymentSettingsCard({
             <input type="checkbox" checked={cardEnabled} onChange={(e) => setCardEnabled(e.target.checked)} />
             カード決済を見積もりで選べるようにする
           </label>
-          {cardEnabled && (
-            <Field label="カード決済のリンク（Stripe決済リンク等・依頼主に直接表示されます）" value={cardPaymentLink} onChange={setCardPaymentLink} />
-          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <span style={label}>銀行振込のデフォルト振込先</span>
             <Field label="口座名義" value={bankInfo.holder ?? ""} onChange={(v) => setBankField("holder", v)} />
@@ -390,6 +386,87 @@ function PaymentSettingsCard({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[] }) {
+  const [links, setLinks] = useState(initialLinks);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  function startRename(l: CardPaymentLink) {
+    setEditingId(l.id);
+    setTitleDraft(l.title);
+    setError("");
+  }
+
+  async function saveRename(id: string) {
+    if (busyId) return;
+    setBusyId(id);
+    setError("");
+    try {
+      await renameCardPaymentLink(id, titleDraft);
+      setLinks((rows) => rows.map((r) => (r.id === id ? { ...r, title: titleDraft.trim() } : r)));
+      setEditingId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "変更できませんでした");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function remove(id: string) {
+    if (busyId || !confirm("この決済リンクを削除しますか？")) return;
+    setBusyId(id);
+    setError("");
+    try {
+      await deleteCardPaymentLink(id);
+      setLinks((rows) => rows.filter((r) => r.id !== id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "削除できませんでした");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div style={card}>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>カード決済のリンク一覧</div>
+      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+        見積もり作成時に入力したリンクがここに並びます。URLは変更できません（タイトルの変更・削除のみ）。
+      </div>
+      {links.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだリンクはありません。</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {links.map((l) => (
+            <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+              {editingId === l.id ? (
+                <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="vid-input" style={{ ...input, height: 32, flex: "none", width: 200 }} />
+              ) : (
+                <span style={{ flex: "none", width: 200, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</span>
+              )}
+              <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.url}</span>
+              {editingId === l.id ? (
+                <button onClick={() => saveRename(l.id)} disabled={busyId === l.id} style={{ ...smallBtn, height: 30 }}>
+                  保存
+                </button>
+              ) : (
+                <button onClick={() => startRename(l)} style={{ ...smallBtn, height: 30 }}>
+                  タイトル変更
+                </button>
+              )}
+              <button onClick={() => remove(l.id)} disabled={busyId === l.id} style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                <Trash size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
     </div>
   );
 }
@@ -890,13 +967,21 @@ const REFUND_MODES: { value: RefundMode; label: string }[] = [
   { value: "none", label: "返金なし" },
 ];
 
+function refundModeLabel(mode: RefundMode, pct: number): string {
+  const found = REFUND_MODES.find((m) => m.value === mode);
+  const base = found?.label ?? mode;
+  return mode === "partial" ? `${base}（${pct}%）` : base;
+}
+
 function RefundPolicyCard({ orgId, initialPolicy }: { orgId: string; initialPolicy: RefundPolicyRow[] }) {
-  const [rows, setRows] = useState(() =>
+  const makeRows = () =>
     REFUND_STAGES.map((s) => {
       const found = initialPolicy.find((p) => p.stage === s.key);
       return { ...s, mode: found?.mode ?? ("none" as RefundMode), pct: found?.pct ?? 0 };
-    }),
-  );
+    });
+  const [saved, setSaved] = useState(makeRows);
+  const [rows, setRows] = useState(saved);
+  const [editing, setEditing] = useState(false);
 
   function patch(i: number, p: Partial<{ mode: RefundMode; pct: number }>) {
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...p } : row)));
@@ -904,54 +989,69 @@ function RefundPolicyCard({ orgId, initialPolicy }: { orgId: string; initialPoli
 
   async function commit(row: (typeof rows)[number]) {
     await updateRefundPolicy(orgId, row.key, row.mode, row.pct);
+    setSaved((r) => r.map((s) => (s.key === row.key ? row : s)));
   }
 
   return (
     <div style={card}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>キャンセル・返金ポリシー</div>
+      <CardHeader title="キャンセル・返金ポリシー" editing={editing} onEdit={() => { setRows(saved); setEditing(true); }} />
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>段階は依頼の進み方で決まるため固定です。受付が決めるのは、それぞれの段階の返金の扱いと割合だけです。</div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {rows.map((r, i) => (
-          <div key={r.key} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <span style={{ fontSize: 12.5 }}>{r.label}</span>
-              <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>{r.when}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <select
-                value={r.mode}
-                onChange={(e) => { const mode = e.target.value as RefundMode; patch(i, { mode }); commit({ ...r, mode }); }}
-                className="vid-input"
-                style={{ ...input, width: 130, height: 32 }}
-              >
-                {REFUND_MODES.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-              {r.mode === "partial" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <input
-                    type="number"
-                    value={r.pct}
-                    onChange={(e) => patch(i, { pct: Number(e.target.value) })}
-                    onBlur={() => commit(rows[i])}
-                    className="vid-input"
-                    style={{ ...input, width: 60, height: 32 }}
-                  />
-                  <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>%</span>
+      {!editing ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {saved.map((r) => (
+            <InfoRow key={r.key} label={r.label} value={refundModeLabel(r.mode, r.pct)} />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {rows.map((r, i) => (
+              <div key={r.key} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 12.5 }}>{r.label}</span>
+                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>{r.when}</span>
                 </div>
-              )}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <select
+                    value={r.mode}
+                    onChange={(e) => { const mode = e.target.value as RefundMode; patch(i, { mode }); commit({ ...r, mode }); }}
+                    className="vid-input"
+                    style={{ ...input, width: 130, height: 32 }}
+                  >
+                    {REFUND_MODES.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                  {r.mode === "partial" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <input
+                        type="number"
+                        value={r.pct}
+                        onChange={(e) => patch(i, { pct: Number(e.target.value) })}
+                        onBlur={() => commit(rows[i])}
+                        className="vid-input"
+                        style={{ ...input, width: 60, height: 32 }}
+                      />
+                      <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: 9, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
+            <div style={{ minWidth: 0, fontSize: 11.5, color: "var(--color-neutral-400)", lineHeight: 1.6 }}>
+              「着手」の定義：受付が対象の案件で「着手する」を押した時点です。押していなければ未着手として扱われ、キャンセル時は原則全額返金になります。
             </div>
           </div>
-        ))}
-      </div>
 
-      <div style={{ display: "flex", gap: 9, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
-        <div style={{ minWidth: 0, fontSize: 11.5, color: "var(--color-neutral-400)", lineHeight: 1.6 }}>
-          「着手」の定義：受付が対象の案件で「着手する」を押した時点です。押していなければ未着手として扱われ、キャンセル時は原則全額返金になります。
-        </div>
-      </div>
+          <button onClick={() => setEditing(false)} style={{ ...smallBtn, height: 36, alignSelf: "flex-start", color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+            閉じる
+          </button>
+        </>
+      )}
     </div>
   );
 }
