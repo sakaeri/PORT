@@ -128,7 +128,7 @@ export default function CaseDetail({
             style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
           >
             {caseThread.archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
-            {caseThread.archived ? "一覧に戻す" : "アーカイブ"}
+            {caseThread.archived ? "一覧に戻す" : "非表示にする"}
           </button>
         )}
       </div>

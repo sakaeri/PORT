@@ -92,7 +92,7 @@ export default function CustomersList({ rows: initialRows, isHq, orgId }: { rows
       {archivedCount > 0 && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-          アーカイブ済みも表示（{archivedCount}件）
+          非表示のものも表示（{archivedCount}件）
         </label>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -121,7 +121,7 @@ export default function CustomersList({ rows: initialRows, isHq, orgId }: { rows
               </div>
             )}
             {c.thread && (
-              <button onClick={() => toggleArchive(c)} disabled={busyId === c.id} aria-label={c.thread.archived ? "一覧に戻す" : "アーカイブ"} style={smallBtn}>
+              <button onClick={() => toggleArchive(c)} disabled={busyId === c.id} aria-label={c.thread.archived ? "一覧に戻す" : "非表示にする"} style={smallBtn}>
                 {c.thread.archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
               </button>
             )}

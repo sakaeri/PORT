@@ -55,7 +55,7 @@ export default function CasesList({ rows: initialRows }: { rows: CaseRow[] }) {
       {archivedCount > 0 && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-          アーカイブ済みも表示（{archivedCount}件）
+          非表示のものも表示（{archivedCount}件）
         </label>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -70,7 +70,7 @@ export default function CasesList({ rows: initialRows }: { rows: CaseRow[] }) {
               {PHASE_LABEL[r.phase]}
             </div>
             {r.threadId && (
-              <button onClick={() => toggleArchive(r)} disabled={busyId === r.id} aria-label={r.archived ? "一覧に戻す" : "アーカイブ"} style={smallBtn}>
+              <button onClick={() => toggleArchive(r)} disabled={busyId === r.id} aria-label={r.archived ? "一覧に戻す" : "非表示にする"} style={smallBtn}>
                 {r.archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
               </button>
             )}

@@ -54,7 +54,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
     supabase.from("threads").select("id, archived_at").eq("customer_id", id).eq("kind", "customer").maybeSingle(),
-    supabase.from("intake_forms").select("id, label, note, intake_fields(id)").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
+    supabase.from("intake_forms").select("id, label, note, intake_fields(id, label, required, sort)").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
     supabase
       .from("menus")
       .select("id, label, note, price, payout, lead_hours")
@@ -67,7 +67,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
     supabase.from("ratings").select("stars, comment, skipped, created_at").eq("customer_id", id).order("created_at", { ascending: false }),
-    supabase.from("requests").select("id, title, amount, phase").eq("customer_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase
+      .from("requests")
+      .select("id, title, amount, phase")
+      .eq("customer_id", id)
+      .not("phase", "in", "(completed,cancelled,declined)")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     supabase.from("organizations").select("card_payment_enabled, bank_transfer_info").eq("id", ctx.orgId).single(),
     supabase.from("card_payment_links").select("id, title, url").eq("org_id", ctx.orgId).order("created_at", { ascending: false }),
   ]);
@@ -76,7 +83,16 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const convertedOrgRaw = Array.isArray(customer.converted_org) ? customer.converted_org[0] : customer.converted_org;
   const convertedOrg = convertedOrgRaw ? { displayName: convertedOrgRaw.display_name, slug: convertedOrgRaw.slug } : null;
 
-  const templates = (templateRows ?? []).map((t) => ({ id: t.id, label: t.label, note: t.note, fieldCount: (t.intake_fields ?? []).length }));
+  const templates = (templateRows ?? []).map((t) => ({
+    id: t.id,
+    label: t.label,
+    note: t.note,
+    fieldCount: (t.intake_fields ?? []).length,
+    fields: (t.intake_fields ?? [])
+      .slice()
+      .sort((a, b) => a.sort - b.sort)
+      .map((f) => ({ label: f.label, required: f.required })),
+  }));
   const menus = (menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, payout: m.payout, leadHours: m.lead_hours }));
   const memos = (memoRows ?? []).map((m) => {
     const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;

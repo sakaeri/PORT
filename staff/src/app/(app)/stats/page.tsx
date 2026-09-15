@@ -14,6 +14,31 @@ function yen(n: number): string {
   return "¥" + Math.round(n).toLocaleString("ja-JP");
 }
 
+function nowJSTYearMonth(): { year: number; month: number } {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+  return { year: Number(parts.find((p) => p.type === "year")!.value), month: Number(parts.find((p) => p.type === "month")!.value) };
+}
+
+function monthKeyJST(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit" }).formatToParts(new Date(iso));
+  return `${parts.find((p) => p.type === "year")!.value}-${parts.find((p) => p.type === "month")!.value}`;
+}
+
+function lastMonthKeys(n: number): { key: string; label: string }[] {
+  const { year, month } = nowJSTYearMonth();
+  const out: { key: string; label: string }[] = [];
+  for (let i = 0; i < n; i++) {
+    let y = year;
+    let m = month - i;
+    while (m <= 0) {
+      m += 12;
+      y -= 1;
+    }
+    out.push({ key: `${y}-${String(m).padStart(2, "0")}`, label: `${y}年${m}月` });
+  }
+  return out;
+}
+
 export default async function StatsPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
@@ -73,7 +98,7 @@ async function OrgStats({ orgId }: { orgId: string }) {
   const supabase = await createClient();
   const { data: requests, error } = await supabase
     .from("requests")
-    .select("phase, amount, pay_status, deposit_amount")
+    .select("phase, amount, pay_status, deposit_amount, paid_at, deposit_paid_at, paid_marked_by, deposit_paid_marked_by")
     .eq("org_id", orgId);
 
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
@@ -89,6 +114,35 @@ async function OrgStats({ orgId }: { orgId: string }) {
   const quoted = rows.filter((r) => r.phase === "quoted").length;
   const completed = rows.filter((r) => r.phase === "completed").length;
 
+  // 入金確認1回＝1件として、確認した月・確認した受付ごとに集計する。
+  const entries = rows.flatMap((r) => {
+    const list: { amount: number; markedBy: string | null; at: string }[] = [];
+    if (r.pay_status === "paid" && r.paid_at) list.push({ amount: r.amount, markedBy: r.paid_marked_by, at: r.paid_at });
+    else if (r.pay_status === "processing" && r.deposit_paid_at) list.push({ amount: r.deposit_amount ?? 0, markedBy: r.deposit_paid_marked_by, at: r.deposit_paid_at });
+    return list;
+  });
+
+  const monthKeys = lastMonthKeys(6);
+  const monthTotals = new Map(monthKeys.map((m) => [m.key, 0]));
+  for (const e of entries) {
+    const key = monthKeyJST(e.at);
+    if (monthTotals.has(key)) monthTotals.set(key, (monthTotals.get(key) ?? 0) + e.amount);
+  }
+
+  const staffIds = Array.from(new Set(entries.map((e) => e.markedBy).filter((id): id is string => !!id)));
+  const { data: staffProfiles } = staffIds.length ? await supabase.from("profiles").select("id, display_name").in("id", staffIds) : { data: [] };
+  const nameById = new Map((staffProfiles ?? []).map((p) => [p.id, p.display_name]));
+
+  const staffTotals = new Map<string, { name: string; amount: number; count: number }>();
+  for (const e of entries) {
+    if (!e.markedBy) continue;
+    const cur = staffTotals.get(e.markedBy) ?? { name: nameById.get(e.markedBy) ?? "不明", amount: 0, count: 0 };
+    cur.amount += e.amount;
+    cur.count += 1;
+    staffTotals.set(e.markedBy, cur);
+  }
+  const staffRows = Array.from(staffTotals.values()).sort((a, b) => b.amount - a.amount);
+
   return (
     <>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -96,11 +150,41 @@ async function OrgStats({ orgId }: { orgId: string }) {
         <StatTile label="完了件数" value={`${completed}件`} />
         <StatTile label="見積もり回答待ち" value={`${quoted}件`} />
       </div>
+
+      <SectionTitle>月別の入金額</SectionTitle>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {monthKeys.map((m) => (
+          <div key={m.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+            <div style={{ flex: 1, fontSize: 13 }}>{m.label}</div>
+            <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>{yen(monthTotals.get(m.key) ?? 0)}</div>
+          </div>
+        ))}
+      </div>
+
+      <SectionTitle>担当者別の入金確認実績</SectionTitle>
+      {staffRows.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ入金確認の実績がありません。</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {staffRows.map((s, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+              <div style={{ flex: 1, fontSize: 13 }}>{s.name}</div>
+              <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>{s.count}件</div>
+              <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)", width: 100, textAlign: "right" }}>{yen(s.amount)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        入金額は受付が「入金を確認した」を押した分だけ反映されます。月別の内訳やスタッフごとの実績は次のフェーズで対応します。
+        入金額は受付が「入金を確認した」を押した分だけ反映されます。
       </div>
     </>
   );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-neutral-400)", marginTop: 4 }}>{children}</div>;
 }
 
 function StatTile({ label, value }: { label: string; value: string }) {

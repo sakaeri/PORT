@@ -137,9 +137,9 @@ function QuoteBubble({ msg }: { msg: Message }) {
   const badge = phase ? (PHASE_BADGE_COLOR[phase] ?? PHASE_BADGE_COLOR.quoted) : null;
 
   return (
-    <div style={{ width: "min(280px, 100%)", padding: "11px 13px", borderRadius: "var(--radius-lg)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent-800)", display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{ width: "min(280px, 100%)", padding: "11px 13px", borderRadius: "var(--radius-lg)", background: "var(--color-surface)", border: "1.5px solid var(--color-accent)", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--color-accent-200)" }}>見積もり</span>
+        <span style={{ flex: "none", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: "var(--color-bg)", background: "var(--color-accent)", padding: "2px 8px", borderRadius: 6 }}>見積もり</span>
         {phase && badge && (
           <span style={{ marginLeft: "auto", flex: "none", fontSize: 10, padding: "2px 8px", borderRadius: 6, border: `1px solid ${badge.border}`, color: badge.color, whiteSpace: "nowrap" }}>
             {PHASE_LABEL[phase]}
@@ -147,13 +147,13 @@ function QuoteBubble({ msg }: { msg: Message }) {
         )}
       </div>
       <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: headingWeight, lineHeight: 1.3 }}>{p.title}</div>
-      {p.note && <div style={{ fontSize: 12, opacity: 0.85 }}>{p.note}</div>}
+      {p.note && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{p.note}</div>}
       {msg.requestAmount != null && <div style={{ fontSize: 17, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{msg.requestAmount.toLocaleString("ja-JP")}</div>}
       {p.due && <div style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>対応の目安：{p.due}</div>}
 
       {phase === "completed" && msg.report && (
-        <div style={{ borderTop: "1px solid var(--color-accent-800)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-          <div style={{ fontSize: 10.5, color: "var(--color-accent-200)" }}>完了報告</div>
+        <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ fontSize: 10.5, color: "var(--color-accent)" }}>完了報告</div>
           <div style={{ fontSize: 12.5 }}>{msg.report.summary}</div>
           {msg.report.details.map((d, i) => (
             <div key={i} style={{ display: "flex", gap: 8, fontSize: 12 }}>
@@ -163,6 +163,27 @@ function QuoteBubble({ msg }: { msg: Message }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function MenuPickBubble({ msg }: { msg: Message }) {
+  const p = msg.payload as { menuLabel?: string; rows?: { label: string; value: string }[]; note?: string };
+  return (
+    <div style={{ width: "min(280px, 100%)", padding: "11px 13px", borderRadius: "var(--radius-lg)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 6 }}>
+      <span style={{ fontSize: 10, letterSpacing: "0.05em", color: "var(--color-neutral-500)" }}>メニュー選択</span>
+      <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: headingWeight, lineHeight: 1.3 }}>{p.menuLabel}</div>
+      {!!p.rows?.length && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
+          {p.rows.map((rw, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, fontSize: 12 }}>
+              <span style={{ width: 88, flex: "none", color: "var(--color-neutral-500)" }}>{rw.label}</span>
+              <span style={{ minWidth: 0, flex: 1 }}>{rw.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {p.note && <div style={{ fontSize: 12.5, paddingTop: 6, borderTop: p.rows?.length ? "none" : "1px solid var(--color-divider)" }}>{p.note}</div>}
     </div>
   );
 }
@@ -195,7 +216,7 @@ export default function CustomerThread({
   orgId: string;
   isHq: boolean;
   convertedOrg: { displayName: string; slug: string | null } | null;
-  templates: { id: string; label: string; note: string | null; fieldCount: number }[];
+  templates: { id: string; label: string; note: string | null; fieldCount: number; fields: { label: string; required: boolean }[] }[];
   menus: MenuOption[];
   memos: WorkMemo[];
   ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
@@ -209,6 +230,7 @@ export default function CustomerThread({
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<{ id: string; label: string; note: string | null; fields: { label: string; required: boolean }[] } | null>(null);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -399,6 +421,8 @@ export default function CustomerThread({
                 </div>
               ) : m.kind === "quote" ? (
                 <QuoteBubble msg={m} />
+              ) : m.kind === "menu_pick" ? (
+                <MenuPickBubble msg={m} />
               ) : (
                 <div
                   style={{
@@ -444,15 +468,9 @@ export default function CustomerThread({
                     key={t.id}
                     label={`${t.label}（${t.fieldCount}項目）`}
                     disabled={busy}
-                    onClick={async () => {
-                      if (!thread) return;
-                      setBusy(true);
-                      try {
-                        await sendTemplateMessage(thread.id, t.id);
-                        setShowTemplates(false);
-                      } finally {
-                        setBusy(false);
-                      }
+                    onClick={() => {
+                      setPreviewTemplate({ id: t.id, label: t.label, note: t.note, fields: t.fields });
+                      setShowTemplates(false);
                     }}
                   />
                 ))}
@@ -526,6 +544,22 @@ export default function CustomerThread({
           <Paperclip size={11} />
           ファイルの添付は次のフェーズで対応します。
         </div>
+      )}
+      {thread && previewTemplate && (
+        <TemplatePreviewDialog
+          template={previewTemplate}
+          busy={busy}
+          onClose={() => setPreviewTemplate(null)}
+          onSend={async () => {
+            setBusy(true);
+            try {
+              await sendTemplateMessage(thread.id, previewTemplate.id);
+              setPreviewTemplate(null);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
       )}
     </div>
 
@@ -765,6 +799,52 @@ function pillStyle(active: boolean): React.CSSProperties {
     borderColor: active ? "var(--color-accent-800)" : "var(--color-divider)",
     borderRadius: "var(--radius-md)",
   };
+}
+
+function TemplatePreviewDialog({
+  template,
+  busy,
+  onClose,
+  onSend,
+}: {
+  template: { label: string; note: string | null; fields: { label: string; required: boolean }[] };
+  busy: boolean;
+  onClose: () => void;
+  onSend: () => void;
+}) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: "min(400px, 100%)", maxHeight: "85vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, padding: 20, borderRadius: "var(--radius-lg)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}
+      >
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>このテンプレを送信</div>
+        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>依頼主にはこの内容のカードが送られ、下の項目を入力してもらいます。</div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+          <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: headingWeight }}>{template.label}</div>
+          {template.note && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>{template.note}</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
+            {template.fields.map((f, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+                <span>{f.label}</span>
+                {f.required && <span style={{ fontSize: 10, color: "var(--color-accent-200)" }}>必須</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button onClick={onClose} disabled={busy} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+            キャンセル
+          </button>
+          <button onClick={onSend} disabled={busy} style={{ ...smallBtn, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
+            {busy ? "送信中…" : "この内容で送信する"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function QuoteDialog({
