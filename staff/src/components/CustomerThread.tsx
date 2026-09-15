@@ -791,6 +791,7 @@ function QuoteDialog({
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customLabel, setCustomLabel] = useState("");
   const [customPrice, setCustomPrice] = useState("");
+  const [customQty, setCustomQty] = useState("1");
   const [customLeadHours, setCustomLeadHours] = useState("");
   const [note, setNote] = useState("");
   const [saveAsMenu, setSaveAsMenu] = useState(false);
@@ -818,12 +819,18 @@ function QuoteDialog({
 
   function addCustomItem() {
     const price = Number(customPrice);
+    const qty = Math.max(1, Math.round(Number(customQty) || 1));
     const leadHours = customLeadHours.trim() ? Math.max(1, Math.round(Number(customLeadHours))) : null;
     if (!customLabel.trim() || !Number.isFinite(price) || price < 0) return;
-    setCustomItems((rows) => [...rows, { label: customLabel.trim(), price, qty: 1, leadHours }]);
+    setCustomItems((rows) => [...rows, { label: customLabel.trim(), price, qty, leadHours }]);
     setCustomLabel("");
     setCustomPrice("");
+    setCustomQty("1");
     setCustomLeadHours("");
+  }
+
+  function bumpCustomQty(index: number, delta: number) {
+    setCustomItems((rows) => rows.map((r, i) => (i === index ? { ...r, qty: Math.max(1, r.qty + delta) } : r)));
   }
 
   const menuItems = menus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id], leadHours: m.leadHours as number | null }));
@@ -915,6 +922,10 @@ function QuoteDialog({
                 <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>金額</span>
                 <input value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} type="number" min={0} className="vid-input" style={inputStyle} />
               </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 64 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>数量</span>
+                <input value={customQty} onChange={(e) => setCustomQty(e.target.value)} type="number" min={1} className="vid-input" style={inputStyle} />
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 90 }}>
                 <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間(h)・任意</span>
                 <input value={customLeadHours} onChange={(e) => setCustomLeadHours(e.target.value)} type="number" min={1} placeholder="なし" className="vid-input" style={inputStyle} />
@@ -931,6 +942,13 @@ function QuoteDialog({
                 ¥{c.price.toLocaleString("ja-JP")}
                 {c.leadHours != null && `・納期${c.leadHours}時間`}
               </span>
+              <button onClick={() => bumpCustomQty(i, -1)} disabled={c.qty <= 1} style={stepperBtn}>
+                −
+              </button>
+              <span style={{ width: 20, textAlign: "center" }}>{c.qty}</span>
+              <button onClick={() => bumpCustomQty(i, 1)} style={stepperBtn}>
+                ＋
+              </button>
               <button onClick={() => setCustomItems((rows) => rows.filter((_, j) => j !== i))} style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
                 <Trash size={12} />
               </button>
