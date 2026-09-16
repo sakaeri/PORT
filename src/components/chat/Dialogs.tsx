@@ -17,6 +17,7 @@ const dialogBox: React.CSSProperties = {
   width: "min(440px, 100%)",
   maxHeight: "calc(100vh - 32px)",
   overflowY: "auto",
+  position: "relative",
   display: "flex",
   flexDirection: "column",
   gap: 12,
@@ -47,7 +48,8 @@ export function ProgressPanel({ bundles, onClose, onCancel }: { bundles: Request
   const inProgress = active.filter((b) => ["started", "approved"].includes(b.request.phase)).length;
   const parts = [quoted && `見積もり待ち ${quoted}件`, preparing && `着手前 ${preparing}件`, inProgress && `対応中 ${inProgress}件`].filter(Boolean);
   const headline = (parts.length ? parts.join("／") + "　" : "") + "同時にお受けできるのは3件までです";
-  const items = bundles.filter((b) => b.request.phase !== "draft").slice().reverse();
+  // 完了した依頼は「報告書一覧」で確認する運用のため、進捗状況からは消す。
+  const items = bundles.filter((b) => !["draft", "completed"].includes(b.request.phase)).slice().reverse();
 
   return (
     <Centered onBackdrop={onClose}>

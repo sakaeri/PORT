@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, Info, X } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { createClient } from "@/lib/supabase/client";
 import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
@@ -249,6 +250,8 @@ export default function CustomerThread({
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const isMobile = useIsMobile();
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<{ id: string; label: string; note: string | null; fields: { label: string; required: boolean }[] } | null>(null);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
@@ -398,6 +401,15 @@ export default function CustomerThread({
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{customer.name}</div>
           <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{customer.memberNo ?? "—"}</div>
         </div>
+        {isMobile && (
+          <button
+            onClick={() => setShowInfoPanel(true)}
+            aria-label="依頼主の情報を表示"
+            style={{ flex: "none", display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}
+          >
+            <Info size={19} />
+          </button>
+        )}
       </div>
 
       {isHq && (
@@ -585,21 +597,41 @@ export default function CustomerThread({
       )}
     </div>
 
-    <div style={{ flex: "none", width: 300, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 18, borderLeft: "1px solid var(--color-divider)" }}>
-      {!isHq && <RatingsSummary ratings={ratings} />}
-      <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
-      {!isHq && (
-        <CaseSummarySection
-          thread={thread}
-          customerId={customer.id}
-          menus={menus}
-          latestRequest={latestRequest}
-          cardPaymentEnabled={cardPaymentEnabled}
-          defaultBankInfo={defaultBankInfo}
-          cardPaymentLinks={cardPaymentLinks}
-        />
-      )}
-    </div>
+    {(!isMobile || showInfoPanel) && (
+      <>
+        {isMobile && <div onClick={() => setShowInfoPanel(false)} style={{ position: "fixed", inset: 0, zIndex: 69, background: "color-mix(in srgb, var(--color-bg) 55%, transparent)" }} />}
+        <div
+          style={
+            isMobile
+              ? { position: "fixed", top: 0, right: 0, bottom: 0, width: "min(320px, 88vw)", zIndex: 70, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 18, background: "var(--color-surface)", borderLeft: "1px solid var(--color-divider)" }
+              : { flex: "none", width: 300, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 18, borderLeft: "1px solid var(--color-divider)" }
+          }
+        >
+          {isMobile && (
+            <button
+              onClick={() => setShowInfoPanel(false)}
+              aria-label="閉じる"
+              style={{ alignSelf: "flex-end", display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}
+            >
+              <X size={18} />
+            </button>
+          )}
+          {!isHq && <RatingsSummary ratings={ratings} />}
+          <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
+          {!isHq && (
+            <CaseSummarySection
+              thread={thread}
+              customerId={customer.id}
+              menus={menus}
+              latestRequest={latestRequest}
+              cardPaymentEnabled={cardPaymentEnabled}
+              defaultBankInfo={defaultBankInfo}
+              cardPaymentLinks={cardPaymentLinks}
+            />
+          )}
+        </div>
+      </>
+    )}
     </div>
   );
 }
