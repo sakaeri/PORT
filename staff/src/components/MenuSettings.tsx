@@ -153,27 +153,35 @@ export default function MenuSettings({
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>メニュー管理</div>
 
       {isMobile ? (
-        <select
-          value={tab}
-          onChange={(e) => setTab(e.target.value as TabKey)}
-          style={{
-            height: 40,
-            padding: "0 10px",
-            fontSize: 13.5,
-            fontFamily: "var(--font-heading)",
-            fontWeight: headingWeight,
-            color: "var(--color-text)",
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-divider)",
-            borderRadius: "var(--radius-md)",
-          }}
-        >
-          {TABS.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+        <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  height: 34,
+                  padding: "0 2px",
+                  cursor: "pointer",
+                  fontSize: 10.5,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  color: active ? "var(--color-bg)" : "var(--color-neutral-400)",
+                  background: active ? "var(--color-accent)" : "transparent",
+                  border: "1px solid",
+                  borderColor: active ? "var(--color-accent)" : "transparent",
+                  borderRadius: "var(--radius-md)",
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
       ) : (
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
           {TABS.map((t) => {
