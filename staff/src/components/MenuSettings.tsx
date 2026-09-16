@@ -146,37 +146,62 @@ export default function MenuSettings({
   initialCardPaymentLinks: CardPaymentLink[];
 }) {
   const [tab, setTab] = useState<TabKey>("company");
+  const isMobile = useIsMobile();
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>メニュー管理</div>
 
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                flex: "none",
-                height: 34,
-                padding: "0 10px",
-                cursor: "pointer",
-                fontSize: 12.5,
-                whiteSpace: "nowrap",
-                color: active ? "var(--color-bg)" : "var(--color-neutral-400)",
-                background: active ? "var(--color-accent)" : "transparent",
-                border: "1px solid",
-                borderColor: active ? "var(--color-accent)" : "transparent",
-                borderRadius: "var(--radius-md)",
-              }}
-            >
+      {isMobile ? (
+        <select
+          value={tab}
+          onChange={(e) => setTab(e.target.value as TabKey)}
+          style={{
+            height: 40,
+            padding: "0 10px",
+            fontSize: 13.5,
+            fontFamily: "var(--font-heading)",
+            fontWeight: headingWeight,
+            color: "var(--color-text)",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-divider)",
+            borderRadius: "var(--radius-md)",
+          }}
+        >
+          {TABS.map((t) => (
+            <option key={t.key} value={t.key}>
               {t.label}
-            </button>
-          );
-        })}
-      </div>
+            </option>
+          ))}
+        </select>
+      ) : (
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
+          {TABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                style={{
+                  flex: "none",
+                  height: 34,
+                  padding: "0 10px",
+                  cursor: "pointer",
+                  fontSize: 12.5,
+                  whiteSpace: "nowrap",
+                  color: active ? "var(--color-bg)" : "var(--color-neutral-400)",
+                  background: active ? "var(--color-accent)" : "transparent",
+                  border: "1px solid",
+                  borderColor: active ? "var(--color-accent)" : "transparent",
+                  borderRadius: "var(--radius-md)",
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {tab === "company" && (
         <>
@@ -485,6 +510,8 @@ function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[
   const [titleDraft, setTitleDraft] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const isMobile = useIsMobile();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   function startRename(l: CardPaymentLink) {
     setEditingId(l.id);
@@ -531,30 +558,64 @@ function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[
         <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだリンクはありません。</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {links.map((l) => (
-            <div key={l.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-              {editingId === l.id ? (
-                <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="vid-input" style={{ ...input, height: 32, minWidth: 0, flex: "1 1 140px" }} />
-              ) : (
-                <span style={{ minWidth: 0, flex: "1 1 140px", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</span>
-              )}
-              <span style={{ minWidth: 0, flex: "2 1 160px", fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.url}</span>
-              <div style={{ display: "flex", flex: "none", gap: 8, marginLeft: "auto" }}>
-                {editingId === l.id ? (
-                  <button onClick={() => saveRename(l.id)} disabled={busyId === l.id} style={{ ...smallBtn, height: 30 }}>
-                    保存
-                  </button>
-                ) : (
-                  <button onClick={() => startRename(l)} style={{ ...smallBtn, height: 30 }}>
-                    タイトル変更
-                  </button>
-                )}
-                <button onClick={() => remove(l.id)} disabled={busyId === l.id} style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                  <Trash size={13} />
+          {links.map((l) =>
+            isMobile ? (
+              <div key={l.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
+                <button
+                  onClick={() => setExpandedId((v) => (v === l.id ? null : l.id))}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
+                >
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</span>
+                  {expandedId === l.id ? <CaretDown size={13} /> : <CaretRight size={13} />}
                 </button>
+                {expandedId === l.id && (
+                  <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", overflowWrap: "anywhere" }}>{l.url}</div>
+                    {editingId === l.id ? (
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="vid-input" style={{ ...input, height: 32, minWidth: 0, flex: 1 }} />
+                        <button onClick={() => saveRename(l.id)} disabled={busyId === l.id} style={{ ...smallBtn, height: 32 }}>
+                          保存
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => startRename(l)} style={{ ...smallBtn, height: 30, flex: 1 }}>
+                          タイトル変更
+                        </button>
+                        <button onClick={() => remove(l.id)} disabled={busyId === l.id} style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                          <Trash size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            ) : (
+              <div key={l.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+                {editingId === l.id ? (
+                  <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="vid-input" style={{ ...input, height: 32, minWidth: 0, flex: "1 1 140px" }} />
+                ) : (
+                  <span style={{ minWidth: 0, flex: "1 1 140px", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</span>
+                )}
+                <span style={{ minWidth: 0, flex: "2 1 160px", fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.url}</span>
+                <div style={{ display: "flex", flex: "none", gap: 8, marginLeft: "auto" }}>
+                  {editingId === l.id ? (
+                    <button onClick={() => saveRename(l.id)} disabled={busyId === l.id} style={{ ...smallBtn, height: 30 }}>
+                      保存
+                    </button>
+                  ) : (
+                    <button onClick={() => startRename(l)} style={{ ...smallBtn, height: 30 }}>
+                      タイトル変更
+                    </button>
+                  )}
+                  <button onClick={() => remove(l.id)} disabled={busyId === l.id} style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                    <Trash size={13} />
+                  </button>
+                </div>
+              </div>
+            ),
+          )}
         </div>
       )}
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}

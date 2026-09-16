@@ -168,7 +168,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
 
   if (isMobile) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)" }}>
+      <div style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)" }}>
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, height: 52, padding: "0 var(--space-4)", background: "var(--color-surface)", borderBottom: "1px solid var(--color-divider)" }}>
           <button
             onClick={() => setDrawerOpen(true)}

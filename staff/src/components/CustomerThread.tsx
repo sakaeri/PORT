@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, Info, X } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { createClient } from "@/lib/supabase/client";
@@ -407,7 +407,7 @@ export default function CustomerThread({
             aria-label="依頼主の情報を表示"
             style={{ flex: "none", display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}
           >
-            <Info size={19} />
+            <SidebarSimple size={19} />
           </button>
         )}
       </div>
