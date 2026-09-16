@@ -84,7 +84,7 @@ async function HqStats() {
 
   return (
     <>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         <StatTile label="登録事業者数" value={`${rows.length}件`} />
         <StatTile label="契約中" value={`${activeCount}件`} />
         <StatTile label="月間売上（見込み）" value={yen(totalMonthly)} />
@@ -172,7 +172,7 @@ async function OrgStats({ orgId }: { orgId: string }) {
 
   return (
     <>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         <StatTile label="累計入金額（確認済み）" value={yen(total)} />
         <StatTile label="完了件数" value={`${completed}件`} />
         <StatTile label="見積もり回答待ち" value={`${quoted}件`} />
@@ -194,9 +194,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ flex: "1 1 160px", padding: "14px 16px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}>
-      <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{label}</div>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20, marginTop: 4 }}>{value}</div>
+    <div style={{ minWidth: 0, padding: "12px 10px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}>
+      <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
     </div>
   );
 }

@@ -150,7 +150,7 @@ export default function MenuSettings({
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>メニュー管理</div>
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
+      <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", overflowX: "auto", borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
         {TABS.map((t) => {
           const active = tab === t.key;
           return (
@@ -158,8 +158,9 @@ export default function MenuSettings({
               key={t.key}
               onClick={() => setTab(t.key)}
               style={{
+                flex: "none",
                 height: 34,
-                padding: "0 14px",
+                padding: "0 10px",
                 cursor: "pointer",
                 fontSize: 12.5,
                 whiteSpace: "nowrap",
@@ -196,10 +197,10 @@ type TabKey = "company" | "menu" | "login" | "templates" | "refund";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "company", label: "会社情報" },
-  { key: "menu", label: "受付メニュー" },
-  { key: "templates", label: "返信テンプレ" },
-  { key: "refund", label: "キャンセル・返金ポリシー" },
-  { key: "login", label: "ログイン情報" },
+  { key: "menu", label: "メニュー" },
+  { key: "templates", label: "テンプレ" },
+  { key: "refund", label: "返金ポリシー" },
+  { key: "login", label: "ログイン設定" },
 ];
 
 function InfoTooltip({ text }: { text: string }) {
@@ -316,12 +317,12 @@ function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | n
     <div style={card}>
       <CardHeader title="会社情報" info="契約書の「甲」・依頼主への表示名・見積書と請求書に使います" editing={editing} onEdit={startEdit} />
       {slug && (
-        <div style={{ fontSize: 12, color: "var(--color-neutral-400)" }}>
-          依頼主用URL：
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
+          <span>お問い合わせURL：</span>
           <a href={`https://port.s-stylegolf.com/${slug}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
             port.s-stylegolf.com/{slug}
           </a>
-          （ホームページ等に載せてご利用ください）
+          <InfoTooltip text="このURLは共通のリンクですが、タップした方ごとに専用のお問い合わせ窓口になります。ホームページなどに載せてご利用ください。" />
         </div>
       )}
       {!editing ? (
@@ -500,25 +501,27 @@ function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {links.map((l) => (
-            <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+            <div key={l.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
               {editingId === l.id ? (
-                <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="vid-input" style={{ ...input, height: 32, flex: "none", width: 200 }} />
+                <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="vid-input" style={{ ...input, height: 32, minWidth: 0, flex: "1 1 140px" }} />
               ) : (
-                <span style={{ flex: "none", width: 200, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</span>
+                <span style={{ minWidth: 0, flex: "1 1 140px", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</span>
               )}
-              <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.url}</span>
-              {editingId === l.id ? (
-                <button onClick={() => saveRename(l.id)} disabled={busyId === l.id} style={{ ...smallBtn, height: 30 }}>
-                  保存
+              <span style={{ minWidth: 0, flex: "2 1 160px", fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.url}</span>
+              <div style={{ display: "flex", flex: "none", gap: 8, marginLeft: "auto" }}>
+                {editingId === l.id ? (
+                  <button onClick={() => saveRename(l.id)} disabled={busyId === l.id} style={{ ...smallBtn, height: 30 }}>
+                    保存
+                  </button>
+                ) : (
+                  <button onClick={() => startRename(l)} style={{ ...smallBtn, height: 30 }}>
+                    タイトル変更
+                  </button>
+                )}
+                <button onClick={() => remove(l.id)} disabled={busyId === l.id} style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                  <Trash size={13} />
                 </button>
-              ) : (
-                <button onClick={() => startRename(l)} style={{ ...smallBtn, height: 30 }}>
-                  タイトル変更
-                </button>
-              )}
-              <button onClick={() => remove(l.id)} disabled={busyId === l.id} style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                <Trash size={13} />
-              </button>
+              </div>
             </div>
           ))}
         </div>
@@ -646,7 +649,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
               </button>
               {open && (
                 <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       <span style={label}>メニュー名</span>
                       <input value={m.label} onChange={(e) => patchLocal(m.id, { label: e.target.value })} onBlur={() => commit(m)} className="vid-input" style={input} />

@@ -69,11 +69,16 @@ export default function MonthlyMenuBreakdown({ months }: { months: MonthBreakdow
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 2 }}>
-        <button onClick={() => setIndex((i) => Math.max(0, i - 1))} disabled={index === 0} aria-label="前の月" style={navBtn}>
+        <button onClick={() => setIndex((i) => Math.max(0, i - 1))} disabled={index === 0} aria-label="前の月" style={{ ...navBtn, opacity: index === 0 ? 0.3 : 1, cursor: index === 0 ? "default" : "pointer" }}>
           <CaretLeft size={14} />
         </button>
         <div style={{ fontSize: 14, fontFamily: "var(--font-heading)" }}>{month.label}</div>
-        <button onClick={() => setIndex((i) => Math.min(months.length - 1, i + 1))} disabled={index === months.length - 1} aria-label="次の月" style={navBtn}>
+        <button
+          onClick={() => setIndex((i) => Math.min(months.length - 1, i + 1))}
+          disabled={index === months.length - 1}
+          aria-label="次の月"
+          style={{ ...navBtn, opacity: index === months.length - 1 ? 0.3 : 1, cursor: index === months.length - 1 ? "default" : "pointer" }}
+        >
           <CaretRight size={14} />
         </button>
       </div>
