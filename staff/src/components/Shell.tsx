@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X } from "@phosphor-icons/react";
@@ -26,7 +26,15 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const prevOrgIdRef = useRef(ctx.orgId);
   useEffect(() => {
+    // 事業者を切り替えた直後、前の事業者の件数が新しい件数を取得するまで
+    // 一瞬残って見えてしまうのを防ぐ（切替時だけ一旦0にする。同じ事業者内の
+    // ページ遷移では毎回リセットしない — ちらつきの原因になるため）。
+    if (prevOrgIdRef.current !== ctx.orgId) {
+      prevOrgIdRef.current = ctx.orgId;
+      setUnreadCount(0);
+    }
     const supabase = createClient(ctx.orgId);
     let cancelled = false;
     async function refreshUnread() {

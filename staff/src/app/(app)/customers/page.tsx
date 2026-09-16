@@ -27,9 +27,12 @@ export default async function CustomersPage() {
     .map((c) => {
       const convertedOrg = Array.isArray(c.converted_org) ? c.converted_org[0] : c.converted_org;
       const summary = summaryByCustomerId.get(c.id) ?? null;
-      const lastMessagePreview = summary
-        ? previewMessage({ kind: summary.last_message_kind ?? "text", body: summary.last_message_body, payload: summary.last_message_payload, deleted_at: summary.last_message_deleted_at })
-        : null;
+      // customer_thread_summaries はスレッドさえあればメッセージが0件でも行を返す
+      // （LEFT JOIN LATERAL のため）。last_message_kind が無ければ「やり取りなし」。
+      const lastMessagePreview =
+        summary && summary.last_message_kind != null
+          ? previewMessage({ kind: summary.last_message_kind, body: summary.last_message_body, payload: summary.last_message_payload, deleted_at: summary.last_message_deleted_at })
+          : null;
       return {
         id: c.id,
         name: c.name,
