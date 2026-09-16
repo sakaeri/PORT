@@ -169,23 +169,23 @@ export function MenuPickBubble({ msg }: { msg: MessageWithExtras }) {
   const p = msg.payload as { menuLabel?: string; menuIcon?: string | null; rows?: { label: string; value: string }[]; note?: string };
   return (
     <div style={{ ...bubbleShell, alignSelf: "flex-end" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent-800)" }}>
-        <span style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-accent-200)" }}>このメニューについて相談したい</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-bubble-self-bg)", color: "var(--color-bubble-self-text)" }}>
+        <span style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.75 }}>このメニューについて相談したい</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {p.menuIcon && <i className={p.menuIcon} style={{ fontSize: 15, color: "var(--color-accent)", flex: "none" }} />}
+          {p.menuIcon && <i className={p.menuIcon} style={{ fontSize: 15, flex: "none" }} />}
           <span style={{ fontSize: 13.5, minWidth: 0, flex: 1, lineHeight: 1.4 }}>{p.menuLabel}</span>
         </div>
         {!!p.rows?.length && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 7, borderTop: "1px solid var(--color-accent-800)" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 7, borderTop: "1px solid color-mix(in srgb, var(--color-bubble-self-text) 25%, transparent)" }}>
             {p.rows.map((rw, i) => (
               <div key={i} style={{ display: "flex", gap: 8, fontSize: 12, lineHeight: 1.5 }}>
-                <span style={{ width: 96, flex: "none", color: "var(--color-neutral-500)" }}>{rw.label}</span>
+                <span style={{ width: 96, flex: "none", opacity: 0.7 }}>{rw.label}</span>
                 <span style={{ minWidth: 0, flex: 1 }}>{rw.value}</span>
               </div>
             ))}
           </div>
         )}
-        {p.note && <div style={{ fontSize: 12, lineHeight: 1.55, paddingTop: 7, borderTop: "1px solid var(--color-accent-800)" }}>{p.note}</div>}
+        {p.note && <div style={{ fontSize: 12, lineHeight: 1.55, paddingTop: 7, borderTop: "1px solid color-mix(in srgb, var(--color-bubble-self-text) 25%, transparent)" }}>{p.note}</div>}
       </div>
       <Meta isSelf time={timeLabel(msg.sent_at)} />
     </div>
