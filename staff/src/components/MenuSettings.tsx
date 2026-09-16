@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash, Plus, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { useIsMobile } from "@/lib/useIsMobile";
 import {
   updateCompanyInfo,
   updateStaffMode,
@@ -150,7 +151,7 @@ export default function MenuSettings({
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>メニュー管理</div>
 
-      <div style={{ display: "flex", gap: 4, flexWrap: "nowrap", overflowX: "auto", borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
         {TABS.map((t) => {
           const active = tab === t.key;
           return (
@@ -205,9 +206,21 @@ const TABS: { key: TabKey; label: string }[] = [
 
 function InfoTooltip({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [mobileTop, setMobileTop] = useState(0);
+
+  useEffect(() => {
+    if (open && isMobile && btnRef.current) {
+      // position:fixed なので、開いた時点のボタン位置（ビューポート基準）を測っておく。
+      setMobileTop(btnRef.current.getBoundingClientRect().bottom + 6);
+    }
+  }, [open, isMobile]);
+
   return (
     <span style={{ position: "relative", display: "inline-flex", flex: "none", alignSelf: "flex-start" }}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         onBlur={() => setOpen(false)}
@@ -233,22 +246,40 @@ function InfoTooltip({ text }: { text: string }) {
       {open && (
         <div
           role="tooltip"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            left: 0,
-            zIndex: 20,
-            width: "max-content",
-            maxWidth: 520,
-            padding: "10px 12px",
-            fontSize: 11.5,
-            lineHeight: 1.6,
-            color: "var(--color-text)",
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-divider)",
-            borderRadius: "var(--radius-md)",
-            boxShadow: "var(--shadow-md)",
-          }}
+          style={
+            isMobile
+              ? {
+                  position: "fixed",
+                  top: mobileTop,
+                  left: 16,
+                  right: 16,
+                  zIndex: 30,
+                  padding: "10px 12px",
+                  fontSize: 11.5,
+                  lineHeight: 1.6,
+                  color: "var(--color-text)",
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-divider)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "var(--shadow-md)",
+                }
+              : {
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  left: 0,
+                  zIndex: 20,
+                  width: "max-content",
+                  maxWidth: 520,
+                  padding: "10px 12px",
+                  fontSize: 11.5,
+                  lineHeight: 1.6,
+                  color: "var(--color-text)",
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-divider)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "var(--shadow-md)",
+                }
+          }
         >
           {text}
         </div>
