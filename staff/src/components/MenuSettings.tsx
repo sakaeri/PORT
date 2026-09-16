@@ -127,7 +127,6 @@ export default function MenuSettings({
   initialLoginEmail,
   initialTemplates,
   initialRefundPolicy,
-  initialSolo,
   slug,
   initialCardPaymentEnabled,
   initialBankInfo,
@@ -216,7 +215,7 @@ export default function MenuSettings({
           <CompanyInfoCard initial={initialCompany} slug={slug} />
           <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} />
           <CardPaymentLinksCard initialLinks={initialCardPaymentLinks} />
-          <StaffModeCard initialSolo={initialSolo} />
+          {/* StaffModeCard は複数スタッフ運用が必要になるまで非表示にする */}
         </>
       )}
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
@@ -631,6 +630,8 @@ function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[
   );
 }
 
+// 複数スタッフ運用が必要になるまで未使用（呼び出し箇所を非表示にしている）。
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function StaffModeCard({ initialSolo }: { initialSolo: boolean }) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(!initialSolo);
