@@ -237,7 +237,7 @@ export function RequestCard({
 
   return (
     <div style={{ ...bubbleShell, alignSelf: "flex-start" }}>
-      <div style={{ width: "min(300px, 100%)", display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: "var(--radius-md)", background: "var(--color-surface)", boxShadow: "0 0 0 1px var(--color-neutral-800)" }}>
+      <div style={{ width: "min(300px, 100%)", display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1.5px solid var(--color-accent)", boxShadow: "var(--shadow-sm)" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={kicker}>お見積もり</span>
@@ -467,7 +467,7 @@ export function IntakeCard({ msg }: { msg: MessageWithExtras }) {
 
   return (
     <div style={{ ...bubbleShell, alignSelf: "flex-start" }}>
-      <div style={{ width: "min(300px, 100%)", display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: "var(--radius-md)", background: "var(--color-surface)", boxShadow: "0 0 0 1px var(--color-neutral-800)" }}>
+      <div style={{ width: "min(300px, 100%)", display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}>
         <span style={kicker}>確認事項</span>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, lineHeight: 1.3 }}>{p.formLabel}</div>
         {p.note && <p style={{ margin: 0, fontSize: 12.5, opacity: 0.8 }}>{p.note}</p>}
