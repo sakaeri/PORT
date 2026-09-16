@@ -9,35 +9,35 @@ export default async function CustomersPage() {
   if (!ctx) return null; // layout already handles the access-denied state
 
   const supabase = await createClient();
-  const { data: customers, error } = await supabase
-    .from("customers")
-    .select(
-      "id, name, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug), threads(id, kind, archived_at, last_msg_at, last_read_at, messages(kind, body, payload, deleted_at, sent_at, sender_role))",
-    )
-    .eq("org_id", ctx.orgId)
-    .order("created_at", { ascending: false })
-    .order("sent_at", { referencedTable: "threads.messages", ascending: false })
-    .limit(1, { referencedTable: "threads.messages" });
+  // 依存のないクエリは並列で投げる。依頼主一覧に必要な「各依頼主の最新メッセージ・未読」は、
+  // 案件トークまで巻き込む二重ネストの embed ではなく、確実に正しい専用RPCでまとめて取る。
+  const [{ data: customers, error }, { data: summaries }] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("id, name, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
+      .eq("org_id", ctx.orgId)
+      .order("created_at", { ascending: false }),
+    supabase.rpc("customer_thread_summaries", { p_org_id: ctx.orgId }),
+  ]);
+
+  const summaryByCustomerId = new Map((summaries ?? []).map((s) => [s.customer_id, s]));
 
   const rows = (customers ?? [])
     .map((c) => {
       const convertedOrg = Array.isArray(c.converted_org) ? c.converted_org[0] : c.converted_org;
-      const thread = (c.threads ?? []).find((t) => t.kind === "customer") ?? null;
-      const lastMessage = thread?.messages?.[0] ?? null;
-      const unread =
-        !!thread &&
-        !thread.archived_at &&
-        lastMessage?.sender_role === "client" &&
-        (!thread.last_read_at || (thread.last_msg_at != null && thread.last_msg_at > thread.last_read_at));
+      const summary = summaryByCustomerId.get(c.id) ?? null;
+      const lastMessagePreview = summary
+        ? previewMessage({ kind: summary.last_message_kind ?? "text", body: summary.last_message_body, payload: summary.last_message_payload, deleted_at: summary.last_message_deleted_at })
+        : null;
       return {
         id: c.id,
         name: c.name,
         memberNo: c.member_no,
         active: c.active,
         convertedOrg: convertedOrg ? { displayName: convertedOrg.display_name, slug: convertedOrg.slug } : null,
-        thread: thread ? { id: thread.id, archived: !!thread.archived_at } : null,
-        lastMessagePreview: lastMessage ? previewMessage(lastMessage) : null,
-        unread,
+        thread: summary ? { id: summary.thread_id, archived: summary.archived } : null,
+        lastMessagePreview,
+        unread: summary?.unread ?? false,
       };
     })
     // やり取りが一度もない依頼主（ページを開いただけ）は一覧に一切出さない
