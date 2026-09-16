@@ -453,7 +453,7 @@ export interface Database {
         Args: Record<string, never>;
         Returns: { org_id: string; org_display_name: string; solo: boolean; is_hq: boolean; role: AppRole; display_name: string }[];
       };
-      unread_customer_count: { Args: Record<string, never>; Returns: number };
+      unread_customer_count: { Args: { p_org_id: string }; Returns: number };
       customer_thread_summaries: {
         Args: { p_org_id: string };
         Returns: {

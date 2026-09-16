@@ -38,7 +38,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     const supabase = createClient(ctx.orgId);
     let cancelled = false;
     async function refreshUnread() {
-      const { data } = await supabase.rpc("unread_customer_count");
+      const { data } = await supabase.rpc("unread_customer_count", { p_org_id: ctx.orgId });
       if (!cancelled && typeof data === "number") setUnreadCount(data);
     }
     void refreshUnread();
