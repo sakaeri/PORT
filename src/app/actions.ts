@@ -14,8 +14,12 @@ async function requireContext() {
 
 // メッセージを送るたびに呼ぶ。これを忘れると threads.last_msg_at が
 // 依頼主側の新着で更新されず、受付側の未読判定が効かなくなる。
-async function touchThread(supabase: Awaited<ReturnType<typeof createClient>>, threadId: string) {
-  await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+// threads の RLS は受付（is_office()）にしか update を許可していないため、
+// 依頼主自身のセッションではこの更新が黙って0件のまま失敗する — service role
+// で書く（last_msg_at を進めるだけの安全な操作なので、ここだけRLSを迂回する）。
+async function touchThread(threadId: string) {
+  const admin = createServiceRoleClient();
+  await admin.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
 }
 
 // 既存アカウントへのログイン（マジックリンク）。今の匿名セッションのトーク内容は
@@ -60,7 +64,7 @@ export async function sendMessage(text: string, attachments: { path: string; nam
       .insert({ thread_id: ctx.threadId, sender_id: ctx.userId, sender_role: "client", kind: "text", body: trimmed });
     if (error) throw error;
   }
-  await touchThread(supabase, ctx.threadId);
+  await touchThread(ctx.threadId);
   await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
 }
 
@@ -82,7 +86,7 @@ export async function submitMenuInquiry(
     payload: { menuId, menuLabel, menuIcon, rows: filled, note: note.trim() },
   });
   if (error) throw error;
-  await touchThread(supabase, ctx.threadId);
+  await touchThread(ctx.threadId);
   await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
 }
 
@@ -129,7 +133,7 @@ export async function submitInfoRequestAnswer(formLabel: string, fields: { label
     payload: { formLabel, rows: filled },
   });
   if (error) throw error;
-  await touchThread(supabase, ctx.threadId);
+  await touchThread(ctx.threadId);
   await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
 }
 
@@ -149,7 +153,7 @@ export async function requestNameChange(newName: string, reason: string) {
     body: `お名前の変更をお願いします。新しいお名前：${trimmed}／理由：${reason}`,
   });
   if (error) throw error;
-  await touchThread(supabase, ctx.threadId);
+  await touchThread(ctx.threadId);
 }
 
 // 決済前の初回登録のみ。以降の変更は requestNameChange（受付経由）に切り替わる
