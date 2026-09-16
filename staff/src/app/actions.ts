@@ -180,24 +180,24 @@ export async function updateLoginPassword(currentPassword: string, newPassword: 
 // ============================================================
 // 返信テンプレ（トークからワンタップで送る定型文。項目を付けると入力フォームになる）
 // ============================================================
-export async function createIntakeForm(orgId: string, saveAnswers: boolean) {
+export async function createIntakeForm(orgId: string) {
   await requireContext();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("intake_forms")
-    .insert({ org_id: orgId, label: "新しいテンプレ", save_answers: saveAnswers, sort: 999 })
+    .insert({ org_id: orgId, label: "新しいテンプレ", sort: 999 })
     .select("id")
     .single();
   if (error || !data) throw error ?? new Error("作成できませんでした");
   return data.id;
 }
 
-export async function updateIntakeForm(id: string, fields: { label: string; note: string; save_answers: boolean }) {
+export async function updateIntakeForm(id: string, fields: { label: string; note: string }) {
   await requireContext();
   const supabase = await createClient();
   const { error } = await supabase
     .from("intake_forms")
-    .update({ label: fields.label.trim(), note: fields.note.trim() || null, save_answers: fields.save_answers })
+    .update({ label: fields.label.trim(), note: fields.note.trim() || null })
     .eq("id", id);
   if (error) throw error;
 }
@@ -830,9 +830,8 @@ export async function sendCaseMessage(caseThreadId: string, text: string) {
 }
 
 // 項目付きテンプレ（intake_forms）を依頼主トークに intake_request として送る。
-// 依頼主側は回答すると customer_answers に保存され、次回以降は自動で
-// 引き当てられる（すでに全項目回答済みなら依頼主側は入力フォームの代わりに
-// 回答済み表示になる）。
+// 依頼主側の回答はその場のメッセージ（intake_answer）としてのみ残り、
+// 依頼主ごとの永続データには繋がらない（見積もりの質問と同じ扱い）。
 export async function sendTemplateMessage(threadId: string, templateId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();

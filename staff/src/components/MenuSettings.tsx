@@ -69,7 +69,6 @@ interface IntakeForm {
   org_id: string;
   label: string;
   note: string | null;
-  save_answers: boolean;
   sort: number;
   intake_fields: IntakeField[];
 }
@@ -864,8 +863,8 @@ function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemp
   const [openId, setOpenId] = useState<string | null>(null);
 
   async function handleAdd() {
-    const id = await createIntakeForm(orgId, true);
-    setTemplates((t) => [...t, { id, org_id: orgId, label: "新しいテンプレ", note: null, save_answers: true, sort: 999, intake_fields: [] }]);
+    const id = await createIntakeForm(orgId);
+    setTemplates((t) => [...t, { id, org_id: orgId, label: "新しいテンプレ", note: null, sort: 999, intake_fields: [] }]);
     setOpenId(id);
   }
 
@@ -880,14 +879,14 @@ function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemp
   }
 
   async function commit(t: IntakeForm) {
-    await updateIntakeForm(t.id, { label: t.label, note: t.note ?? "", save_answers: t.save_answers });
+    await updateIntakeForm(t.id, { label: t.label, note: t.note ?? "" });
   }
 
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>返信テンプレ</div>
-        <InfoTooltip text="受付がトークからワンタップで送る定型の返信です。項目を付けると入力フォームになり、「回答を依頼主データに残す」をオンにすると次回以降は自動で引き当てます。" />
+        <InfoTooltip text="受付がトークからワンタップで送る定型の返信です。項目を付けると依頼主が入力するフォームになります。" />
         <div style={{ flex: 1 }} />
         <button onClick={handleAdd} style={smallBtn}>
           <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
@@ -929,15 +928,6 @@ function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemp
                   </div>
 
                   <TemplateFieldsEditor formId={t.id} fields={t.intake_fields} onChange={(fields) => patchLocal(t.id, { intake_fields: fields })} />
-
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
-                    <input
-                      type="checkbox"
-                      checked={t.save_answers}
-                      onChange={(e) => { patchLocal(t.id, { save_answers: e.target.checked }); commit({ ...t, save_answers: e.target.checked }); }}
-                    />
-                    回答を依頼主データに残す（次回以降は自動で引き当てます）
-                  </label>
 
                   <div style={{ display: "flex", justifyContent: "flex-end" }}>
                     <button onClick={() => handleDelete(t.id)} style={{ ...smallBtn, color: "var(--color-accent-200)", borderColor: "var(--color-divider)" }}>

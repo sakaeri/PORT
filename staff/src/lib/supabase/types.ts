@@ -163,20 +163,6 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["customer_vault_items"]["Row"]>;
         Relationships: [];
       };
-      customer_answers: {
-        Row: {
-          id: string;
-          customer_id: string;
-          field_key: string;
-          label: string;
-          value: string;
-          verified_at: string | null;
-          updated_at: string;
-        };
-        Insert: Partial<Database["public"]["Tables"]["customer_answers"]["Row"]> & { customer_id: string; field_key: string; label: string };
-        Update: Partial<Database["public"]["Tables"]["customer_answers"]["Row"]>;
-        Relationships: [];
-      };
       menus: {
         Row: {
           id: string;
@@ -220,7 +206,6 @@ export interface Database {
           note: string | null;
           icon: string | null;
           body: string | null;
-          save_answers: boolean;
           sort: number;
         };
         Insert: Partial<Database["public"]["Tables"]["intake_forms"]["Row"]> & { org_id: string; label: string };
