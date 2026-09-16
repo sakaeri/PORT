@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash, ArrowSquareOut } from "@phosphor-icons/react";
+import { Plus, Trash, ArrowSquareOut, CaretDown } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { switchStaffOrg, createOrgForCurrentUser, removeMyOrgLink } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
@@ -23,9 +23,12 @@ export default function OrgSwitcher({
   const [switching, setSwitching] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showManage, setShowManage] = useState(false);
+  const [open, setOpen] = useState(false);
   const removableOrgs = orgs.filter((o) => !o.isPrimary && o.role === "owner");
+  const hasMenu = orgs.length > 1 || removableOrgs.length > 0 || role === "owner";
 
   async function handleSwitch(newOrgId: string) {
+    setOpen(false);
     if (newOrgId === orgId || switching) return;
     setSwitching(true);
     try {
@@ -45,57 +48,103 @@ export default function OrgSwitcher({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "6px 4px 14px" }}>
-      {orgs.length > 1 ? (
-        <select
-          value={orgId}
-          onChange={(e) => handleSwitch(e.target.value)}
-          disabled={switching}
-          style={{
-            width: "100%",
-            height: 34,
-            padding: "0 8px",
-            fontSize: 13,
-            fontFamily: "var(--font-heading)",
-            fontWeight: headingWeight,
-            color: "var(--color-text)",
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-divider)",
-            borderRadius: "var(--radius-md)",
-            cursor: "pointer",
-          }}
-        >
-          {orgs.map((o) => (
-            <option key={o.orgId} value={o.orgId}>
-              {o.displayName}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{orgDisplayName}</div>
+    <div style={{ position: "relative", padding: "6px 0 4px" }}>
+      <button
+        onClick={() => hasMenu && setOpen((v) => !v)}
+        disabled={!hasMenu}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          width: "100%",
+          padding: "2px 0",
+          cursor: hasMenu ? "pointer" : "default",
+          background: "transparent",
+          border: "none",
+          fontFamily: "var(--font-heading)",
+          fontWeight: headingWeight,
+          fontSize: 15,
+          color: "var(--color-text)",
+        }}
+      >
+        <span style={{ minWidth: 0, flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{orgDisplayName}</span>
+        {hasMenu && <CaretDown size={12} color="var(--color-neutral-500)" style={{ flex: "none" }} />}
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 59 }} />
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              width: 200,
+              marginTop: 4,
+              zIndex: 60,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              padding: 6,
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-divider)",
+              boxShadow: "var(--shadow-md)",
+            }}
+          >
+            {orgs.length > 1 &&
+              orgs.map((o) => (
+                <button
+                  key={o.orgId}
+                  onClick={() => handleSwitch(o.orgId)}
+                  disabled={switching}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    height: 32,
+                    padding: "0 8px",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    fontSize: 12.5,
+                    borderRadius: "var(--radius-sm)",
+                    border: "none",
+                    color: o.orgId === orgId ? "var(--color-accent)" : "var(--color-text)",
+                    background: o.orgId === orgId ? "color-mix(in srgb, var(--color-accent) 14%, transparent)" : "transparent",
+                  }}
+                >
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.displayName}</span>
+                </button>
+              ))}
+            {orgs.length > 1 && (removableOrgs.length > 0 || role === "owner") && (
+              <div style={{ height: 1, background: "var(--color-divider)", margin: "3px 2px" }} />
+            )}
+            {removableOrgs.length > 0 && (
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  setShowManage(true);
+                }}
+                style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 8px", cursor: "pointer", textAlign: "left", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", borderRadius: "var(--radius-sm)" }}
+              >
+                窓口を整理
+              </button>
+            )}
+            {role === "owner" && (
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  setShowAdd(true);
+                }}
+                style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 8px", cursor: "pointer", textAlign: "left", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "none", borderRadius: "var(--radius-sm)" }}
+              >
+                <Plus size={12} />
+                窓口を追加
+              </button>
+            )}
+          </div>
+        </>
       )}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>受付画面</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {removableOrgs.length > 0 && (
-            <button
-              onClick={() => setShowManage(true)}
-              style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer", fontSize: 10.5, color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
-            >
-              窓口を整理
-            </button>
-          )}
-          {role === "owner" && (
-            <button
-              onClick={() => setShowAdd(true)}
-              style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer", fontSize: 10.5, color: "var(--color-accent)", background: "transparent", border: "none" }}
-            >
-              <Plus size={11} />
-              窓口を追加
-            </button>
-          )}
-        </div>
-      </div>
+
       {showAdd && <AddOrgDialog onClose={() => setShowAdd(false)} onCreated={handleSwitch} />}
       {showManage && <ManageOrgsDialog orgs={removableOrgs} onClose={() => setShowManage(false)} onRemoved={handleRemoved} />}
     </div>

@@ -164,10 +164,10 @@ export default function MenuSettings({
                 cursor: "pointer",
                 fontSize: 12.5,
                 whiteSpace: "nowrap",
-                color: active ? "var(--color-accent-100)" : "var(--color-neutral-400)",
-                background: active ? "var(--color-accent-900)" : "transparent",
+                color: active ? "var(--color-bg)" : "var(--color-neutral-400)",
+                background: active ? "var(--color-accent)" : "transparent",
                 border: "1px solid",
-                borderColor: active ? "var(--color-accent-800)" : "transparent",
+                borderColor: active ? "var(--color-accent)" : "transparent",
                 borderRadius: "var(--radius-md)",
               }}
             >
@@ -272,10 +272,10 @@ function CardHeader({ title, info, editing, onEdit }: { title: string; info?: st
   );
 }
 
-function InfoRow({ label: l, value }: { label: string; value: string }) {
+function InfoRow({ label: l, value, labelWidth = 90 }: { label: string; value: string; labelWidth?: number }) {
   return (
-    <div style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
-      <span style={{ width: 90, flex: "none", color: "var(--color-neutral-500)" }}>{l}</span>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 12, fontSize: 12.5 }}>
+      <span style={{ width: labelWidth, flex: "none", color: "var(--color-neutral-500)", lineHeight: 1.5 }}>{l}</span>
       <span style={{ minWidth: 0, flex: 1, color: value ? "inherit" : "var(--color-neutral-500)" }}>{value || "（未設定）"}</span>
     </div>
   );
@@ -1064,9 +1064,9 @@ function RefundPolicyCard({ orgId, initialPolicy }: { orgId: string; initialPoli
       />
 
       {!editing ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {saved.map((r) => (
-            <InfoRow key={r.key} label={r.label} value={refundModeLabel(r.mode, r.pct)} />
+            <InfoRow key={r.key} label={r.label} value={refundModeLabel(r.mode, r.pct)} labelWidth={168} />
           ))}
         </div>
       ) : (
