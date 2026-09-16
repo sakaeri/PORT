@@ -11,7 +11,7 @@ export default async function CustomersPage() {
   const supabase = await createClient();
   // 依存のないクエリは並列で投げる。依頼主一覧に必要な「各依頼主の最新メッセージ・未読」は、
   // 案件トークまで巻き込む二重ネストの embed ではなく、確実に正しい専用RPCでまとめて取る。
-  const [{ data: customers, error }, { data: summaries }] = await Promise.all([
+  const [{ data: customers, error }, { data: summaries, error: summariesError }] = await Promise.all([
     supabase
       .from("customers")
       .select("id, name, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
@@ -19,6 +19,7 @@ export default async function CustomersPage() {
       .order("created_at", { ascending: false }),
     supabase.rpc("customer_thread_summaries", { p_org_id: ctx.orgId }),
   ]);
+  if (summariesError) console.error("customer_thread_summaries failed:", summariesError);
 
   const summaryByCustomerId = new Map((summaries ?? []).map((s) => [s.customer_id, s]));
 
@@ -47,9 +48,9 @@ export default async function CustomersPage() {
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>依頼主</div>
 
-      {error && <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>}
+      {(error || summariesError) && <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>}
 
-      {!error && rows.length === 0 && (
+      {!error && !summariesError && rows.length === 0 && (
         <div style={{ fontSize: 13.5, color: "var(--color-neutral-500)", lineHeight: 1.7 }}>
           まだ依頼主がいません。依頼主用のチャット画面にアクセスがあると、ここに一覧が表示されます。
         </div>
