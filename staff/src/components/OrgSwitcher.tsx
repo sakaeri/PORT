@@ -13,11 +13,13 @@ export default function OrgSwitcher({
   orgDisplayName,
   role,
   orgs,
+  unreadCounts,
 }: {
   orgId: string;
   orgDisplayName: string;
   role: "owner" | "reception";
   orgs: StaffOrgOption[];
+  unreadCounts: Record<string, number>;
 }) {
   const router = useRouter();
   const [switching, setSwitching] = useState(false);
@@ -26,6 +28,7 @@ export default function OrgSwitcher({
   const [open, setOpen] = useState(false);
   const removableOrgs = orgs.filter((o) => !o.isPrimary && o.role === "owner");
   const hasMenu = orgs.length > 1 || removableOrgs.length > 0 || role === "owner";
+  const hasOtherUnread = orgs.some((o) => o.orgId !== orgId && (unreadCounts[o.orgId] ?? 0) > 0);
 
   async function handleSwitch(newOrgId: string) {
     setOpen(false);
@@ -68,6 +71,7 @@ export default function OrgSwitcher({
         }}
       >
         <span style={{ minWidth: 0, flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{orgDisplayName}</span>
+        {hasOtherUnread && <span aria-label="他の窓口に未読あり" style={{ flex: "none", width: 7, height: 7, borderRadius: "50%", background: "var(--stb-seal-ink)" }} />}
         {hasMenu && <CaretDown size={12} color="var(--color-neutral-500)" style={{ flex: "none" }} />}
       </button>
 
@@ -93,28 +97,37 @@ export default function OrgSwitcher({
             }}
           >
             {orgs.length > 1 &&
-              orgs.map((o) => (
-                <button
-                  key={o.orgId}
-                  onClick={() => handleSwitch(o.orgId)}
-                  disabled={switching}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    height: 32,
-                    padding: "0 8px",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 12.5,
-                    borderRadius: "var(--radius-sm)",
-                    border: "none",
-                    color: o.orgId === orgId ? "var(--color-accent)" : "var(--color-text)",
-                    background: o.orgId === orgId ? "color-mix(in srgb, var(--color-accent) 14%, transparent)" : "transparent",
-                  }}
-                >
-                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.displayName}</span>
-                </button>
-              ))}
+              orgs.map((o) => {
+                const count = unreadCounts[o.orgId] ?? 0;
+                return (
+                  <button
+                    key={o.orgId}
+                    onClick={() => handleSwitch(o.orgId)}
+                    disabled={switching}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      height: 32,
+                      padding: "0 8px",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontSize: 12.5,
+                      borderRadius: "var(--radius-sm)",
+                      border: "none",
+                      color: o.orgId === orgId ? "var(--color-accent)" : "var(--color-text)",
+                      background: o.orgId === orgId ? "color-mix(in srgb, var(--color-accent) 14%, transparent)" : "transparent",
+                    }}
+                  >
+                    <span style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.displayName}</span>
+                    {count > 0 && (
+                      <span style={{ flex: "none", fontSize: 10.5, fontWeight: 700, color: "var(--color-bg)", background: "var(--stb-seal-ink)", borderRadius: 8, padding: "1px 6px" }}>
+                        {count > 99 ? "99+" : count}件
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             {orgs.length > 1 && (removableOrgs.length > 0 || role === "owner") && (
               <div style={{ height: 1, background: "var(--color-divider)", margin: "3px 2px" }} />
             )}

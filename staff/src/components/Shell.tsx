@@ -24,22 +24,31 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   const router = useRouter();
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // 事業者ごとの未読件数。今開いている事業者だけでなく、リンクしている
+  // 他の事業者の分もまとめて持っておき、事業者切替の▼に出す（is_staff_of()の
+  // RLSにより、ヘッダーを切り替えなくても他の自分の事業者は読める）。
+  const [orgUnreadCounts, setOrgUnreadCounts] = useState<Record<string, number>>({});
+  const unreadCount = orgUnreadCounts[ctx.orgId] ?? 0;
 
   const prevOrgIdRef = useRef(ctx.orgId);
   useEffect(() => {
     // 事業者を切り替えた直後、前の事業者の件数が新しい件数を取得するまで
-    // 一瞬残って見えてしまうのを防ぐ（切替時だけ一旦0にする。同じ事業者内の
+    // 一瞬残って見えてしまうのを防ぐ（切替時だけ一旦クリアする。同じ事業者内の
     // ページ遷移では毎回リセットしない — ちらつきの原因になるため）。
     if (prevOrgIdRef.current !== ctx.orgId) {
       prevOrgIdRef.current = ctx.orgId;
-      setUnreadCount(0);
+      setOrgUnreadCounts({});
     }
     const supabase = createClient(ctx.orgId);
     let cancelled = false;
     async function refreshUnread() {
-      const { data } = await supabase.rpc("unread_customer_count", { p_org_id: ctx.orgId });
-      if (!cancelled && typeof data === "number") setUnreadCount(data);
+      const results = await Promise.all(
+        ctx.orgs.map(async (o) => {
+          const { data } = await supabase.rpc("unread_customer_count", { p_org_id: o.orgId });
+          return [o.orgId, typeof data === "number" ? data : 0] as const;
+        }),
+      );
+      if (!cancelled) setOrgUnreadCounts(Object.fromEntries(results));
     }
     void refreshUnread();
     const channel = supabase
@@ -54,7 +63,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       clearInterval(interval);
     };
     // pathname included so navigating away from a thread (which marks it read) re-checks the count
-  }, [ctx.orgId, pathname]);
+  }, [ctx.orgId, ctx.orgs, pathname]);
 
   // ページ遷移したら開きっぱなしのドロワーを閉じる。
   useEffect(() => {
@@ -101,7 +110,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           <Headset size={16} color="var(--color-accent)" />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <OrgSwitcher orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} role={ctx.role} orgs={ctx.orgs} />
+          <OrgSwitcher orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} role={ctx.role} orgs={ctx.orgs} unreadCounts={orgUnreadCounts} />
         </div>
       </div>
 
