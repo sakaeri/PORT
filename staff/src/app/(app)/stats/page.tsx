@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { headingWeight } from "@/lib/style";
+import MonthlyMenuBreakdown, { type MonthBreakdown } from "@/components/MonthlyMenuBreakdown";
 
 const PLAN_LABEL: Record<string, string> = {
   trial: "トライアル中",
@@ -24,17 +25,30 @@ function monthKeyJST(iso: string): string {
   return `${parts.find((p) => p.type === "year")!.value}-${parts.find((p) => p.type === "month")!.value}`;
 }
 
-function lastMonthKeys(n: number): { key: string; label: string }[] {
+function parseMonthKey(key: string): { year: number; month: number } {
+  const [y, m] = key.split("-").map(Number);
+  return { year: y, month: m };
+}
+
+function monthKeyFromYM(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function addMonths(year: number, month: number, delta: number): { year: number; month: number } {
+  const total = year * 12 + (month - 1) + delta;
+  return { year: Math.floor(total / 12), month: (((total % 12) + 12) % 12) + 1 };
+}
+
+// 実績のある最も古い月〜今月までを連続した一覧にする（データがなければ今月だけ）。
+function monthRange(oldestKey: string | null): { key: string; label: string }[] {
   const { year, month } = nowJSTYearMonth();
+  const currentKey = monthKeyFromYM(year, month);
+  const start = oldestKey && oldestKey < currentKey ? parseMonthKey(oldestKey) : { year, month };
   const out: { key: string; label: string }[] = [];
-  for (let i = 0; i < n; i++) {
-    let y = year;
-    let m = month - i;
-    while (m <= 0) {
-      m += 12;
-      y -= 1;
-    }
-    out.push({ key: `${y}-${String(m).padStart(2, "0")}`, label: `${y}年${m}月` });
+  let { year: y, month: m } = start;
+  while (monthKeyFromYM(y, m) <= currentKey) {
+    out.push({ key: monthKeyFromYM(y, m), label: `${y}年${m}月` });
+    ({ year: y, month: m } = addMonths(y, m, 1));
   }
   return out;
 }
@@ -98,7 +112,7 @@ async function OrgStats({ orgId }: { orgId: string }) {
   const supabase = await createClient();
   const { data: requests, error } = await supabase
     .from("requests")
-    .select("phase, amount, pay_status, deposit_amount, paid_at, deposit_paid_at, paid_marked_by, deposit_paid_marked_by")
+    .select("id, phase, amount, pay_status, deposit_amount, paid_at, deposit_paid_at, paid_marked_by, deposit_paid_marked_by")
     .eq("org_id", orgId);
 
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
@@ -116,18 +130,50 @@ async function OrgStats({ orgId }: { orgId: string }) {
 
   // 入金確認1回＝1件として、確認した月・確認した受付ごとに集計する。
   const entries = rows.flatMap((r) => {
-    const list: { amount: number; markedBy: string | null; at: string }[] = [];
-    if (r.pay_status === "paid" && r.paid_at) list.push({ amount: r.amount, markedBy: r.paid_marked_by, at: r.paid_at });
-    else if (r.pay_status === "processing" && r.deposit_paid_at) list.push({ amount: r.deposit_amount ?? 0, markedBy: r.deposit_paid_marked_by, at: r.deposit_paid_at });
+    const list: { requestId: string; amount: number; markedBy: string | null; at: string }[] = [];
+    if (r.pay_status === "paid" && r.paid_at) list.push({ requestId: r.id, amount: r.amount, markedBy: r.paid_marked_by, at: r.paid_at });
+    else if (r.pay_status === "processing" && r.deposit_paid_at) list.push({ requestId: r.id, amount: r.deposit_amount ?? 0, markedBy: r.deposit_paid_marked_by, at: r.deposit_paid_at });
     return list;
   });
 
-  const monthKeys = lastMonthKeys(6);
-  const monthTotals = new Map(monthKeys.map((m) => [m.key, 0]));
+  // 確認できた金額を、その依頼の内訳（request_items）の比率で按分してメニューごとに集計する
+  // （予約金など一部だけ確認済みの場合も、全項目に同じ比率で配分する）。
+  const requestIds = Array.from(new Set(entries.map((e) => e.requestId)));
+  const { data: itemRows } = requestIds.length ? await supabase.from("request_items").select("request_id, label, price, qty").in("request_id", requestIds) : { data: [] };
+  const itemsByRequest = new Map<string, { label: string; price: number; qty: number }[]>();
+  for (const it of itemRows ?? []) {
+    const list = itemsByRequest.get(it.request_id) ?? [];
+    list.push(it);
+    itemsByRequest.set(it.request_id, list);
+  }
+
+  const breakdownByMonth = new Map<string, Map<string, number>>();
   for (const e of entries) {
     const key = monthKeyJST(e.at);
-    if (monthTotals.has(key)) monthTotals.set(key, (monthTotals.get(key) ?? 0) + e.amount);
+    const bucket = breakdownByMonth.get(key) ?? new Map<string, number>();
+    const items = itemsByRequest.get(e.requestId) ?? [];
+    const itemTotal = items.reduce((s, it) => s + it.price * it.qty, 0);
+    if (items.length && itemTotal > 0) {
+      for (const it of items) {
+        const share = ((it.price * it.qty) / itemTotal) * e.amount;
+        bucket.set(it.label, (bucket.get(it.label) ?? 0) + share);
+      }
+    } else {
+      bucket.set("その他", (bucket.get("その他") ?? 0) + e.amount);
+    }
+    breakdownByMonth.set(key, bucket);
   }
+
+  const oldestKey = entries.length ? entries.map((e) => monthKeyJST(e.at)).reduce((a, b) => (a < b ? a : b)) : null;
+  const months: MonthBreakdown[] = monthRange(oldestKey).map((m) => {
+    const bucket = breakdownByMonth.get(m.key);
+    const items = bucket
+      ? Array.from(bucket.entries())
+          .map(([label, amount]) => ({ label, amount }))
+          .sort((a, b) => b.amount - a.amount)
+      : [];
+    return { key: m.key, label: m.label, items };
+  });
 
   const staffIds = Array.from(new Set(entries.map((e) => e.markedBy).filter((id): id is string => !!id)));
   const { data: staffProfiles } = staffIds.length ? await supabase.from("profiles").select("id, display_name").in("id", staffIds) : { data: [] };
@@ -151,15 +197,8 @@ async function OrgStats({ orgId }: { orgId: string }) {
         <StatTile label="見積もり回答待ち" value={`${quoted}件`} />
       </div>
 
-      <SectionTitle>月別の入金額</SectionTitle>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {monthKeys.map((m) => (
-          <div key={m.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
-            <div style={{ flex: 1, fontSize: 13 }}>{m.label}</div>
-            <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>{yen(monthTotals.get(m.key) ?? 0)}</div>
-          </div>
-        ))}
-      </div>
+      <SectionTitle>月別・メニュー別の入金額</SectionTitle>
+      <MonthlyMenuBreakdown months={months} />
 
       <SectionTitle>担当者別の入金確認実績</SectionTitle>
       {staffRows.length === 0 ? (
