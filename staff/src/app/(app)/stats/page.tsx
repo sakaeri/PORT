@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { headingWeight } from "@/lib/style";
-import MonthlyMenuBreakdown, { type MonthBreakdown } from "@/components/MonthlyMenuBreakdown";
+import MonthlyMenuBreakdown, { type MonthBreakdown, type MonthRow } from "@/components/MonthlyMenuBreakdown";
 
 const PLAN_LABEL: Record<string, string> = {
   trial: "トライアル中",
@@ -112,12 +112,17 @@ async function OrgStats({ orgId }: { orgId: string }) {
   const supabase = await createClient();
   const { data: requests, error } = await supabase
     .from("requests")
-    .select("id, phase, amount, pay_status, deposit_amount, paid_at, deposit_paid_at")
+    .select("id, title, phase, amount, pay_status, deposit_amount, paid_at, deposit_paid_at, customers(name)")
     .eq("org_id", orgId);
 
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
 
   const rows = requests ?? [];
+  function customerNameOf(r: (typeof rows)[number]): string {
+    const c = Array.isArray(r.customers) ? r.customers[0] : r.customers;
+    return c?.name ?? "—";
+  }
+
   // 実際に着金確認できた金額だけを合計する（見積もり金額ではない）。
   // pay_status='paid'なら全額、'processing'（予約金のみ確認済み）ならdeposit_amountの分だけ数える。
   const total = rows.reduce((s, r) => {
@@ -128,51 +133,41 @@ async function OrgStats({ orgId }: { orgId: string }) {
   const quoted = rows.filter((r) => r.phase === "quoted").length;
   const completed = rows.filter((r) => r.phase === "completed").length;
 
-  // 入金確認1回＝1件として、確認した月ごとに集計する。
-  const entries = rows.flatMap((r) => {
-    const list: { requestId: string; amount: number; at: string }[] = [];
-    if (r.pay_status === "paid" && r.paid_at) list.push({ requestId: r.id, amount: r.amount, at: r.paid_at });
-    else if (r.pay_status === "processing" && r.deposit_paid_at) list.push({ requestId: r.id, amount: r.deposit_amount ?? 0, at: r.deposit_paid_at });
-    return list;
-  });
-
-  // 確認できた金額を、その依頼の内訳（request_items）の比率で按分してメニューごとに集計する
-  // （予約金など一部だけ確認済みの場合も、全項目に同じ比率で配分する）。
-  const requestIds = Array.from(new Set(entries.map((e) => e.requestId)));
-  const { data: itemRows } = requestIds.length ? await supabase.from("request_items").select("request_id, label, price, qty").in("request_id", requestIds) : { data: [] };
-  const itemsByRequest = new Map<string, { label: string; price: number; qty: number }[]>();
-  for (const it of itemRows ?? []) {
-    const list = itemsByRequest.get(it.request_id) ?? [];
-    list.push(it);
-    itemsByRequest.set(it.request_id, list);
-  }
-
-  const breakdownByMonth = new Map<string, Map<string, number>>();
-  for (const e of entries) {
-    const key = monthKeyJST(e.at);
-    const bucket = breakdownByMonth.get(key) ?? new Map<string, number>();
-    const items = itemsByRequest.get(e.requestId) ?? [];
-    const itemTotal = items.reduce((s, it) => s + it.price * it.qty, 0);
-    if (items.length && itemTotal > 0) {
-      for (const it of items) {
-        const share = ((it.price * it.qty) / itemTotal) * e.amount;
-        bucket.set(it.label, (bucket.get(it.label) ?? 0) + share);
-      }
-    } else {
-      bucket.set("その他", (bucket.get("その他") ?? 0) + e.amount);
+  // 確認できた入金は、確認した月ごとに1件＝1行としてそのまま表示する（依頼主・見積もりタイトルつき）。
+  const confirmedRows: (MonthRow & { at: string })[] = [];
+  for (const r of rows) {
+    if (r.pay_status === "paid" && r.paid_at) {
+      confirmedRows.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid", at: r.paid_at });
+    } else if (r.pay_status === "processing" && r.deposit_paid_at) {
+      confirmedRows.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.deposit_amount ?? 0, status: "paid", at: r.deposit_paid_at });
     }
-    breakdownByMonth.set(key, bucket);
+  }
+  const paidByMonth = new Map<string, MonthRow[]>();
+  for (const c of confirmedRows) {
+    const key = monthKeyJST(c.at);
+    const list = paidByMonth.get(key) ?? [];
+    list.push(c);
+    paidByMonth.set(key, list);
   }
 
-  const oldestKey = entries.length ? entries.map((e) => monthKeyJST(e.at)).reduce((a, b) => (a < b ? a : b)) : null;
+  // 入金待ち（未回収）は、過去の月ではなく今の状況として今月のところにだけ表示する。
+  const pendingRows: MonthRow[] = rows
+    .filter((r) => r.pay_status !== "paid" && !["draft", "cancelled", "declined"].includes(r.phase))
+    .map((r) => ({
+      requestId: r.id,
+      customerName: customerNameOf(r),
+      title: r.title,
+      amount: r.pay_status === "processing" ? r.amount - (r.deposit_amount ?? 0) : r.amount,
+      status: "pending" as const,
+    }))
+    .filter((r) => r.amount > 0);
+
+  const oldestKey = confirmedRows.length ? confirmedRows.map((c) => monthKeyJST(c.at)).reduce((a, b) => (a < b ? a : b)) : null;
+  const { year, month } = nowJSTYearMonth();
+  const currentKey = monthKeyFromYM(year, month);
   const months: MonthBreakdown[] = monthRange(oldestKey).map((m) => {
-    const bucket = breakdownByMonth.get(m.key);
-    const items = bucket
-      ? Array.from(bucket.entries())
-          .map(([label, amount]) => ({ label, amount }))
-          .sort((a, b) => b.amount - a.amount)
-      : [];
-    return { key: m.key, label: m.label, items };
+    const paid = paidByMonth.get(m.key) ?? [];
+    return { key: m.key, label: m.label, rows: m.key === currentKey ? [...pendingRows, ...paid] : paid };
   });
 
   return (
@@ -183,11 +178,11 @@ async function OrgStats({ orgId }: { orgId: string }) {
         <StatTile label="見積もり回答待ち" value={`${quoted}件`} />
       </div>
 
-      <SectionTitle>月別・メニュー別の入金額</SectionTitle>
+      <SectionTitle>月別の入金状況</SectionTitle>
       <MonthlyMenuBreakdown months={months} />
 
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        入金額は受付が「入金を確認した」を押した分だけ反映されます。
+        入金額は受付が「入金を確認した」を押した分だけ反映されます。行をタップするとその案件トークに移動します。
       </div>
     </>
   );
