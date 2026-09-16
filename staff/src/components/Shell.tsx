@@ -180,9 +180,9 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           <div style={{ minWidth: 0, flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ctx.orgDisplayName}</div>
           {unreadCount > 0 && (
             <span
-              style={{ flex: "none", minWidth: 18, height: 18, padding: "0 5px", display: "grid", placeItems: "center", fontSize: 10.5, fontWeight: 700, color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: 9 }}
+              style={{ flex: "none", height: 20, padding: "0 8px", display: "grid", placeItems: "center", fontSize: 10.5, fontWeight: 700, whiteSpace: "nowrap", color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: 10 }}
             >
-              {unreadCount > 99 ? "99+" : unreadCount}
+              未読{unreadCount > 99 ? "99+" : unreadCount}件
             </span>
           )}
         </div>
