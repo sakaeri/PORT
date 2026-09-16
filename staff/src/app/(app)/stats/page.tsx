@@ -112,7 +112,7 @@ async function OrgStats({ orgId }: { orgId: string }) {
   const supabase = await createClient();
   const { data: requests, error } = await supabase
     .from("requests")
-    .select("id, phase, amount, pay_status, deposit_amount, paid_at, deposit_paid_at, paid_marked_by, deposit_paid_marked_by")
+    .select("id, phase, amount, pay_status, deposit_amount, paid_at, deposit_paid_at")
     .eq("org_id", orgId);
 
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
@@ -128,11 +128,11 @@ async function OrgStats({ orgId }: { orgId: string }) {
   const quoted = rows.filter((r) => r.phase === "quoted").length;
   const completed = rows.filter((r) => r.phase === "completed").length;
 
-  // 入金確認1回＝1件として、確認した月・確認した受付ごとに集計する。
+  // 入金確認1回＝1件として、確認した月ごとに集計する。
   const entries = rows.flatMap((r) => {
-    const list: { requestId: string; amount: number; markedBy: string | null; at: string }[] = [];
-    if (r.pay_status === "paid" && r.paid_at) list.push({ requestId: r.id, amount: r.amount, markedBy: r.paid_marked_by, at: r.paid_at });
-    else if (r.pay_status === "processing" && r.deposit_paid_at) list.push({ requestId: r.id, amount: r.deposit_amount ?? 0, markedBy: r.deposit_paid_marked_by, at: r.deposit_paid_at });
+    const list: { requestId: string; amount: number; at: string }[] = [];
+    if (r.pay_status === "paid" && r.paid_at) list.push({ requestId: r.id, amount: r.amount, at: r.paid_at });
+    else if (r.pay_status === "processing" && r.deposit_paid_at) list.push({ requestId: r.id, amount: r.deposit_amount ?? 0, at: r.deposit_paid_at });
     return list;
   });
 
@@ -175,20 +175,6 @@ async function OrgStats({ orgId }: { orgId: string }) {
     return { key: m.key, label: m.label, items };
   });
 
-  const staffIds = Array.from(new Set(entries.map((e) => e.markedBy).filter((id): id is string => !!id)));
-  const { data: staffProfiles } = staffIds.length ? await supabase.from("profiles").select("id, display_name").in("id", staffIds) : { data: [] };
-  const nameById = new Map((staffProfiles ?? []).map((p) => [p.id, p.display_name]));
-
-  const staffTotals = new Map<string, { name: string; amount: number; count: number }>();
-  for (const e of entries) {
-    if (!e.markedBy) continue;
-    const cur = staffTotals.get(e.markedBy) ?? { name: nameById.get(e.markedBy) ?? "不明", amount: 0, count: 0 };
-    cur.amount += e.amount;
-    cur.count += 1;
-    staffTotals.set(e.markedBy, cur);
-  }
-  const staffRows = Array.from(staffTotals.values()).sort((a, b) => b.amount - a.amount);
-
   return (
     <>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -199,21 +185,6 @@ async function OrgStats({ orgId }: { orgId: string }) {
 
       <SectionTitle>月別・メニュー別の入金額</SectionTitle>
       <MonthlyMenuBreakdown months={months} />
-
-      <SectionTitle>担当者別の入金確認実績</SectionTitle>
-      {staffRows.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ入金確認の実績がありません。</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {staffRows.map((s, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
-              <div style={{ flex: 1, fontSize: 13 }}>{s.name}</div>
-              <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>{s.count}件</div>
-              <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)", width: 100, textAlign: "right" }}>{yen(s.amount)}</div>
-            </div>
-          ))}
-        </div>
-      )}
 
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
         入金額は受付が「入金を確認した」を押した分だけ反映されます。
