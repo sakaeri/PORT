@@ -6,7 +6,6 @@ export const PHASE_LABEL: Record<RequestPhase, string> = {
   quoted: "見積もり待ち",
   preparing: "着手前（承認済み）",
   started: "着手済み",
-  approved: "対応中",
   completed: "完了",
   cancelled: "キャンセル・返金済み",
   declined: "見送り",

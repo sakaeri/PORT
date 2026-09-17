@@ -128,7 +128,6 @@ const PHASE_BADGE_COLOR: Partial<Record<RequestPhase, { color: string; border: s
   quoted: { color: "var(--color-neutral-400)", border: "var(--color-divider)" },
   preparing: { color: "var(--color-accent-300)", border: "var(--color-accent-700)" },
   started: { color: "var(--color-accent-100)", border: "var(--color-accent-700)" },
-  approved: { color: "var(--color-accent-100)", border: "var(--color-accent-700)" },
   completed: { color: "var(--color-accent)", border: "var(--color-accent)" },
   cancelled: { color: "var(--color-neutral-400)", border: "var(--color-divider)" },
   declined: { color: "var(--color-neutral-400)", border: "var(--color-divider)" },

@@ -12,7 +12,6 @@ export type RequestPhase =
   | "quoted"
   | "preparing"
   | "started"
-  | "approved"
   | "completed"
   | "cancelled"
   | "declined";
@@ -289,6 +288,7 @@ export interface Database {
           deposit_paid_marked_by: string | null;
           bank_transfer_info: BankTransferInfo | null;
           card_payment_link: string | null;
+          final_card_payment_link: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]> & { customer_id: string; title: string };

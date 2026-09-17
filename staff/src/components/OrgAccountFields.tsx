@@ -83,7 +83,7 @@ export function OrgAccountFields({
 }) {
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
         <Field label="正式名称" value={form.name} onChange={(v) => set("name", v)} />
         <Field label="表示名（依頼主に見える）" value={form.display_name} onChange={(v) => set("display_name", v)} />
         <Field label="代表者名" value={form.rep_name} onChange={(v) => set("rep_name", v)} />
@@ -97,7 +97,7 @@ export function OrgAccountFields({
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
             この事業者のオーナーが受付画面に入るためのログイン情報
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
             <Field label="オーナーの表示名" value={form.owner_display_name} onChange={(v) => set("owner_display_name", v)} />
             <Field label="ログインメールアドレス" value={form.owner_email} onChange={(v) => set("owner_email", v)} />
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>

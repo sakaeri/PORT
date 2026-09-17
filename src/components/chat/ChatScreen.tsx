@@ -196,7 +196,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
     () => messages.filter((m) => m.requestBundle).map((m) => m.requestBundle as RequestBundle),
     [messages],
   );
-  const activeCount = bundles.filter((b) => b.request.phase === "quoted" || ["preparing", "started", "approved"].includes(b.request.phase)).length;
+  const activeCount = bundles.filter((b) => b.request.phase === "quoted" || ["preparing", "started"].includes(b.request.phase)).length;
   const reportsCount = bundles.filter((b) => b.request.phase === "completed" && b.report?.sent_at && !ackedIds.has(b.request.id)).length;
 
   const q = searchQuery.trim().toLowerCase();
@@ -317,7 +317,14 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
 
       <Composer threadId={ctx.threadId} orgId={ctx.orgId} onSend={handleSend} onOpenMenuSheet={() => setShowMenuSheet(true)} />
 
-      {showProgress && <ProgressPanel bundles={bundles} onClose={() => setShowProgress(false)} onCancel={(id) => { setShowProgress(false); setCancelTargetId(id); }} />}
+      {showProgress && (
+        <ProgressPanel
+          bundles={bundles}
+          refundPolicies={refundPolicies}
+          onClose={() => setShowProgress(false)}
+          onCancel={(id) => { setShowProgress(false); setCancelTargetId(id); }}
+        />
+      )}
       {showReports && <ReportsDialog bundles={bundles} ackedIds={ackedIds} onAck={ackReport} onClose={() => setShowReports(false)} />}
       {showMenuSheet && <MenuSheet menus={menus} onClose={() => setShowMenuSheet(false)} onSubmit={handleMenuSubmit} />}
       {cancelTargetBundle && (

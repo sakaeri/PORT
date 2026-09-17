@@ -1,7 +1,7 @@
 import type { Database } from "@/lib/supabase/types";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
-// 呼び出し側（受付アプリの案件詳細など）は必ずしも requests の全カラムを
+// 呼び出し側（案件詳細画面など）は必ずしも requests の全カラムを
 // 持っているとは限らないため、実際に使うフィールドだけを要求する。
 type RequestRow = Pick<
   Database["public"]["Tables"]["requests"]["Row"],
@@ -16,9 +16,8 @@ export interface RefundResult {
   pct: number;
 }
 
-// 段階の決定: 見積提示前 / 承諾後・着手前 / 着手後 / 納品後 / 著しい遅延（terminate=全額保護）。
-// 「著しい遅延」は目安(due_at)を過ぎてなお未完了のケース — 依頼主には内部期限を見せず、
-// 「対応が大幅に遅れている場合は全額をお返しします」という文言でだけ表す。
+// 依頼主アプリ側(src/lib/refund.ts)とロジックを揃えている
+// （受付側からのキャンセルでも同じ返金額になるようにするため）。
 export function refundStageFor(r: RequestRow): RefundPolicyRow["stage"] {
   if (r.phase === "completed") return "delivered";
   if (r.phase === "preparing" || r.phase === "started") {
@@ -30,8 +29,7 @@ export function refundStageFor(r: RequestRow): RefundPolicyRow["stage"] {
 }
 
 // 実際に入金済みの額。予約金だけ入金済みで残金が未確認（paid_at はまだ立たない）の
-// 場合、以前は「未決済」扱いになり返金額が0円になっていた —
-// 予約金分は確実に入金済みなので、その額を基準にする。
+// 場合は予約金分を基準にする。
 function paidAmountFor(r: RequestRow): number {
   if (r.paid_at) return r.amount;
   if (r.payment_timing === "deposit" && r.deposit_paid_at) return r.deposit_amount ?? 0;

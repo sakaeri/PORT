@@ -28,8 +28,6 @@ function phaseStageIndex(phase: RequestRow["phase"]): number {
       return 1;
     case "started":
       return 2;
-    case "approved":
-      return 3;
     case "completed":
       return 4;
     default:
@@ -48,7 +46,6 @@ const BADGE: Record<string, StatusBadge> = {
   quoted: { label: "見積もり待ち", color: "var(--color-neutral-300)", bg: "transparent", edge: "var(--color-divider)" },
   preparing: { label: "着手前", color: "var(--color-accent-300)", bg: "transparent", edge: "var(--color-accent-700)" },
   started: { label: "着手済み", color: "var(--color-accent-100)", bg: "var(--color-accent-800)", edge: "var(--color-accent-700)" },
-  approved: { label: "対応中", color: "var(--color-accent-100)", bg: "var(--color-accent-800)", edge: "var(--color-accent-700)" },
   completed: { label: "完了", color: "var(--color-accent)", bg: "transparent", edge: "var(--color-accent)" },
   cancelled: { label: "返金済み", color: "var(--color-neutral-400)", bg: "transparent", edge: "var(--color-divider)" },
   declined: { label: "見送り", color: "var(--color-neutral-400)", bg: "transparent", edge: "var(--color-divider)" },

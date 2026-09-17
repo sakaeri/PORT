@@ -41,11 +41,21 @@ function Centered({ onBackdrop, children }: { onBackdrop: () => void; children: 
 }
 
 // ---------- 進捗状況パネル ----------
-export function ProgressPanel({ bundles, onClose, onCancel }: { bundles: RequestBundle[]; onClose: () => void; onCancel: (id: string) => void }) {
+export function ProgressPanel({
+  bundles,
+  refundPolicies,
+  onClose,
+  onCancel,
+}: {
+  bundles: RequestBundle[];
+  refundPolicies: RefundPolicyRow[];
+  onClose: () => void;
+  onCancel: (id: string) => void;
+}) {
   const active = bundles.filter((b) => b.request.phase !== "declined");
   const quoted = active.filter((b) => b.request.phase === "quoted").length;
   const preparing = active.filter((b) => b.request.phase === "preparing").length;
-  const inProgress = active.filter((b) => ["started", "approved"].includes(b.request.phase)).length;
+  const inProgress = active.filter((b) => b.request.phase === "started").length;
   const parts = [quoted && `見積もり待ち ${quoted}件`, preparing && `着手前 ${preparing}件`, inProgress && `対応中 ${inProgress}件`].filter(Boolean);
   const headline = (parts.length ? parts.join("／") + "　" : "") + "同時にお受けできるのは3件までです";
   // 完了した依頼は「報告書一覧」で確認する運用のため、進捗状況からは消す。
@@ -65,7 +75,8 @@ export function ProgressPanel({ bundles, onClose, onCancel }: { bundles: Request
           {items.map(({ request: r, items: lineItems }) => {
               const badge = statusBadgeFor(r);
               const stage = stageInfoFor(r);
-              const canCancel = r.phase === "quoted" || ["preparing", "started", "approved"].includes(r.phase);
+              const canCancel = r.phase === "quoted" || ["preparing", "started"].includes(r.phase);
+              const refund = computeRefund(r, refundPolicies);
               return (
                 <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 9, padding: 13, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -99,7 +110,13 @@ export function ProgressPanel({ bundles, onClose, onCancel }: { bundles: Request
                   </div>
                   {canCancel && (
                     <button onClick={() => onCancel(r.id)} style={{ height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--color-text)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                      {r.phase === "quoted" ? "この見積もりを断る" : r.started_at ? `キャンセル（着手後のため50%返金 ${yen(Math.round(r.amount / 2))}）` : "全額返金してキャンセル"}
+                      {r.phase === "quoted"
+                        ? "この見積もりを断る"
+                        : refund.mode === "full"
+                          ? "全額返金してキャンセル"
+                          : refund.mode === "none"
+                            ? "キャンセル（返金なし）"
+                            : `キャンセル（返金 ${yen(refund.amount)}）`}
                     </button>
                   )}
                 </div>

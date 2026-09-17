@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
+import { computeRefund } from "@/lib/refund";
 import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage } from "@/lib/supabase/types";
 
 async function requireContext() {
@@ -813,6 +814,74 @@ export async function submitCaseReport(
   const { error: reqError } = await supabase.from("requests").update({ phase: "completed", completed_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
   if (reqError) throw reqError;
   await postCaseNotice(supabase, requestId, "完了報告を送信しました");
+}
+
+// 予約金＋カード決済のとき、残金用の決済リンクを新しく発行して依頼主トークに
+// 案内する（最初のカード決済リンクは予約金専用の金額で固定されているため、
+// 残金分は別リンクとして登録し直す必要がある）。
+export async function setFinalPaymentLink(requestId: string, url: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const trimmed = url.trim();
+  if (!trimmed) throw new Error("URLを入力してください");
+
+  const { data: request } = await supabase.from("requests").select("customer_id").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
+  if (!request) throw new Error("案件が見つかりません");
+
+  const { error } = await supabase.from("requests").update({ final_card_payment_link: trimmed }).eq("id", requestId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+
+  const { data: customerThread } = await supabase
+    .from("threads")
+    .select("id")
+    .eq("kind", "customer")
+    .eq("org_id", ctx.orgId)
+    .eq("customer_id", request.customer_id)
+    .maybeSingle();
+  if (customerThread) {
+    const { error: msgError } = await supabase.from("messages").insert({
+      thread_id: customerThread.id,
+      sender_id: ctx.userId,
+      sender_role: ctx.role,
+      kind: "text",
+      body: `残金のお支払いはこちらから進めてください：${trimmed}`,
+    });
+    if (msgError) throw msgError;
+    await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", customerThread.id);
+  }
+  await postCaseNotice(supabase, requestId, "残金の決済リンクを送信しました");
+}
+
+// 受付側からのキャンセル・強制終了。これまで依頼のキャンセルは依頼主側にしか
+// 手段がなかったが、対応が大幅に遅れて受付側から終了させたい場合などのために追加。
+// 返金計算は依頼主アプリの cancelRequest と同じロジック（lib/refund.ts）を使う。
+export async function cancelCaseRequest(requestId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+
+  const { data: r, error: fetchError } = await supabase.from("requests").select("*").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!r) throw new Error("案件が見つかりません");
+  if (["completed", "cancelled", "declined"].includes(r.phase)) throw new Error("この依頼はすでに終了しています");
+
+  const { data: policies } = await supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId);
+  const refund = computeRefund(r, policies ?? []);
+  const now = new Date().toISOString();
+  const nextPhase = r.phase === "quoted" ? "declined" : "cancelled";
+
+  const { error } = await supabase
+    .from("requests")
+    .update({ phase: nextPhase, cancelled_at: now, refund_pct: refund.pct, refunded_amount: refund.amount })
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId);
+  if (error) throw error;
+
+  await postCaseNotice(
+    supabase,
+    requestId,
+    nextPhase === "declined" ? "受付が見積もりを見送りにしました" : `受付が対応を終了し、キャンセル扱いにしました（返金 ¥${refund.amount.toLocaleString("ja-JP")}）`,
+  );
+  return refund;
 }
 
 // 案件トーク（スタッフ内メモ・進捗ログ）への書き込み。削除は deleteMessage を共用する

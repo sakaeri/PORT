@@ -6,17 +6,22 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Archive, ArrowCounterClockwise, Star } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
+import { computeRefund } from "@/lib/refund";
 import {
   confirmPayment,
   confirmDeposit,
   confirmFinalPayment,
   startCaseRequest,
   submitCaseReport,
+  cancelCaseRequest,
+  setFinalPaymentLink,
   archiveCaseThread,
   unarchiveCaseThread,
 } from "@/app/actions";
-import type { BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
+import type { BankTransferInfo, Database, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
+
+type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 
 const card: React.CSSProperties = {
   padding: 16,
@@ -52,6 +57,7 @@ const inputStyle: React.CSSProperties = {
 
 export default function CaseDetail({
   request,
+  refundPolicies,
   customer,
   report,
   rating,
@@ -67,6 +73,8 @@ export default function CaseDetail({
     amount: number;
     phase: RequestPhase;
     createdAt: string;
+    dueAt: string | null;
+    paidAt: string | null;
     paymentTiming: PaymentTiming;
     depositPercent: number | null;
     depositAmount: number | null;
@@ -75,7 +83,9 @@ export default function CaseDetail({
     payStatus: string;
     bankTransferInfo: BankTransferInfo | null;
     cardPaymentLink: string | null;
+    finalCardPaymentLink: string | null;
   };
+  refundPolicies: RefundPolicyRow[];
   customer: { id: string; name: string } | null;
   report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[] } | null;
   rating: { stars: number | null; comment: string | null; skipped: boolean } | null;
@@ -113,6 +123,35 @@ export default function CaseDetail({
   const handleConfirmFinal = () => runAction(() => confirmFinalPayment(request.id), request.paymentTiming === "deposit" ? "残金の入金を確認しましたか？" : "入金を確認しましたか？");
   const handleToggleArchive = () =>
     runAction(() => (caseThread?.archived ? unarchiveCaseThread(caseThread.id) : archiveCaseThread(caseThread!.id)));
+
+  const canCancel = !["completed", "cancelled", "declined"].includes(request.phase);
+  const refund = computeRefund(
+    {
+      phase: request.phase,
+      due_at: request.dueAt,
+      paid_at: request.paidAt,
+      amount: request.amount,
+      payment_timing: request.paymentTiming,
+      deposit_amount: request.depositAmount,
+      deposit_paid_at: request.depositPaidAt,
+    },
+    refundPolicies,
+  );
+  const cancelLabel =
+    request.phase === "quoted"
+      ? "この見積もりを見送りにする"
+      : refund.mode === "full"
+        ? "キャンセルにする（全額返金）"
+        : refund.mode === "none"
+          ? "キャンセルにする（返金なし）"
+          : `キャンセルにする（返金 ¥${refund.amount.toLocaleString("ja-JP")}）`;
+  const handleCancel = () =>
+    runAction(
+      async () => {
+        await cancelCaseRequest(request.id);
+      },
+      request.phase === "quoted" ? "この見積もりを見送りにします。よろしいですか？" : `${cancelLabel}。よろしいですか？`,
+    );
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 640, width: "100%", margin: "0 auto" }}>
@@ -209,11 +248,16 @@ export default function CaseDetail({
         ) : (
           <>
             {request.paymentTiming === "deposit" && request.payStatus === "processing" && ["started", "completed"].includes(request.phase) && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>残金 ¥{(request.amount - (request.depositAmount ?? 0)).toLocaleString("ja-JP")} は未確認です</span>
-                <button onClick={handleConfirmFinal} disabled={busy} style={{ ...btn, height: 32 }}>
-                  {busy ? "処理中…" : "残金の入金を確認した"}
-                </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>残金 ¥{(request.amount - (request.depositAmount ?? 0)).toLocaleString("ja-JP")} は未確認です</span>
+                  <button onClick={handleConfirmFinal} disabled={busy} style={{ ...btn, height: 32 }}>
+                    {busy ? "処理中…" : "残金の入金を確認した"}
+                  </button>
+                </div>
+                {request.payMethod === "card" && (
+                  <FinalPaymentLinkForm requestId={request.id} currentLink={request.finalCardPaymentLink} />
+                )}
               </div>
             )}
             {(request.paymentTiming === "before_shipping" || request.paymentTiming === "postpay") && request.phase === "completed" && (
@@ -225,6 +269,18 @@ export default function CaseDetail({
               </div>
             )}
           </>
+        )}
+
+        {canCancel && (
+          <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 10 }}>
+            <button
+              onClick={handleCancel}
+              disabled={busy}
+              style={{ height: 34, padding: "0 12px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+            >
+              {cancelLabel}
+            </button>
+          </div>
         )}
 
         {request.phase === "completed" && report && (
@@ -329,6 +385,76 @@ function CompletionReportForm({ requestId }: { requestId: string }) {
           {saving ? "送信中…" : "この内容で完了報告する"}
         </button>
         <button onClick={() => setOpen(false)} style={{ ...btn, color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
+          キャンセル
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// 予約金＋カード決済のとき、残金用の決済リンクを登録して依頼主トークに送る。
+// 最初のカード決済リンクは予約金専用の金額で固定されているため、残金分は
+// 別のリンクとして案内する必要がある。
+function FinalPaymentLinkForm({ requestId, currentLink }: { requestId: string; currentLink: string | null }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit() {
+    if (saving || !url.trim()) return;
+    setError("");
+    setSaving(true);
+    try {
+      await setFinalPaymentLink(requestId, url);
+      setOpen(false);
+      setUrl("");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "送信できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (currentLink && !open) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
+        <span style={{ color: "var(--color-neutral-500)" }}>残金の決済リンク送信済み：</span>
+        <a href={currentLink} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {currentLink}
+        </a>
+        <button onClick={() => setOpen(true)} style={{ flex: "none", cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-500)", background: "transparent", border: "none", textDecoration: "underline" }}>
+          作り直す
+        </button>
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} style={{ ...btn, height: 32, alignSelf: "flex-start" }}>
+        残金の決済リンクを送る
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <input
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="残金分のカード決済リンク（URL）"
+        className="vid-input"
+        style={{ ...inputStyle, flex: 1, minWidth: 200 }}
+      />
+      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={submit} disabled={saving || !url.trim()} style={{ ...btn, height: 36 }}>
+          {saving ? "送信中…" : "このリンクを送る"}
+        </button>
+        <button onClick={() => setOpen(false)} style={{ ...btn, height: 36, color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
           キャンセル
         </button>
       </div>

@@ -233,7 +233,7 @@ export function RequestCard({
   const stage = stageInfoFor(r);
   const refund = computeRefund(r, refundPolicies);
   const started = !!r.started_at;
-  const canCancel = ["preparing", "started", "approved"].includes(r.phase);
+  const canCancel = ["preparing", "started"].includes(r.phase);
 
   return (
     <div style={{ ...bubbleShell, alignSelf: "flex-start" }}>
@@ -284,7 +284,9 @@ export function RequestCard({
                 </div>
                 <div style={{ color: "var(--color-neutral-500)" }}>{paymentTimingNote(r)}</div>
                 {r.payment_timing === "deposit" && r.deposit_paid_at && (
-                  <div style={{ color: "var(--color-accent-300)" }}>予約金は入金済みです。残金は対応完了後にご案内します。</div>
+                  <div style={{ color: "var(--color-accent-300)" }}>
+                    予約金は入金済みです。{r.pay_method === "bank" && "残金は対応完了後にご案内します。"}
+                  </div>
                 )}
                 {r.pay_method === "bank" && r.bank_transfer_info && (
                   <div style={{ marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 2 }}>
@@ -303,7 +305,15 @@ export function RequestCard({
                 )}
                 {r.pay_method === "card" && (
                   <div style={{ marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
-                    {r.card_payment_link ? (
+                    {r.payment_timing === "deposit" && r.deposit_paid_at ? (
+                      r.final_card_payment_link ? (
+                        <a href={r.final_card_payment_link} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
+                          残金のお支払いはこちらから
+                        </a>
+                      ) : (
+                        "残金の決済リンクは、このトークで追ってお送りします。"
+                      )
+                    ) : r.card_payment_link ? (
                       <a href={r.card_payment_link} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
                         こちらからカード決済へ進む
                       </a>
