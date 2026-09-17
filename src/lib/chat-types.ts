@@ -62,4 +62,7 @@ export interface CustomerContext {
   email: string | null;
   isAnonymous: boolean;
   avatarUrl: string | null;
+  // トライアル終了・支払い滞納などで、この事業所への新規の問い合わせ・返信を
+  // 止めるべき状態かどうか。過去のやり取りの閲覧は常にできる。
+  orgLocked: boolean;
 }

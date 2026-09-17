@@ -6,9 +6,14 @@ import { getStaffContext } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
 import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage } from "@/lib/supabase/types";
 
-async function requireContext() {
+// allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
+// （キャンセル処理や、支払い設定そのものなど）用。既定はロック中なら弾く。
+async function requireContext(opts?: { allowLocked?: boolean }) {
   const ctx = await getStaffContext();
   if (!ctx) throw new Error("権限がありません");
+  if (ctx.isLocked && !opts?.allowLocked) {
+    throw new Error("お支払い状況の確認が必要です。ご利用の継続には「お支払い設定」からお手続きください。");
+  }
   return ctx;
 }
 
@@ -277,7 +282,9 @@ function validateSlug(rawSlug: string) {
 
 // 事業者の行＋既定のキャンセル/返金ポリシーを作るだけの部分。オーナーの
 // ログインをどう用意するか（新規作成 or 今のログインに追加）は呼び出し側で分ける。
-async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createServiceRoleClient>) {
+// referredByUserId が入っていれば紹介経由として扱い、トライアルを90日にする
+// （通常は30日）。
+async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createServiceRoleClient>, referredByUserId?: string | null) {
   const slug = validateSlug(fields.slug);
   if (!fields.name.trim() || !fields.display_name.trim()) {
     throw new Error("正式名称・表示名は必須です");
@@ -286,6 +293,7 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
   const { data: existing } = await admin.from("organizations").select("id").eq("slug", slug).maybeSingle();
   if (existing) throw new Error("このURLの合言葉はすでに使われています");
 
+  const trialDays = referredByUserId ? 90 : 30;
   const { data: org, error: orgErr } = await admin
     .from("organizations")
     .insert({
@@ -296,7 +304,8 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
       email: fields.email.trim() || null,
       slug,
       plan_status: "trial",
-      trial_ends_on: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      trial_ends_on: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      referred_by_user_id: referredByUserId ?? null,
     })
     .select("id")
     .single();
@@ -314,7 +323,7 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
   return { orgId: org.id as string, slug };
 }
 
-async function createOrgCore(fields: OrgAccountFields) {
+async function createOrgCore(fields: OrgAccountFields, referredByUserId?: string | null) {
   if (fields.owner_password.length < 8) {
     throw new Error("パスワードは8文字以上にしてください");
   }
@@ -336,7 +345,7 @@ async function createOrgCore(fields: OrgAccountFields) {
 
   let result: { orgId: string; slug: string };
   try {
-    result = await createOrgRow(fields, admin);
+    result = await createOrgRow(fields, admin, referredByUserId);
   } catch (e) {
     await admin.auth.admin.deleteUser(userId);
     throw e;
@@ -360,6 +369,40 @@ async function createOrgCore(fields: OrgAccountFields) {
 export async function createOrgAccount(fields: OrgAccountFields) {
   await requireHq();
   return createOrgCore(fields);
+}
+
+// LPからの公開セルフサインアップ。HQ権限は不要（本部を介さず誰でも申し込める）。
+// Turnstile（CAPTCHA）で機械的な大量作成を防ぎ、紹介コード（=紹介元オーナーの
+// profile id）が実在するオーナーのものであれば90日トライアルとして扱う。
+export async function signUpSelfServe(fields: OrgAccountFields, refUserId: string | null, turnstileToken: string) {
+  await verifyTurnstile(turnstileToken);
+
+  const admin = createServiceRoleClient();
+  let referredByUserId: string | null = null;
+  if (refUserId) {
+    const { data: refProfile } = await admin.from("profiles").select("id").eq("id", refUserId).eq("role", "owner").maybeSingle();
+    if (refProfile) referredByUserId = refProfile.id;
+  }
+
+  return createOrgCore(fields, referredByUserId);
+}
+
+// TURNSTILE_SECRET_KEY が未設定の間は検証をスキップする（本番公開前に必ず設定すること。
+// 未設定のまま公開すると誰でも無制限にアカウントを作成できてしまう）。
+async function verifyTurnstile(token: string) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) {
+    console.warn("verifyTurnstile: TURNSTILE_SECRET_KEY is not set — skipping CAPTCHA verification");
+    return;
+  }
+  if (!token) throw new Error("認証に失敗しました。ページを再読み込みしてもう一度お試しください。");
+  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ secret, response: token }),
+  });
+  const data = (await res.json()) as { success: boolean };
+  if (!data.success) throw new Error("認証に失敗しました。ページを再読み込みしてもう一度お試しください。");
 }
 
 // 依頼主一覧の問い合わせ行から、そのままその依頼主を新しい事業者として
@@ -856,7 +899,7 @@ export async function setFinalPaymentLink(requestId: string, url: string) {
 // 手段がなかったが、対応が大幅に遅れて受付側から終了させたい場合などのために追加。
 // 返金計算は依頼主アプリの cancelRequest と同じロジック（lib/refund.ts）を使う。
 export async function cancelCaseRequest(requestId: string) {
-  const ctx = await requireContext();
+  const ctx = await requireContext({ allowLocked: true });
   const supabase = await createClient();
 
   const { data: r, error: fetchError } = await supabase.from("requests").select("*").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();

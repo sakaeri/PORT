@@ -122,6 +122,7 @@ const smallBtn: React.CSSProperties = {
 
 export default function MenuSettings({
   orgId,
+  referrerUserId,
   initialCompany,
   initialMenus,
   initialLoginEmail,
@@ -133,6 +134,7 @@ export default function MenuSettings({
   initialCardPaymentLinks,
 }: {
   orgId: string;
+  referrerUserId: string;
   initialCompany: Company;
   initialMenus: Menu[];
   initialLoginEmail: string;
@@ -212,7 +214,7 @@ export default function MenuSettings({
 
       {tab === "company" && (
         <>
-          <CompanyInfoCard initial={initialCompany} slug={slug} />
+          <CompanyInfoCard initial={initialCompany} slug={slug} referrerUserId={referrerUserId} />
           <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} />
           <CardPaymentLinksCard initialLinks={initialCardPaymentLinks} />
           {/* StaffModeCard は複数スタッフ運用が必要になるまで非表示にする */}
@@ -344,12 +346,24 @@ function InfoRow({ label: l, value, labelWidth = 90 }: { label: string; value: s
   );
 }
 
-function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | null }) {
+function CompanyInfoCard({ initial, slug, referrerUserId }: { initial: Company; slug: string | null; referrerUserId: string }) {
   const [saved, setSaved] = useState(initial);
   const [form, setForm] = useState(initial);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const referralLink = `https://port-business.s-stylegolf.com/signup?ref=${referrerUserId}`;
+
+  async function copyReferralLink() {
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }
 
   function set<K extends keyof Company>(key: K, value: Company[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -388,6 +402,14 @@ function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | n
           <InfoTooltip text="このURLは共通のリンクですが、タップした方ごとに専用のお問い合わせ窓口になります。ホームページなどに載せてご利用ください。" />
         </div>
       )}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)", flexWrap: "wrap" }}>
+        <span>紹介リンク：</span>
+        <span style={{ color: "var(--color-accent-300)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{referralLink}</span>
+        <button onClick={copyReferralLink} style={{ flex: "none", height: 24, padding: "0 8px", cursor: "pointer", fontSize: 11, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)" }}>
+          {copied ? "コピーしました" : "コピー"}
+        </button>
+        <InfoTooltip text="このリンクから他の事業者がPORTに申し込むと、通常30日間のトライアルが90日間になります。" />
+      </div>
       {!editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <InfoRow label="正式名称" value={saved.name} />

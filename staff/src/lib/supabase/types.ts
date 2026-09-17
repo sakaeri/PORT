@@ -451,7 +451,16 @@ export interface Database {
       };
       staff_context: {
         Args: Record<string, never>;
-        Returns: { org_id: string; org_display_name: string; solo: boolean; is_hq: boolean; role: AppRole; display_name: string }[];
+        Returns: {
+          org_id: string;
+          org_display_name: string;
+          solo: boolean;
+          is_hq: boolean;
+          role: AppRole;
+          display_name: string;
+          plan_status: "trial" | "active" | "past_due" | "paused" | "cancelled";
+          trial_ends_on: string | null;
+        }[];
       };
       unread_customer_count: { Args: { p_org_id: string }; Returns: number };
       customer_thread_summaries: {

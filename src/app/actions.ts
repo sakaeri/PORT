@@ -12,6 +12,16 @@ async function requireContext() {
   return ctx;
 }
 
+// 新規の問い合わせ・返信など、事業所にとって新しいやり取りを生む操作専用。
+// トライアル終了・支払い滞納などでロック中の窓口では使えない
+// （過去のやり取りの閲覧や、キャンセル・評価などの既存のやり取りの後始末は
+// requireContext() のままブロックしない）。
+async function requireActiveContext() {
+  const ctx = await requireContext();
+  if (ctx.orgLocked) throw new Error("現在この窓口は新しいお問い合わせを受け付けておりません。しばらくしてから再度お試しください。");
+  return ctx;
+}
+
 // メッセージを送るたびに呼ぶ。これを忘れると threads.last_msg_at が
 // 依頼主側の新着で更新されず、受付側の未読判定が効かなくなる。
 // threads の RLS は受付（is_office()）にしか update を許可していないため、
@@ -42,7 +52,7 @@ export async function requestMagicLink(email: string) {
 }
 
 export async function sendMessage(text: string, attachments: { path: string; name: string; mime: string; bytes: number }[]) {
-  const ctx = await requireContext();
+  const ctx = await requireActiveContext();
   const supabase = await createClient();
   const trimmed = text.trim();
   if (!trimmed && attachments.length === 0) return;
@@ -75,7 +85,7 @@ export async function submitMenuInquiry(
   rows: { label: string; value: string }[],
   note: string,
 ) {
-  const ctx = await requireContext();
+  const ctx = await requireActiveContext();
   const supabase = await createClient();
   const filled = rows.filter((r) => r.value.trim());
   const { error } = await supabase.from("messages").insert({
@@ -121,7 +131,7 @@ export async function deleteVaultItem(id: string) {
 // 依頼主ごとの永続データ（customer_vault_items＝マイページの「よく使う情報」）には繋げない
 // —— 確認事項テンプレはあくまで一回きりのやり取りとして扱う。
 export async function submitInfoRequestAnswer(formLabel: string, fields: { label: string; value: string }[]) {
-  const ctx = await requireContext();
+  const ctx = await requireActiveContext();
   const filled = fields.filter((f) => f.value.trim());
   if (!filled.length) return;
   const supabase = await createClient();
@@ -140,7 +150,7 @@ export async function submitInfoRequestAnswer(formLabel: string, fields: { label
 // 受付への依頼として本人発言のまま投稿する（自動応答は作らない — 実際の返信は
 // 受付が対応してから届く。プロトタイプの「即座に受付が返信する」演出は本番では行わない）。
 export async function requestNameChange(newName: string, reason: string) {
-  const ctx = await requireContext();
+  const ctx = await requireActiveContext();
   const supabase = await createClient();
   const trimmed = newName.trim();
   if (!trimmed || !reason) throw new Error("入力内容をご確認ください");

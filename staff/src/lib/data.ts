@@ -19,6 +19,12 @@ export interface StaffContext {
   solo: boolean;
   isHq: boolean;
   orgs: StaffOrgOption[];
+  planStatus: "trial" | "active" | "past_due" | "paused" | "cancelled";
+  trialEndsOn: string | null;
+  // トライアル終了後（または滞納・停止）で、新規のやり取りなど書き込み系を
+  // 止めるべき状態かどうか。閲覧は常にできる（データを人質にしない）。
+  // PORT本部の事業者（isHq）は対象外。
+  isLocked: boolean;
 }
 
 // null means: not logged in, or logged in but not owner/reception (e.g. a
@@ -39,6 +45,12 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
   ]);
   if (!ctx || (ctx.role !== "owner" && ctx.role !== "reception")) return null;
 
+  const isHq = ctx.is_hq ?? false;
+  const planStatus = ctx.plan_status ?? "trial";
+  const trialEndsOn = ctx.trial_ends_on ?? null;
+  const trialExpired = trialEndsOn != null && trialEndsOn < new Date().toISOString().slice(0, 10);
+  const isLocked = !isHq && (planStatus === "past_due" || planStatus === "paused" || planStatus === "cancelled" || (planStatus === "trial" && trialExpired));
+
   return {
     userId: auth.user.id,
     orgId: ctx.org_id,
@@ -46,7 +58,10 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
     role: ctx.role,
     displayName: ctx.display_name ?? "スタッフ",
     solo: ctx.solo ?? false,
-    isHq: ctx.is_hq ?? false,
+    isHq,
     orgs: (orgs ?? []).map((o) => ({ orgId: o.org_id, displayName: o.display_name, role: o.role as "owner" | "reception", isPrimary: o.is_primary, slug: o.slug })),
+    planStatus,
+    trialEndsOn,
+    isLocked,
   };
 });
