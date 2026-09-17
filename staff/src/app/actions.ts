@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
+import { getStripe } from "@/lib/stripe";
 import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage } from "@/lib/supabase/types";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
@@ -21,6 +22,64 @@ async function requireHq() {
   const ctx = await requireContext();
   if (!ctx.isHq) throw new Error("権限がありません");
   return ctx;
+}
+
+// ============================================================
+// PORT利用料の決済（Stripe）。オーナーのみ。支払い設定そのものなので
+// ロック中（トライアル終了・支払い滞納）でも呼べる必要がある（allowLocked）。
+// 席数（seats）は制作者機能が未実装のため常に0 — 今は基本料(base_fee)だけを
+// 請求する。制作者機能ができたら席数分の従量課金の行を追加する。
+// ============================================================
+export async function startSubscriptionSetup() {
+  const ctx = await requireContext({ allowLocked: true });
+  if (ctx.role !== "owner") throw new Error("お支払い設定の変更はオーナーのみ行えます");
+
+  const stripe = getStripe();
+  const supabase = await createClient();
+  const { data: org, error } = await supabase
+    .from("organizations")
+    .select("base_fee, email, display_name, stripe_customer_id, stripe_subscription_id")
+    .eq("id", ctx.orgId)
+    .single();
+  if (error || !org) throw error ?? new Error("事業者情報を取得できませんでした");
+
+  const baseFee = org.base_fee;
+  const productId = process.env.STRIPE_PRODUCT_ID;
+  if (!productId) throw new Error("決済機能の準備ができていません。しばらくしてから再度お試しください。");
+
+  let customerId = org.stripe_customer_id;
+  if (!customerId) {
+    const customer = await stripe.customers.create({ name: org.display_name, email: org.email ?? undefined, metadata: { org_id: ctx.orgId } });
+    customerId = customer.id;
+    await supabase.from("organizations").update({ stripe_customer_id: customerId }).eq("id", ctx.orgId);
+  }
+
+  const createFreshSubscription = async () => {
+    const sub = await stripe.subscriptions.create({
+      customer: customerId!,
+      items: [{ price_data: { currency: "jpy", product: productId, unit_amount: baseFee, recurring: { interval: "month" } } }],
+      payment_behavior: "default_incomplete",
+      payment_settings: { save_default_payment_method: "on_subscription" },
+      expand: ["latest_invoice"],
+    });
+    await supabase.from("organizations").update({ stripe_subscription_id: sub.id }).eq("id", ctx.orgId);
+    return sub;
+  };
+
+  // 前回が未確定（incomplete）のまま残っていればそれを使い回す。
+  // 有効・解約済みなど、それ以外の状態なら新しく作り直す。
+  let subscription = org.stripe_subscription_id
+    ? await stripe.subscriptions.retrieve(org.stripe_subscription_id, { expand: ["latest_invoice"] })
+    : null;
+  if (!subscription || subscription.status !== "incomplete") {
+    subscription = await createFreshSubscription();
+  }
+
+  const invoice = subscription.latest_invoice;
+  const clientSecret = invoice && typeof invoice === "object" ? invoice.confirmation_secret?.client_secret : null;
+  if (!clientSecret) throw new Error("決済の準備に失敗しました");
+
+  return clientSecret;
 }
 
 // org_write ポリシーは owner のみ更新可（reception は不可）。RLS は該当行が

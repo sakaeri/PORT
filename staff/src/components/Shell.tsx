@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X } from "@phosphor-icons/react";
+import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, CreditCard, Sun, MoonStars, SignOut, List, X } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { headingWeight } from "@/lib/style";
@@ -16,6 +16,7 @@ const NAV = [
   { href: "/stats", label: "売上・実績", icon: ChartBar },
   { href: "/staff", label: "スタッフ", icon: UsersThree, hideWhenSolo: true },
   { href: "/menu", label: "メニュー管理", icon: GearSix },
+  { href: "/billing", label: "お支払い設定", icon: CreditCard, hideWhenHq: true },
   { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true },
 ];
 
@@ -101,7 +102,36 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     router.refresh();
   }
 
-  const navItems = NAV.filter((n) => !(n.hideWhenSolo && ctx.solo) && !(n.hqOnly && !ctx.isHq));
+  const navItems = NAV.filter((n) => !(n.hideWhenSolo && ctx.solo) && !(n.hqOnly && !ctx.isHq) && !(n.hideWhenHq && ctx.isHq));
+
+  // Date.now() はレンダー中に直接呼べない（純粋関数のルール）ため、
+  // マウント後にeffectで計算する。初回描画では null のままバナーを出さない。
+  const [daysUntilTrialEnd, setDaysUntilTrialEnd] = useState<number | null>(null);
+  useEffect(() => {
+    if (!ctx.trialEndsOn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a prop-derived, clock-dependent value that can't be computed during render
+      setDaysUntilTrialEnd(null);
+      return;
+    }
+    setDaysUntilTrialEnd(Math.ceil((new Date(ctx.trialEndsOn).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+  }, [ctx.trialEndsOn]);
+  const trialEndingSoon = !ctx.isHq && ctx.planStatus === "trial" && daysUntilTrialEnd != null && daysUntilTrialEnd >= 0 && daysUntilTrialEnd <= 5;
+
+  const billingBanner = ctx.isLocked ? (
+    <Link
+      href="/billing"
+      style={{ display: "block", padding: "9px var(--space-4)", fontSize: 12.5, textAlign: "center", color: "var(--color-bg)", background: "var(--stb-seal-ink)", textDecoration: "none" }}
+    >
+      お支払い状況の確認が必要です。新しいお問い合わせ・返信ができません。「お支払い設定」からお手続きください →
+    </Link>
+  ) : trialEndingSoon ? (
+    <Link
+      href="/billing"
+      style={{ display: "block", padding: "9px var(--space-4)", fontSize: 12.5, textAlign: "center", color: "var(--color-accent-100)", background: "var(--color-accent-800)", textDecoration: "none" }}
+    >
+      {daysUntilTrialEnd === 0 ? "本日" : `あと${daysUntilTrialEnd}日で`}トライアルが終了します。「お支払い設定」からお手続きください →
+    </Link>
+  ) : null;
 
   const sidebarBody = (
     <>
@@ -236,7 +266,10 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           </>
         )}
 
-        <main style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</main>
+        <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {billingBanner}
+          <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
+        </main>
       </div>
     );
   }
@@ -258,7 +291,10 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
         {sidebarBody}
       </aside>
 
-      <main style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</main>
+      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {billingBanner}
+        <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
+      </main>
     </div>
   );
 }
