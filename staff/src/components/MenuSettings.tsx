@@ -1167,17 +1167,30 @@ function RefundPolicyCard({ orgId, initialPolicy }: { orgId: string; initialPoli
         <>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {rows.map((r, i) => (
-              <div key={r.key} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div
+                key={r.key}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  padding: "12px 14px",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--color-neutral-800)",
+                  border: "1px solid var(--color-divider)",
+                }}
+              >
+                <div style={{ minWidth: 180, flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
                   <span style={{ fontSize: 12.5 }}>{r.label}</span>
                   <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>{r.when}</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none" }}>
                   <select
                     value={r.mode}
                     onChange={(e) => { const mode = e.target.value as RefundMode; patch(i, { mode }); commit({ ...r, mode }); }}
                     className="vid-input"
-                    style={{ ...input, width: 130, height: 32 }}
+                    style={{ ...input, width: 140, height: 34 }}
                   >
                     {REFUND_MODES.map((m) => (
                       <option key={m.value} value={m.value}>{m.label}</option>
@@ -1191,7 +1204,7 @@ function RefundPolicyCard({ orgId, initialPolicy }: { orgId: string; initialPoli
                         onChange={(e) => patch(i, { pct: Number(e.target.value) })}
                         onBlur={() => commit(rows[i])}
                         className="vid-input"
-                        style={{ ...input, width: 60, height: 32 }}
+                        style={{ ...input, width: 60, height: 34 }}
                       />
                       <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>%</span>
                     </div>
@@ -1201,7 +1214,7 @@ function RefundPolicyCard({ orgId, initialPolicy }: { orgId: string; initialPoli
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: 9, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
+          <div style={{ display: "flex", gap: 9, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-neutral-800)", border: "1px solid var(--color-divider)" }}>
             <div style={{ minWidth: 0, fontSize: 11.5, color: "var(--color-neutral-400)", lineHeight: 1.6 }}>
               「着手」の定義：受付が対象の案件で「着手する」を押した時点です。押していなければ未着手として扱われ、キャンセル時は原則全額返金になります。
             </div>
