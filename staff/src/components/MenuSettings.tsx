@@ -176,7 +176,7 @@ export default function MenuSettings({
                   borderRadius: "var(--radius-md)",
                 }}
               >
-                {t.label}
+                {t.mobileLabel}
               </button>
             );
           })}
@@ -228,12 +228,12 @@ export default function MenuSettings({
 
 type TabKey = "company" | "menu" | "login" | "templates" | "refund";
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "company", label: "会社情報" },
-  { key: "menu", label: "メニュー" },
-  { key: "templates", label: "テンプレ" },
-  { key: "refund", label: "返金ポリシー" },
-  { key: "login", label: "ログイン設定" },
+const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
+  { key: "company", label: "会社情報", mobileLabel: "会社情報" },
+  { key: "menu", label: "受付メニュー", mobileLabel: "メニュー" },
+  { key: "templates", label: "返信テンプレ", mobileLabel: "テンプレ" },
+  { key: "refund", label: "キャンセル・返金ポリシー", mobileLabel: "返金ポリシー" },
+  { key: "login", label: "ログイン情報", mobileLabel: "ログイン設定" },
 ];
 
 function InfoTooltip({ text }: { text: string }) {
