@@ -30,11 +30,24 @@ export async function POST(request: Request) {
   ) {
     const subscription = event.data.object;
     const admin = createServiceRoleClient();
-    const { error } = await admin
-      .from("organizations")
-      .update({ plan_status: mapStripeStatus(subscription.status) })
-      .eq("stripe_subscription_id", subscription.id);
-    if (error) console.error("stripe-webhook: failed to update plan_status", error);
+    const newStatus = mapStripeStatus(subscription.status);
+
+    const { data: org } = await admin.from("organizations").select("id, plan_status").eq("stripe_subscription_id", subscription.id).maybeSingle();
+    if (org) {
+      const { error } = await admin.from("organizations").update({ plan_status: newStatus }).eq("id", org.id);
+      if (error) console.error("stripe-webhook: failed to update plan_status", error);
+
+      // 紹介経由で申し込んだ事業者が初めて課金有効になったタイミングで、
+      // 紹介元のチケットを pending → confirmed にする（紹介者への還元の判定用）。
+      if (newStatus === "active" && org.plan_status !== "active") {
+        const { error: creditError } = await admin
+          .from("referral_credits")
+          .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+          .eq("referred_org_id", org.id)
+          .eq("status", "pending");
+        if (creditError) console.error("stripe-webhook: failed to confirm referral credit", creditError);
+      }
+    }
   }
 
   return NextResponse.json({ received: true });

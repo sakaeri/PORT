@@ -442,13 +442,24 @@ export async function signUpSelfServe(fields: OrgAccountFields, refUserId: strin
   await verifyTurnstile(turnstileToken);
 
   const admin = createServiceRoleClient();
-  let referredByUserId: string | null = null;
+  let referrer: { userId: string; orgId: string } | null = null;
   if (refUserId) {
-    const { data: refProfile } = await admin.from("profiles").select("id").eq("id", refUserId).eq("role", "owner").maybeSingle();
-    if (refProfile) referredByUserId = refProfile.id;
+    const { data: refProfile } = await admin.from("profiles").select("id, org_id").eq("id", refUserId).eq("role", "owner").maybeSingle();
+    if (refProfile) referrer = { userId: refProfile.id, orgId: refProfile.org_id };
   }
 
-  return createOrgCore(fields, referredByUserId);
+  const result = await createOrgCore(fields, referrer?.userId ?? null);
+
+  // 紹介した事業者が後で1枚使えるチケットの元。初回課金が通ったら
+  // Stripe Webhook側で confirmed に更新する（今は pending で記録するだけ）。
+  if (referrer) {
+    const { error } = await admin
+      .from("referral_credits")
+      .insert({ referrer_user_id: referrer.userId, referrer_org_id: referrer.orgId, referred_org_id: result.orgId });
+    if (error) console.error("signUpSelfServe: failed to record referral_credits", error);
+  }
+
+  return result;
 }
 
 // TURNSTILE_SECRET_KEY が未設定の間は検証をスキップする（本番公開前に必ず設定すること。

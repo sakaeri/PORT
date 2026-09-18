@@ -38,6 +38,7 @@ export type PaymentTiming = "prepay_full" | "deposit" | "before_shipping" | "pos
 export type AgreementKind = "contract" | "employment_part" | "employment_full" | "nda" | "consent";
 export type PayMode = "hourly" | "daily" | "monthly" | "menu" | "share" | "none";
 export type PlanStatus = "trial" | "active" | "past_due" | "paused" | "cancelled";
+export type ReferralStatus = "pending" | "confirmed" | "consumed" | "revoked";
 
 export interface BankTransferInfo {
   holder?: string;
@@ -425,6 +426,21 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["referral_leads"]["Row"]> & { org_id: string; customer_id: string; customer_name: string };
         Update: Partial<Database["public"]["Tables"]["referral_leads"]["Row"]>;
+        Relationships: [];
+      };
+      referral_credits: {
+        Row: {
+          id: string;
+          referrer_user_id: string;
+          referrer_org_id: string;
+          referred_org_id: string;
+          status: ReferralStatus;
+          confirmed_at: string | null;
+          consumed_billing_month: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["referral_credits"]["Row"]> & { referrer_user_id: string; referrer_org_id: string; referred_org_id: string };
+        Update: Partial<Database["public"]["Tables"]["referral_credits"]["Row"]>;
         Relationships: [];
       };
       staff_org_links: {
