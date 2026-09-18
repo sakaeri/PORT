@@ -77,16 +77,26 @@ export async function startSubscriptionSetup() {
     return sub;
   };
 
-  // 前回が未確定（incomplete）のまま残っていればそれを使い回す。
-  // 有効・解約済みなど、それ以外の状態なら新しく作り直す。
   let subscription = org.stripe_subscription_id
     ? await stripe.subscriptions.retrieve(org.stripe_subscription_id, { expand: ["latest_invoice.confirmation_secret"] })
     : null;
-  const isFresh = !subscription || subscription.status !== "incomplete";
-  if (isFresh) {
-    subscription = await createFreshSubscription();
+
+  // すでに支払い済みで有効なら、カード入力フォームを出す必要はない
+  // （Payment Elementのconfirmを"redirect: if_required"で行っても、
+  // Webhookでplan_statusが反映されるまでの一瞬だけこの画面が再読み込みされる
+  // ことがあるため、その場合は「既に完了しています」を返す）。
+  if (subscription && (subscription.status === "active" || subscription.status === "trialing")) {
+    return { status: "active" as const };
   }
-  if (isFresh && availableCreditId) await markReferralCreditConsumed(admin, availableCreditId);
+
+  // 存在しない、または解約済み・期限切れなら新しく作り直す。
+  // incomplete・past_due・unpaid などは既存のものをそのまま使い回す
+  // （新しく作ると二重にサブスクリプションができてしまうため）。
+  const needsFresh = !subscription || subscription.status === "canceled" || subscription.status === "incomplete_expired";
+  if (needsFresh) {
+    subscription = await createFreshSubscription();
+    if (availableCreditId) await markReferralCreditConsumed(admin, availableCreditId);
+  }
   if (!subscription) throw new Error("決済の準備に失敗しました");
 
   const invoice = subscription.latest_invoice;
@@ -101,7 +111,7 @@ export async function startSubscriptionSetup() {
     throw new Error("決済の準備に失敗しました");
   }
 
-  return clientSecret;
+  return { status: "needs_payment" as const, clientSecret };
 }
 
 // org_write ポリシーは owner のみ更新可（reception は不可）。RLS は該当行が

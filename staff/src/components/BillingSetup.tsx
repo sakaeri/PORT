@@ -21,13 +21,26 @@ const primaryBtn: React.CSSProperties = {
 
 export default function BillingSetup() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [alreadyActive, setAlreadyActive] = useState(false);
+  const [succeeded, setSucceeded] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     startSubscriptionSetup()
-      .then(setClientSecret)
+      .then((result) => {
+        if (result.status === "active") setAlreadyActive(true);
+        else setClientSecret(result.clientSecret);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "準備に失敗しました"));
   }, []);
+
+  if (succeeded || alreadyActive) {
+    return (
+      <div style={{ fontSize: 13, color: "var(--color-accent-300)" }}>
+        お支払い方法の登録が完了しました。反映まで数分かかる場合があります。
+      </div>
+    );
+  }
 
   if (!stripePromise) {
     return <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>決済機能は準備中です。しばらくしてから再度お試しください。</div>;
@@ -37,12 +50,12 @@ export default function BillingSetup() {
 
   return (
     <Elements stripe={stripePromise} options={{ clientSecret }}>
-      <PaymentForm />
+      <PaymentForm onSuccess={() => setSucceeded(true)} />
     </Elements>
   );
 }
 
-function PaymentForm() {
+function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -52,14 +65,24 @@ function PaymentForm() {
     if (!stripe || !elements || submitting) return;
     setSubmitting(true);
     setError("");
+    // redirect: "if_required" にしないと、3D Secureなどが不要な普通のカードでも
+    // 毎回 return_url に強制的に飛ばされてしまう。その場合、Webhookで
+    // plan_status が反映されるより先にこの画面が再読み込みされ、まだ
+    // トライアル中のまま扱われて、また空の入力フォームに戻って見えてしまう
+    // （実際には決済自体は成功している）。
     const { error: confirmError } = await stripe.confirmPayment({
       elements,
       confirmParams: { return_url: `${window.location.origin}/billing?done=1` },
+      redirect: "if_required",
     });
     if (confirmError) {
       setError(confirmError.message ?? "決済に失敗しました");
       setSubmitting(false);
+      return;
     }
+    // 3D Secureなど、どうしてもリダイレクトが必要な決済手段だった場合は
+    // ここに来る前にページ遷移している。ここに来た＝リダイレクト不要で完了。
+    onSuccess();
   }
 
   return (
