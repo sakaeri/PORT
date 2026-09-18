@@ -27,6 +27,7 @@ interface Props {
   refundPolicies: RefundPolicyRow[];
   initialVault: VaultRow[];
   companies: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];
+  referralSignupUrl: string;
 }
 
 const MENU_SELECT = "*, menu_questions(*)";
@@ -49,7 +50,7 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, menus: initialMenus, refundPolicies, initialVault, companies }: Props) {
+export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, menus: initialMenus, refundPolicies, initialVault, companies, referralSignupUrl }: Props) {
   const [messages, setMessages] = useState(initialMessages);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
@@ -346,6 +347,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
           isDark={isDark}
           onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}
+          referralSignupUrl={referralSignupUrl}
         />
       )}
     </div>

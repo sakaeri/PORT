@@ -58,6 +58,7 @@ export default function MyPageDialog({
   isDark,
   onToggleTheme,
   onClose,
+  referralSignupUrl,
 }: {
   userId: string;
   memberNo: string | null;
@@ -73,6 +74,7 @@ export default function MyPageDialog({
   isDark: boolean;
   onToggleTheme: () => void;
   onClose: () => void;
+  referralSignupUrl: string;
 }) {
   const [name, setName] = useState(customerName);
   const nameIsPlaceholder = name === NAME_PLACEHOLDER;
@@ -95,21 +97,15 @@ export default function MyPageDialog({
   const [vaultRows, setVaultRows] = useState(vault.map((v) => ({ ...v })));
 
   const [refOpen, setRefOpen] = useState(false);
-  const [refUrl, setRefUrl] = useState("");
-  const [refSending, setRefSending] = useState(false);
-  const [refError, setRefError] = useState("");
 
-  async function handleStartReferral() {
-    if (refSending || refUrl) return;
-    setRefSending(true);
-    setRefError("");
-    try {
-      setRefUrl(await startReferral());
-    } catch (e) {
-      setRefError(e instanceof Error ? e.message : "送信できませんでした");
-    } finally {
-      setRefSending(false);
-    }
+  // リンクは referralSignupUrl としてページ読み込み時に用意済みなので、
+  // クリックしたらそのまま /signup に飛ばす（非同期処理を挟まない）。
+  // 営業フォロー用の記録（referral_leads）は結果を待たず裏側で行い、
+  // 失敗してもナビゲーションは止めない。
+  function handleReferralClick() {
+    void startReferral().catch(() => {
+      /* 記録に失敗しても申し込み自体は止めない */
+    });
   }
 
   const [authView, setAuthView] = useState<"none" | "login" | "create">("none");
@@ -414,26 +410,18 @@ export default function MyPageDialog({
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: "var(--color-accent-200)" }}>
                   <Gift size={14} />
-                  <span>
-                    {refUrl ? "以下のリンクからお申し込みを進めてください。" : "紹介経由なので、90日間無料でお試しいただけます。"}
-                  </span>
+                  <span>この画面から始めると、90日間無料でお試しいただけます。</span>
                 </div>
-                {refError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{refError}</span>}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                  {refUrl ? (
-                    <a
-                      href={refUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ height: 36, padding: "0 14px", display: "inline-flex", alignItems: "center", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", textDecoration: "none" }}
-                    >
-                      申し込みへ進む
-                    </a>
-                  ) : (
-                    <button onClick={handleStartReferral} disabled={refSending} style={{ height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-                      {refSending ? "送信中…" : "90日間無料で始める"}
-                    </button>
-                  )}
+                  <a
+                    href={referralSignupUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={handleReferralClick}
+                    style={{ height: 36, padding: "0 14px", display: "inline-flex", alignItems: "center", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", textDecoration: "none" }}
+                  >
+                    90日間無料で始める
+                  </a>
                   <button onClick={() => setRefOpen((v) => !v)} style={{ height: 34, padding: "0 12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
                     {refOpen ? <CaretDown size={13} /> : <CaretRight size={13} />}
                     できること
@@ -452,7 +440,7 @@ export default function MyPageDialog({
                       </div>
                     ))}
                     <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6, marginTop: 2 }}>
-                      紹介経由でお申し込みいただくと、90日間は料金が一切かかりません。
+                      こちらからお申し込みいただくと、90日間は料金が一切かかりません。
                     </div>
                   </div>
                 )}
