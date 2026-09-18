@@ -88,7 +88,14 @@ export async function startSubscriptionSetup() {
 
   const invoice = subscription.latest_invoice;
   const clientSecret = invoice && typeof invoice === "object" ? invoice.confirmation_secret?.client_secret : null;
-  if (!clientSecret) throw new Error("決済の準備に失敗しました");
+  if (!clientSecret) {
+    console.error("startSubscriptionSetup: confirmation_secret missing", {
+      subscriptionId: subscription.id,
+      subscriptionStatus: subscription.status,
+      invoice: typeof invoice === "object" && invoice ? { id: invoice.id, status: invoice.status, amountDue: invoice.amount_due, total: invoice.total } : invoice,
+    });
+    throw new Error("決済の準備に失敗しました");
+  }
 
   return clientSecret;
 }
