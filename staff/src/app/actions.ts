@@ -61,6 +61,9 @@ export async function startSubscriptionSetup() {
   const availableCreditId = await pickAvailableReferralCredit(admin, ctx.orgId);
   const couponId = availableCreditId ? await getOrCreateReferralCoupon(stripe) : null;
 
+  // confirmation_secret は latest_invoice を展開しただけでは含まれず、
+  // "latest_invoice.confirmation_secret" まで明示的にexpandしないと
+  // 返ってこない（invoiceが確定済み・請求額ありでもnullのままだった実例あり）。
   const createFreshSubscription = async () => {
     const sub = await stripe.subscriptions.create({
       customer: customerId!,
@@ -68,7 +71,7 @@ export async function startSubscriptionSetup() {
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       ...(couponId ? { coupon: couponId } : {}),
-      expand: ["latest_invoice"],
+      expand: ["latest_invoice.confirmation_secret"],
     });
     await supabase.from("organizations").update({ stripe_subscription_id: sub.id }).eq("id", ctx.orgId);
     return sub;
@@ -77,7 +80,7 @@ export async function startSubscriptionSetup() {
   // 前回が未確定（incomplete）のまま残っていればそれを使い回す。
   // 有効・解約済みなど、それ以外の状態なら新しく作り直す。
   let subscription = org.stripe_subscription_id
-    ? await stripe.subscriptions.retrieve(org.stripe_subscription_id, { expand: ["latest_invoice"] })
+    ? await stripe.subscriptions.retrieve(org.stripe_subscription_id, { expand: ["latest_invoice.confirmation_secret"] })
     : null;
   const isFresh = !subscription || subscription.status !== "incomplete";
   if (isFresh) {
@@ -89,10 +92,11 @@ export async function startSubscriptionSetup() {
   const invoice = subscription.latest_invoice;
   const clientSecret = invoice && typeof invoice === "object" ? invoice.confirmation_secret?.client_secret : null;
   if (!clientSecret) {
+    // expand指定を変えても直らない場合の切り分け用に、invoiceの中身を全部出す。
     console.error("startSubscriptionSetup: confirmation_secret missing", {
       subscriptionId: subscription.id,
       subscriptionStatus: subscription.status,
-      invoice: typeof invoice === "object" && invoice ? { id: invoice.id, status: invoice.status, amountDue: invoice.amount_due, total: invoice.total } : invoice,
+      invoiceRaw: JSON.stringify(invoice),
     });
     throw new Error("決済の準備に失敗しました");
   }
