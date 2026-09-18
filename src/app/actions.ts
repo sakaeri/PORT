@@ -287,9 +287,11 @@ export async function cancelRequest(requestId: string) {
   }
 }
 
-// マイページの「自社でも」→「3ヶ月無料で始める」用。まだ自動返信メールの仕組みは
-// ないため、ここでは申し込みの記録だけ行う（PORT運営がSupabase側で確認して連絡する）。
-export async function startReferral() {
+// マイページの「自社でも」→「90日間無料で始める」用。営業フォロー用の記録を
+// 残しつつ、その場でセルフサインアップ（受付アプリの /signup）に進めるリンクを
+// 返す。紹介元はこの事業所のオーナーの profile id（受付アプリの紹介リンクと
+// 同じ仕組み）とし、90日トライアルとして扱われる。
+export async function startReferral(): Promise<string> {
   const ctx = await requireContext();
   const admin = createServiceRoleClient();
   const { error } = await admin.from("referral_leads").insert({
@@ -299,4 +301,8 @@ export async function startReferral() {
     customer_email: ctx.email,
   });
   if (error) throw error;
+
+  const { data: owner } = await admin.from("profiles").select("id").eq("org_id", ctx.orgId).eq("role", "owner").maybeSingle();
+  const staffAppUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
+  return owner ? `${staffAppUrl}/signup?ref=${owner.id}` : `${staffAppUrl}/signup`;
 }

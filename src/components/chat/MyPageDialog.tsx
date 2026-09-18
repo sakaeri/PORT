@@ -95,17 +95,16 @@ export default function MyPageDialog({
   const [vaultRows, setVaultRows] = useState(vault.map((v) => ({ ...v })));
 
   const [refOpen, setRefOpen] = useState(false);
-  const [refStarted, setRefStarted] = useState(false);
+  const [refUrl, setRefUrl] = useState("");
   const [refSending, setRefSending] = useState(false);
   const [refError, setRefError] = useState("");
 
   async function handleStartReferral() {
-    if (refSending || refStarted) return;
+    if (refSending || refUrl) return;
     setRefSending(true);
     setRefError("");
     try {
-      await startReferral();
-      setRefStarted(true);
+      setRefUrl(await startReferral());
     } catch (e) {
       setRefError(e instanceof Error ? e.message : "送信できませんでした");
     } finally {
@@ -411,21 +410,28 @@ export default function MyPageDialog({
               <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
                 <div style={{ fontFamily: "var(--font-heading)", fontSize: 14, lineHeight: 1.5 }}>この窓口のしくみを、自社でも</div>
                 <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.65 }}>
-                  この画面は PORT という受付のしくみです。同じやり方で、自社の依頼受付にもお使いいただけます。月額 ¥4,800 ＋ 制作者1人あたり ¥1,500〜。
+                  この画面は PORT という受付のしくみです。同じやり方で、自社の依頼受付にもお使いいただけます。月額 ¥4,800〜。
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: "var(--color-accent-200)" }}>
                   <Gift size={14} />
                   <span>
-                    {refStarted
-                      ? "お申し込みを受け付けました。担当より追ってご連絡いたします。"
-                      : "紹介経由なので、基本料が3ヶ月無料になります。"}
+                    {refUrl ? "以下のリンクからお申し込みを進めてください。" : "紹介経由なので、90日間無料でお試しいただけます。"}
                   </span>
                 </div>
                 {refError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{refError}</span>}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                  {!refStarted && (
+                  {refUrl ? (
+                    <a
+                      href={refUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ height: 36, padding: "0 14px", display: "inline-flex", alignItems: "center", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", textDecoration: "none" }}
+                    >
+                      申し込みへ進む
+                    </a>
+                  ) : (
                     <button onClick={handleStartReferral} disabled={refSending} style={{ height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-                      {refSending ? "送信中…" : "3ヶ月無料で始める"}
+                      {refSending ? "送信中…" : "90日間無料で始める"}
                     </button>
                   )}
                   <button onClick={() => setRefOpen((v) => !v)} style={{ height: 34, padding: "0 12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
@@ -446,7 +452,7 @@ export default function MyPageDialog({
                       </div>
                     ))}
                     <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6, marginTop: 2 }}>
-                      基本料 ¥4,800 が3ヶ月無料になります。制作者の席は1人目（ご本人）が基本料に含まれ、2人目から ¥1,500/月です。
+                      紹介経由でお申し込みいただくと、90日間は料金が一切かかりません。
                     </div>
                   </div>
                 )}
