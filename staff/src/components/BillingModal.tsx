@@ -1,13 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { X } from "@phosphor-icons/react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { startSubscriptionSetup } from "@/app/actions";
+import { headingWeight } from "@/lib/style";
 
 const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 const stripePromise = PUBLISHABLE_KEY ? loadStripe(PUBLISHABLE_KEY) : null;
 
+const scrim: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 80, background: "color-mix(in srgb, var(--color-bg) 55%, transparent)" };
+const dialogBox: React.CSSProperties = {
+  width: "min(420px, 100%)",
+  maxHeight: "calc(100vh - 32px)",
+  overflowY: "auto",
+  position: "relative",
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
+  padding: 20,
+  borderRadius: "var(--radius-lg)",
+  background: "var(--color-surface)",
+  boxShadow: "var(--shadow-lg)",
+};
 const primaryBtn: React.CSSProperties = {
   height: 40,
   padding: "0 18px",
@@ -19,7 +35,27 @@ const primaryBtn: React.CSSProperties = {
   borderRadius: "var(--radius-md)",
 };
 
-export default function BillingSetup() {
+export default function BillingModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={scrim} onClick={onClose}>
+      <div style={{ position: "fixed", inset: 0, display: "grid", placeItems: "center", padding: "var(--space-4)" }} onClick={onClose}>
+        <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={dialogBox}>
+          <button
+            onClick={onClose}
+            aria-label="閉じる"
+            style={{ position: "absolute", top: 14, right: 14, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
+          >
+            <X size={16} />
+          </button>
+          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>お支払い方法の登録</div>
+          <BillingSetup onDone={onClose} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BillingSetup({ onDone }: { onDone: () => void }) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [alreadyActive, setAlreadyActive] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
@@ -36,9 +72,12 @@ export default function BillingSetup() {
 
   if (succeeded || alreadyActive) {
     return (
-      <div style={{ fontSize: 13, color: "var(--color-accent-300)" }}>
-        お支払い方法の登録が完了しました。反映まで数分かかる場合があります。
-      </div>
+      <>
+        <div style={{ fontSize: 13, color: "var(--color-accent-300)" }}>お支払い方法の登録が完了しました。反映まで数分かかる場合があります。</div>
+        <button onClick={onDone} style={{ ...primaryBtn, alignSelf: "flex-start" }}>
+          閉じる
+        </button>
+      </>
     );
   }
 
@@ -66,13 +105,12 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
     setSubmitting(true);
     setError("");
     // redirect: "if_required" にしないと、3D Secureなどが不要な普通のカードでも
-    // 毎回 return_url に強制的に飛ばされてしまう。その場合、Webhookで
-    // plan_status が反映されるより先にこの画面が再読み込みされ、まだ
-    // トライアル中のまま扱われて、また空の入力フォームに戻って見えてしまう
-    // （実際には決済自体は成功している）。
+    // 毎回 return_url に強制的に飛ばされてしまう。ポップアップなので、遷移先は
+    // 開いていた元のページのURL（ここでは開いた瞬間のURL）にしておく
+    // — 万一リダイレクトが必要な決済手段だった場合だけそこへ戻る。
     const { error: confirmError } = await stripe.confirmPayment({
       elements,
-      confirmParams: { return_url: `${window.location.origin}/billing?done=1` },
+      confirmParams: { return_url: window.location.href },
       redirect: "if_required",
     });
     if (confirmError) {

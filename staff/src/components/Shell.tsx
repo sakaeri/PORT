@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, CreditCard, Sun, MoonStars, SignOut, List, X } from "@phosphor-icons/react";
+import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { headingWeight } from "@/lib/style";
 import OrgSwitcher from "@/components/OrgSwitcher";
+import BillingModal from "@/components/BillingModal";
 import type { StaffContext } from "@/lib/data";
 
 const NAV = [
@@ -16,7 +17,6 @@ const NAV = [
   { href: "/stats", label: "売上・実績", icon: ChartBar },
   { href: "/staff", label: "スタッフ", icon: UsersThree, hideWhenSolo: true },
   { href: "/menu", label: "メニュー管理", icon: GearSix },
-  { href: "/billing", label: "お支払い設定", icon: CreditCard, hideWhenHq: true },
   { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true },
 ];
 
@@ -102,7 +102,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     router.refresh();
   }
 
-  const navItems = NAV.filter((n) => !(n.hideWhenSolo && ctx.solo) && !(n.hqOnly && !ctx.isHq) && !(n.hideWhenHq && ctx.isHq));
+  const navItems = NAV.filter((n) => !(n.hideWhenSolo && ctx.solo) && !(n.hqOnly && !ctx.isHq));
 
   // Date.now() はレンダー中に直接呼べない（純粋関数のルール）ため、
   // マウント後にeffectで計算する。初回描画では null のままバナーを出さない。
@@ -117,20 +117,16 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   }, [ctx.trialEndsOn]);
   const trialEndingSoon = !ctx.isHq && ctx.planStatus === "trial" && daysUntilTrialEnd != null && daysUntilTrialEnd >= 0 && daysUntilTrialEnd <= 5;
 
+  const [showBillingModal, setShowBillingModal] = useState(false);
+  const bannerBtnStyle: React.CSSProperties = { display: "block", width: "100%", padding: "9px var(--space-4)", cursor: "pointer", fontSize: 12.5, textAlign: "center", border: "none" };
   const billingBanner = ctx.isLocked ? (
-    <Link
-      href="/billing"
-      style={{ display: "block", padding: "9px var(--space-4)", fontSize: 12.5, textAlign: "center", color: "var(--color-bg)", background: "var(--stb-seal-ink)", textDecoration: "none" }}
-    >
-      お支払い状況の確認が必要です。新しいお問い合わせ・返信ができません。「お支払い設定」からお手続きください →
-    </Link>
+    <button onClick={() => setShowBillingModal(true)} style={{ ...bannerBtnStyle, color: "var(--color-bg)", background: "var(--stb-seal-ink)" }}>
+      お支払い状況の確認が必要です。新しいお問い合わせ・返信ができません。お支払い方法を登録してください →
+    </button>
   ) : trialEndingSoon ? (
-    <Link
-      href="/billing"
-      style={{ display: "block", padding: "9px var(--space-4)", fontSize: 12.5, textAlign: "center", color: "var(--color-accent-100)", background: "var(--color-accent-800)", textDecoration: "none" }}
-    >
-      {daysUntilTrialEnd === 0 ? "本日" : `あと${daysUntilTrialEnd}日で`}トライアルが終了します。「お支払い設定」からお手続きください →
-    </Link>
+    <button onClick={() => setShowBillingModal(true)} style={{ ...bannerBtnStyle, color: "var(--color-accent-100)", background: "var(--color-accent-800)" }}>
+      {daysUntilTrialEnd === 0 ? "本日" : `あと${daysUntilTrialEnd}日で`}トライアルが終了します。お支払い方法を登録してください →
+    </button>
   ) : null;
 
   const sidebarBody = (
@@ -270,6 +266,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           {billingBanner}
           <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
         </main>
+        {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
       </div>
     );
   }
@@ -295,6 +292,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
         {billingBanner}
         <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
       </main>
+      {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
     </div>
   );
 }
