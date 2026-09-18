@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
-import { getStripe } from "@/lib/stripe";
+import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
 import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage } from "@/lib/supabase/types";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
@@ -54,12 +54,20 @@ export async function startSubscriptionSetup() {
     await supabase.from("organizations").update({ stripe_customer_id: customerId }).eq("id", ctx.orgId);
   }
 
+  const admin = createServiceRoleClient();
+  // 確定済みの紹介チケットが残っていれば、新規作成するサブスクリプションに
+  // 最初から1ヶ月無料クーポンを組み込む（作成後にupdateすると初回請求には
+  // 間に合わないため、作成時に渡す必要がある）。
+  const availableCreditId = await pickAvailableReferralCredit(admin, ctx.orgId);
+  const couponId = availableCreditId ? await getOrCreateReferralCoupon(stripe) : null;
+
   const createFreshSubscription = async () => {
     const sub = await stripe.subscriptions.create({
       customer: customerId!,
       items: [{ price_data: { currency: "jpy", product: productId, unit_amount: baseFee, recurring: { interval: "month" } } }],
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
+      ...(couponId ? { coupon: couponId } : {}),
       expand: ["latest_invoice"],
     });
     await supabase.from("organizations").update({ stripe_subscription_id: sub.id }).eq("id", ctx.orgId);
@@ -71,9 +79,12 @@ export async function startSubscriptionSetup() {
   let subscription = org.stripe_subscription_id
     ? await stripe.subscriptions.retrieve(org.stripe_subscription_id, { expand: ["latest_invoice"] })
     : null;
-  if (!subscription || subscription.status !== "incomplete") {
+  const isFresh = !subscription || subscription.status !== "incomplete";
+  if (isFresh) {
     subscription = await createFreshSubscription();
   }
+  if (isFresh && availableCreditId) await markReferralCreditConsumed(admin, availableCreditId);
+  if (!subscription) throw new Error("決済の準備に失敗しました");
 
   const invoice = subscription.latest_invoice;
   const clientSecret = invoice && typeof invoice === "object" ? invoice.confirmation_secret?.client_secret : null;

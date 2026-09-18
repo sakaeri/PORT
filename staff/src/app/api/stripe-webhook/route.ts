@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
-import { getStripe } from "@/lib/stripe";
+import { consumeReferralCreditOnExistingSubscription, getStripe } from "@/lib/stripe";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 // Stripeからのサブスクリプション状態変化の通知。stripe_subscription_id で
@@ -40,12 +40,28 @@ export async function POST(request: Request) {
       // 紹介経由で申し込んだ事業者が初めて課金有効になったタイミングで、
       // 紹介元のチケットを pending → confirmed にする（紹介者への還元の判定用）。
       if (newStatus === "active" && org.plan_status !== "active") {
-        const { error: creditError } = await admin
+        const { data: credit, error: creditError } = await admin
           .from("referral_credits")
           .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
           .eq("referred_org_id", org.id)
-          .eq("status", "pending");
+          .eq("status", "pending")
+          .select("referrer_org_id")
+          .maybeSingle();
         if (creditError) console.error("stripe-webhook: failed to confirm referral credit", creditError);
+
+        // 紹介元がすでに課金中（サブスクリプションを持っている）なら、
+        // このタイミングで1ヶ月無料クーポンをすぐ適用する。まだ課金開始前
+        // （トライアル中）なら、後で startSubscriptionSetup 側が適用する。
+        if (credit?.referrer_org_id) {
+          const { data: referrerOrg } = await admin
+            .from("organizations")
+            .select("stripe_subscription_id")
+            .eq("id", credit.referrer_org_id)
+            .maybeSingle();
+          if (referrerOrg?.stripe_subscription_id) {
+            await consumeReferralCreditOnExistingSubscription(admin, stripe, credit.referrer_org_id, referrerOrg.stripe_subscription_id);
+          }
+        }
       }
     }
   }
