@@ -63,7 +63,8 @@ export default function SignupForm({ refUserId }: { refUserId: string | null }) 
     window.turnstile.render(turnstileRef.current, { sitekey: TURNSTILE_SITE_KEY, callback: setTurnstileToken });
   }
 
-  async function submit() {
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
     if (submitting) return;
     setError("");
     setSubmitting(true);
@@ -100,8 +101,8 @@ export default function SignupForm({ refUserId }: { refUserId: string | null }) 
         </div>
       </div>
 
-      <div style={card}>
-        <OrgAccountFields form={form} set={set} />
+      <form onSubmit={submit} style={card}>
+        <OrgAccountFields form={form} set={set} selfServe />
 
         {TURNSTILE_SITE_KEY && (
           <>
@@ -112,10 +113,10 @@ export default function SignupForm({ refUserId }: { refUserId: string | null }) 
 
         {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
 
-        <button onClick={submit} disabled={submitting} style={{ ...primaryBtn, alignSelf: "flex-start" }}>
+        <button type="submit" disabled={submitting} style={{ ...primaryBtn, alignSelf: "flex-start" }}>
           {submitting ? "作成中…" : "無料で始める"}
         </button>
-      </div>
+      </form>
     </div>
   );
 }

@@ -402,9 +402,14 @@ async function createOrgCore(fields: OrgAccountFields, referredByUserId?: string
   }
   const userId = userRes.user.id;
 
+  // セルフサインアップでは連絡用メールアドレスの入力欄自体を出していないため、
+  // 空欄ならログインメールアドレスをそのまま事業者の連絡先としても使う
+  // （Stripeの領収書送付先にもなる）。
+  const orgFields = { ...fields, email: fields.email.trim() || fields.owner_email.trim() };
+
   let result: { orgId: string; slug: string };
   try {
-    result = await createOrgRow(fields, admin, referredByUserId);
+    result = await createOrgRow(orgFields, admin, referredByUserId);
   } catch (e) {
     await admin.auth.admin.deleteUser(userId);
     throw e;
