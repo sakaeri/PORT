@@ -397,6 +397,7 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
       tel: fields.tel.trim() || null,
       email: fields.email.trim() || null,
       slug,
+      solo: true,
       plan_status: "trial",
       trial_ends_on: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       referred_by_user_id: referredByUserId ?? null,
