@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash, Plus, CaretDown, CaretRight } from "@phosphor-icons/react";
+import { Trash, Plus, CaretDown, CaretRight, Gift } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -215,7 +215,7 @@ export default function MenuSettings({
 
       {tab === "company" && (
         <>
-          <CompanyInfoCard initial={initialCompany} slug={slug} referrerUserId={referrerUserId} />
+          <CompanyInfoCard initial={initialCompany} slug={slug} />
           <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} />
           <CardPaymentLinksCard initialLinks={initialCardPaymentLinks} />
           {/* StaffModeCard は複数スタッフ運用が必要になるまで非表示にする */}
@@ -224,7 +224,12 @@ export default function MenuSettings({
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
       {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} />}
-      {tab === "login" && <LoginInfoCard initialEmail={initialLoginEmail} />}
+      {tab === "login" && (
+        <>
+          <LoginInfoCard initialEmail={initialLoginEmail} />
+          <ReferralCard referrerUserId={referrerUserId} />
+        </>
+      )}
     </div>
   );
 }
@@ -347,35 +352,12 @@ function InfoRow({ label: l, value, labelWidth = 90 }: { label: string; value: s
   );
 }
 
-function CompanyInfoCard({ initial, slug, referrerUserId }: { initial: Company; slug: string | null; referrerUserId: string }) {
+function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | null }) {
   const [saved, setSaved] = useState(initial);
   const [form, setForm] = useState(initial);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
-  const referralLink = `https://port-business.s-stylegolf.com/signup?ref=${referrerUserId}`;
-
-  async function shareReferralLink() {
-    // 端末が共有シートに対応していればそちらを使い、対応していなければ
-    // URLをコピーするだけにする（PCのブラウザなど navigator.share が
-    // ないケース）。
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "PORT", text: "PORTを使ってみませんか？", url: referralLink });
-      } catch {
-        /* 共有をキャンセルした場合など。何もしない */
-      }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(referralLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
-  }
 
   function set<K extends keyof Company>(key: K, value: Company[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -414,15 +396,6 @@ function CompanyInfoCard({ initial, slug, referrerUserId }: { initial: Company; 
           <InfoTooltip text="このURLは共通のリンクですが、タップした方ごとに専用のお問い合わせ窓口になります。ホームページなどに載せてご利用ください。" />
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-        <button
-          onClick={shareReferralLink}
-          style={{ height: 30, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)" }}
-        >
-          {copied ? "リンクをコピーしました" : "知り合いにもPORTを勧めて1ヶ月無料をもらう"}
-        </button>
-        <InfoTooltip text="このリンクから知り合いの事業者が申し込むと、通常30日間のトライアルが90日間になります。その事業者が実際にお支払いを始めたタイミングで、あなたの利用料が1ヶ月分無料になります。" />
-      </div>
       {!editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <InfoRow label="正式名称" value={saved.name} />
@@ -876,6 +849,53 @@ function QuestionsEditor({ menuId, questions, onChange }: { menuId: string; ques
       ))}
       <button onClick={add} style={{ alignSelf: "flex-start", ...smallBtn, height: 30 }}>
         ＋質問を追加
+      </button>
+    </div>
+  );
+}
+
+// 依頼主のマイページにある「自社でも」の紹介ブロックと見た目・構成を
+// 揃えた、受付側オーナー向けの紹介カード。
+function ReferralCard({ referrerUserId }: { referrerUserId: string }) {
+  const [copied, setCopied] = useState(false);
+  const referralLink = `https://port-business.s-stylegolf.com/signup?ref=${referrerUserId}`;
+
+  async function shareReferralLink() {
+    // 端末が共有シートに対応していればそちらを使い、対応していなければ
+    // URLをコピーするだけにする（PCのブラウザなど navigator.share が
+    // ないケース）。
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "PORT", text: "PORTを使ってみませんか？", url: referralLink });
+      } catch {
+        /* 共有をキャンセルした場合など。何もしない */
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div style={card}>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>知り合いの事業者にもPORTを勧める</div>
+      <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.65 }}>
+        このリンクから知り合いの事業者が申し込むと、通常30日間のトライアルが90日間になります。
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--color-accent-300)" }}>
+        <Gift size={14} />
+        <span>その事業者が実際にお支払いを始めると、あなたに1ヶ月無料チケットが届きます。</span>
+      </div>
+      <button
+        onClick={shareReferralLink}
+        style={{ height: 36, padding: "0 14px", alignSelf: "flex-start", cursor: "pointer", fontSize: 12.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+      >
+        {copied ? "リンクをコピーしました" : "知り合いに紹介する"}
       </button>
     </div>
   );
