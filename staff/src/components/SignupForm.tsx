@@ -1,10 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { headingWeight } from "@/lib/style";
 import { signUpSelfServe } from "@/app/actions";
+import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/errors";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
 declare global {
@@ -39,12 +41,12 @@ const primaryBtn: React.CSSProperties = {
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 export default function SignupForm({ refUserId }: { refUserId: string | null }) {
+  const router = useRouter();
   const [form, setForm] = useState<OrgAccountFormState>(EMPTY_ORG_FORM);
   const [slugTouched, setSlugTouched] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
   const turnstileRef = useRef<HTMLDivElement>(null);
   const renderedRef = useRef(false);
 
@@ -70,26 +72,21 @@ export default function SignupForm({ refUserId }: { refUserId: string | null }) 
     setSubmitting(true);
     try {
       await signUpSelfServe(form, refUserId, turnstileToken);
-      setDone(true);
+      // 作成した直後にそのままログインさせる。ここで別アカウントとして
+      // ログイン中だった場合も、signInWithPassword がセッションを新しい
+      // オーナーのものに置き換えてくれる。
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: form.owner_email.trim(),
+        password: form.owner_password,
+      });
+      if (signInError) throw signInError;
+      router.push("/");
+      router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "登録できませんでした");
-    } finally {
+      setError(errorMessage(e, "登録できませんでした"));
       setSubmitting(false);
     }
-  }
-
-  if (done) {
-    return (
-      <div style={card}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>アカウントを作成しました</div>
-        <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-          入力いただいたメールアドレスとパスワードでログインできます。{refUserId && "紹介経由のため、トライアル期間は90日間になります。"}
-        </div>
-        <Link href="/login" style={{ ...primaryBtn, display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none", alignSelf: "flex-start" }}>
-          ログインへ進む
-        </Link>
-      </div>
-    );
   }
 
   return (

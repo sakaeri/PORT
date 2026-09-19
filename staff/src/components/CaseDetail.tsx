@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Archive, ArrowCounterClockwise, Star } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { errorMessage } from "@/lib/errors";
 import { PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
 import {
@@ -107,7 +108,7 @@ export default function CaseDetail({
       await action();
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "操作に失敗しました");
+      setError(errorMessage(e, "操作に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -345,7 +346,7 @@ function CompletionReportForm({ requestId }: { requestId: string }) {
       await submitCaseReport(requestId, summary, noteToCustomer, deliverables, delivery);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "送信できませんでした");
+      setError(errorMessage(e, "送信できませんでした"));
     } finally {
       setSaving(false);
     }
@@ -412,7 +413,7 @@ function FinalPaymentLinkForm({ requestId, currentLink }: { requestId: string; c
       setUrl("");
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "送信できませんでした");
+      setError(errorMessage(e, "送信できませんでした"));
     } finally {
       setSaving(false);
     }

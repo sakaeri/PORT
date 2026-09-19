@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { errorMessage } from "@/lib/errors";
 import { UserCircle, CircleNotch } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { updateAvatar, removeAvatar } from "@/app/actions";
@@ -84,7 +85,7 @@ export default function AvatarPicker({
       await updateAvatar(data.publicUrl);
       onChange(data.publicUrl);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "アップロードできませんでした");
+      setError(errorMessage(e, "アップロードできませんでした"));
     } finally {
       setUploading(false);
     }
@@ -98,7 +99,7 @@ export default function AvatarPicker({
       await removeAvatar();
       onChange(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "削除できませんでした");
+      setError(errorMessage(e, "削除できませんでした"));
     } finally {
       setUploading(false);
     }

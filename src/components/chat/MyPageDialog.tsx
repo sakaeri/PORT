@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { errorMessage } from "@/lib/errors";
 import { X, CheckCircle, Gift, CaretDown, CaretRight, ChatsCircle, Receipt, UsersThree, Sun, MoonStars } from "@phosphor-icons/react";
 import type { VaultRow } from "@/lib/chat-types";
 import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, startReferral } from "@/app/actions";
@@ -133,7 +134,7 @@ export default function MyPageDialog({
       setNameOpen(false);
       setNameError("");
     } catch (e) {
-      setNameError(e instanceof Error ? e.message : "送信できませんでした");
+      setNameError(errorMessage(e, "送信できませんでした"));
     } finally {
       setNamePending(false);
     }
@@ -151,7 +152,7 @@ export default function MyPageDialog({
       setEmError("");
       setEmDone(true);
     } catch (e) {
-      setEmError(e instanceof Error ? e.message : "保存できませんでした");
+      setEmError(errorMessage(e, "保存できませんでした"));
     } finally {
       setEmSaving(false);
     }

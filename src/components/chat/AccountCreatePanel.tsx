@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { errorMessage } from "@/lib/errors";
 import { setInitialProfile } from "@/app/actions";
 
 // 今の匿名セッション（今のトーク）はそのまま、名前とメールを登録して本アカウント化する。
@@ -24,7 +25,7 @@ export default function AccountCreatePanel({ onRequestClose }: { onRequestClose:
       await setInitialProfile(name, email, "");
       setSent(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "作成できませんでした");
+      setError(errorMessage(e, "作成できませんでした"));
     } finally {
       setSending(false);
     }

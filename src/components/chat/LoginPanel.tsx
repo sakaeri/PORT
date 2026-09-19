@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { errorMessage } from "@/lib/errors";
 import { requestMagicLink } from "@/app/actions";
 
 // 既存アカウントへのログイン導線。今のトークに何かやり取りがある状態でログイン
@@ -31,7 +32,7 @@ export default function LoginPanel({
       await requestMagicLink(email);
       setSent(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "送信できませんでした");
+      setError(errorMessage(e, "送信できませんでした"));
     } finally {
       setSending(false);
     }

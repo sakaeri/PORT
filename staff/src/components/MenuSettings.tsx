@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash, Plus, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
 import {
   updateCompanyInfo,
@@ -384,7 +385,7 @@ function CompanyInfoCard({ initial, slug, referrerUserId }: { initial: Company; 
       setSaved(form);
       setEditing(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "保存できませんでした");
+      setError(errorMessage(e, "保存できませんでした"));
     } finally {
       setSaving(false);
     }
@@ -479,7 +480,7 @@ function PaymentSettingsCard({
       setSaved({ cardEnabled, bankInfo });
       setEditing(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "保存できませんでした");
+      setError(errorMessage(e, "保存できませんでした"));
     } finally {
       setSaving(false);
     }
@@ -557,7 +558,7 @@ function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[
       setLinks((rows) => rows.map((r) => (r.id === id ? { ...r, title: titleDraft.trim() } : r)));
       setEditingId(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "変更できませんでした");
+      setError(errorMessage(e, "変更できませんでした"));
     } finally {
       setBusyId(null);
     }
@@ -571,7 +572,7 @@ function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[
       await deleteCardPaymentLink(id);
       setLinks((rows) => rows.filter((r) => r.id !== id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "削除できませんでした");
+      setError(errorMessage(e, "削除できませんでした"));
     } finally {
       setBusyId(null);
     }
@@ -670,7 +671,7 @@ function StaffModeCard({ initialSolo }: { initialSolo: boolean }) {
       setEnabled(next);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "切り替えできませんでした");
+      setError(errorMessage(e, "切り替えできませんでした"));
     } finally {
       setSaving(false);
     }
@@ -891,7 +892,7 @@ function LoginInfoCard({ initialEmail }: { initialEmail: string }) {
       setEditingEmail(false);
       setDone("確認メールを新しいアドレスに送信しました。リンクを開くと切り替わります。");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "変更できませんでした");
+      setError(errorMessage(e, "変更できませんでした"));
     } finally {
       setSaving(false);
     }
@@ -911,7 +912,7 @@ function LoginInfoCard({ initialEmail }: { initialEmail: string }) {
       setConfirmPw("");
       setDone("パスワードを変更しました。");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "変更できませんでした");
+      setError(errorMessage(e, "変更できませんでした"));
     } finally {
       setSaving(false);
     }

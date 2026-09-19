@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { createClient } from "@/lib/supabase/client";
 import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage } from "@/app/actions";
@@ -757,7 +758,7 @@ function ConvertSection({ customerId, customerName }: { customerId: string; cust
       const result = await convertCustomerToOrg(customerId, form);
       setCreated({ slug: result.slug, email: form.owner_email, password: form.owner_password });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "登録できませんでした");
+      setError(errorMessage(e, "登録できませんでした"));
     } finally {
       setSaving(false);
     }
@@ -1001,7 +1002,7 @@ function QuoteDialog({
       });
       onCreated(requestId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "作成できませんでした");
+      setError(errorMessage(e, "作成できませんでした"));
     } finally {
       setSaving(false);
     }

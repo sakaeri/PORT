@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { errorMessage } from "@/lib/errors";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
 import type { AttachmentRow, MessageWithExtras, RequestBundle, RequestRow } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
@@ -469,7 +470,7 @@ export function IntakeCard({ msg }: { msg: MessageWithExtras }) {
       await submitInfoRequestAnswer(p.formLabel ?? "", filled);
       setSubmitted(filled);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "送信できませんでした");
+      setError(errorMessage(e, "送信できませんでした"));
     } finally {
       setSaving(false);
     }

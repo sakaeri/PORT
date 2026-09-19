@@ -6,6 +6,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { startSubscriptionSetup } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
+import { errorMessage } from "@/lib/errors";
 
 const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 const stripePromise = PUBLISHABLE_KEY ? loadStripe(PUBLISHABLE_KEY) : null;
@@ -67,7 +68,7 @@ function BillingSetup({ onDone }: { onDone: () => void }) {
         if (result.status === "active") setAlreadyActive(true);
         else setClientSecret(result.clientSecret);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "準備に失敗しました"));
+      .catch((e) => setError(errorMessage(e, "準備に失敗しました")));
   }, []);
 
   if (succeeded || alreadyActive) {

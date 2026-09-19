@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, ArrowSquareOut, Trash } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { errorMessage } from "@/lib/errors";
 import { createOrgAccount, deleteOrgForHq } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
@@ -63,7 +64,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
       await deleteOrgForHq(o.id);
       setOrgs((rows) => rows.filter((r) => r.id !== o.id));
     } catch (e) {
-      alert(e instanceof Error ? e.message : "削除できませんでした");
+      alert(errorMessage(e, "削除できませんでした"));
     } finally {
       setDeletingId(null);
     }
@@ -90,7 +91,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
       setSlugTouched(false);
       setShowForm(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "作成できませんでした");
+      setError(errorMessage(e, "作成できませんでした"));
     } finally {
       setSaving(false);
     }

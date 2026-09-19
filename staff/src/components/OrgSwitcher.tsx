@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash, ArrowSquareOut, CaretDown } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { errorMessage } from "@/lib/errors";
 import { switchStaffOrg, createOrgForCurrentUser, removeMyOrgLink } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import type { StaffOrgOption } from "@/lib/data";
@@ -179,7 +180,7 @@ function ManageOrgsDialog({ orgs, onClose, onRemoved }: { orgs: StaffOrgOption[]
       setRows((r) => r.filter((x) => x.orgId !== o.orgId));
       onRemoved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "削除できませんでした");
+      setError(errorMessage(e, "削除できませんでした"));
     } finally {
       setRemovingId(null);
     }
@@ -270,7 +271,7 @@ function AddOrgDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
       const result = await createOrgForCurrentUser(form);
       setCreated(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "作成できませんでした");
+      setError(errorMessage(e, "作成できませんでした"));
     } finally {
       setSaving(false);
     }
