@@ -356,7 +356,18 @@ function CompanyInfoCard({ initial, slug, referrerUserId }: { initial: Company; 
   const [copied, setCopied] = useState(false);
   const referralLink = `https://port-business.s-stylegolf.com/signup?ref=${referrerUserId}`;
 
-  async function copyReferralLink() {
+  async function shareReferralLink() {
+    // 端末が共有シートに対応していればそちらを使い、対応していなければ
+    // URLをコピーするだけにする（PCのブラウザなど navigator.share が
+    // ないケース）。
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "PORT", text: "PORTを使ってみませんか？", url: referralLink });
+      } catch {
+        /* 共有をキャンセルした場合など。何もしない */
+      }
+      return;
+    }
     try {
       await navigator.clipboard.writeText(referralLink);
       setCopied(true);
@@ -403,13 +414,14 @@ function CompanyInfoCard({ initial, slug, referrerUserId }: { initial: Company; 
           <InfoTooltip text="このURLは共通のリンクですが、タップした方ごとに専用のお問い合わせ窓口になります。ホームページなどに載せてご利用ください。" />
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)", flexWrap: "wrap" }}>
-        <span>紹介リンク：</span>
-        <span style={{ color: "var(--color-accent-300)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{referralLink}</span>
-        <button onClick={copyReferralLink} style={{ flex: "none", height: 24, padding: "0 8px", cursor: "pointer", fontSize: 11, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)" }}>
-          {copied ? "コピーしました" : "コピー"}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <button
+          onClick={shareReferralLink}
+          style={{ height: 30, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)" }}
+        >
+          {copied ? "リンクをコピーしました" : "知り合いにもPORTを勧めて1ヶ月無料をもらう"}
         </button>
-        <InfoTooltip text="このリンクから他の事業者がPORTに申し込むと、通常30日間のトライアルが90日間になります。" />
+        <InfoTooltip text="このリンクから他の事業者がPORTに申し込むと、トライアル期間が30日間から90日間になります。申し込みが完了すると、あなたの次回のお支払いが1ヶ月分無料になります。" />
       </div>
       {!editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
