@@ -32,6 +32,9 @@ export default async function MenuSettingsPage() {
     <MenuSettings
       orgId={ctx.orgId}
       referrerUserId={ctx.userId}
+      isHq={ctx.isHq}
+      planStatus={ctx.planStatus}
+      trialEndsOn={ctx.trialEndsOn}
       initialCompany={{
         name: org?.name ?? "",
         display_name: org?.display_name ?? "",
