@@ -1,5 +1,6 @@
 import { getStaffContext } from "@/lib/data";
 import Shell from "@/components/Shell";
+import BackToLoginButton from "@/components/BackToLoginButton";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getStaffContext();
@@ -11,10 +12,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // belongs to the separate, not-yet-built production-staff app).
     return (
       <div style={{ height: "100vh", display: "grid", placeItems: "center", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)", padding: 24, textAlign: "center" }}>
-        <div style={{ maxWidth: 360, fontSize: 13.5, lineHeight: 1.7 }}>
-          このアカウントには受付画面の権限がありません。
-          <br />
-          心当たりがない場合は運営にご連絡ください。
+        <div style={{ maxWidth: 360, display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ fontSize: 13.5, lineHeight: 1.7 }}>
+            このアカウントには受付画面の権限がありません。
+            <br />
+            心当たりがない場合は運営にご連絡ください。
+          </div>
+          <BackToLoginButton />
         </div>
       </div>
     );
