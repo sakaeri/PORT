@@ -421,7 +421,7 @@ function CompanyInfoCard({ initial, slug, referrerUserId }: { initial: Company; 
         >
           {copied ? "リンクをコピーしました" : "知り合いにもPORTを勧めて1ヶ月無料をもらう"}
         </button>
-        <InfoTooltip text="このリンクから他の事業者がPORTに申し込むと、トライアル期間が30日間から90日間になります。申し込みが完了すると、あなたの次回のお支払いが1ヶ月分無料になります。" />
+        <InfoTooltip text="このリンクから知り合いの事業者が申し込むと、通常30日間のトライアルが90日間になります。その事業者が実際にお支払いを始めたタイミングで、あなたの利用料が1ヶ月分無料になります。" />
       </div>
       {!editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
