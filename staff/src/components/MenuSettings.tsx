@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Trash, Plus, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { useIsMobile } from "@/lib/useIsMobile";
-import BillingModal from "@/components/BillingModal";
 import {
   updateCompanyInfo,
   updateStaffMode,
@@ -124,9 +123,6 @@ const smallBtn: React.CSSProperties = {
 export default function MenuSettings({
   orgId,
   referrerUserId,
-  isHq,
-  planStatus,
-  trialEndsOn,
   initialCompany,
   initialMenus,
   initialLoginEmail,
@@ -139,9 +135,6 @@ export default function MenuSettings({
 }: {
   orgId: string;
   referrerUserId: string;
-  isHq: boolean;
-  planStatus: "trial" | "active" | "past_due" | "paused" | "cancelled";
-  trialEndsOn: string | null;
   initialCompany: Company;
   initialMenus: Menu[];
   initialLoginEmail: string;
@@ -222,7 +215,6 @@ export default function MenuSettings({
       {tab === "company" && (
         <>
           <CompanyInfoCard initial={initialCompany} slug={slug} referrerUserId={referrerUserId} />
-          {!isHq && <BillingStatusCard planStatus={planStatus} trialEndsOn={trialEndsOn} />}
           <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} />
           <CardPaymentLinksCard initialLinks={initialCardPaymentLinks} />
           {/* StaffModeCard は複数スタッフ運用が必要になるまで非表示にする */}
@@ -448,54 +440,6 @@ function CompanyInfoCard({ initial, slug, referrerUserId }: { initial: Company; 
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-const PLAN_STATUS_LABEL: Record<"trial" | "active" | "past_due" | "paused" | "cancelled", string> = {
-  trial: "トライアル中",
-  active: "登録済み（有効）",
-  past_due: "お支払いが必要です",
-  paused: "一時停止中",
-  cancelled: "解約済み",
-};
-
-function BillingStatusCard({
-  planStatus,
-  trialEndsOn,
-}: {
-  planStatus: "trial" | "active" | "past_due" | "paused" | "cancelled";
-  trialEndsOn: string | null;
-}) {
-  const [showModal, setShowModal] = useState(false);
-  // Date.now() 相当の計算を描画中に直接行うと react-hooks/purity に
-  // 引っかかるため、Shell.tsx と同じくマウント後に useEffect で計算する。
-  const [daysLeft, setDaysLeft] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (planStatus !== "trial" || !trialEndsOn) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a prop-derived, clock-dependent value that can't be computed during render
-      setDaysLeft(null);
-      return;
-    }
-    const diffMs = new Date(trialEndsOn).getTime() - Date.now();
-    setDaysLeft(Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24))));
-  }, [planStatus, trialEndsOn]);
-
-  const statusText =
-    planStatus === "trial" && daysLeft != null ? `${PLAN_STATUS_LABEL.trial}（残り${daysLeft}日）` : PLAN_STATUS_LABEL[planStatus];
-
-  return (
-    <div style={card}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>お支払い状況</div>
-        <InfoTooltip text="PORTのご利用料金のお支払い方法を登録・確認できます。" />
-      </div>
-      <InfoRow label="状況" value={statusText} />
-      <button onClick={() => setShowModal(true)} style={{ ...smallBtn, height: 36, alignSelf: "flex-start" }}>
-        {planStatus === "active" ? "お支払い方法を変更する" : "お支払い方法を登録する"}
-      </button>
-      {showModal && <BillingModal onClose={() => setShowModal(false)} />}
     </div>
   );
 }
