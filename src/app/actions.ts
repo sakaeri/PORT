@@ -12,6 +12,31 @@ async function requireContext() {
   return ctx;
 }
 
+// proxy.ts はもう匿名ログインを自動では行わない（VerifyGate参照）。初回訪問時、
+// 見えない認証（Cloudflare Turnstile）を通ってからこれを呼び、そこで初めて
+// 匿名セッションを開始する。TURNSTILE_SECRET_KEY が未設定の間は検証をスキップ
+// する（本番公開前に必ず設定すること。未設定のまま公開すると誰でも無制限に
+// 匿名アカウントを作成できてしまう）。
+export async function completeAnonymousEntry(turnstileToken: string) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) {
+    console.warn("completeAnonymousEntry: TURNSTILE_SECRET_KEY is not set — skipping CAPTCHA verification");
+  } else {
+    if (!turnstileToken) throw new Error("認証に失敗しました。ページを再読み込みしてもう一度お試しください。");
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ secret, response: turnstileToken }),
+    });
+    const data = (await res.json()) as { success: boolean };
+    if (!data.success) throw new Error("認証に失敗しました。ページを再読み込みしてもう一度お試しください。");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInAnonymously();
+  if (error) throw error;
+}
+
 // 新規の問い合わせ・返信など、事業所にとって新しいやり取りを生む操作専用。
 // トライアル終了・支払い滞納などでロック中の窓口では使えない
 // （過去のやり取りの閲覧や、キャンセル・評価などの既存のやり取りの後始末は

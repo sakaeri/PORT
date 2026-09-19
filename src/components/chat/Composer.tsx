@@ -86,7 +86,12 @@ export default function Composer({ threadId, orgId, onSend, onOpenMenuSheet }: P
     const supabase = createClient(orgId);
     const path = `${threadId}/${crypto.randomUUID()}-${file.name}`;
     const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
-    if (error) return error.message;
+    if (error) {
+      // 合計容量の上限（Storage側のRLSポリシー、20260919000001_attachment_total_cap.sql）
+      // に達すると、生のRLSエラーメッセージが返ってくるので分かりやすい文言に差し替える。
+      if (/row-level security/i.test(error.message)) return "送信できる容量の上限に達しました。受付にご連絡ください";
+      return error.message;
+    }
     setAttachments((a) => [...a, { path, name: file.name, mime: file.type, bytes: file.size }]);
     return null;
   }

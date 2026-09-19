@@ -6,6 +6,17 @@ import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MessageWit
 
 export type { CustomerContext, MessageWithExtras, RequestBundle };
 
+// page.tsx calls this before getCustomerContext() to tell apart "not signed
+// in yet" (expected on a brand-new visit now that proxy.ts no longer signs
+// visitors in automatically — see VerifyGate) from a genuine failure further
+// down (env vars missing, DB trigger not run), which still needs its own
+// error message rather than silently reshowing the verify gate forever.
+export async function hasAuthSession(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  return !!data.user;
+}
+
 // Assumes proxy.ts has already ensured an authenticated (possibly anonymous)
 // session and resolved x-vid-org from the domain. The DB trigger provisions
 // the profile row; the customers/threads row for THIS org is provisioned here

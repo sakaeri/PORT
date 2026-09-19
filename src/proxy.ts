@@ -61,15 +61,18 @@ export async function proxy(request: NextRequest) {
   }
   if (orgId) requestHeaders.set("x-vid-org", orgId);
 
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) {
-    // First visit: start the customer's session with no signup screen. The
-    // handle_new_customer trigger (see supabase/migrations) provisions their
-    // profile row as soon as this auth.users row exists; the customers/threads
-    // row for whichever org they're visiting is provisioned on demand by
-    // getCustomerContext() (a shared login may be a customer of several orgs).
-    await supabase.auth.signInAnonymously();
-  }
+  // Calling getUser() here (result unused) is what actually refreshes an
+  // existing session's cookie via the setAll callback above — this is why
+  // this call stays even though nothing here still auto-signs a visitor in.
+  // First visit: no automatic anonymous sign-in anymore. page.tsx renders
+  // VerifyGate instead, which runs an invisible Cloudflare Turnstile check
+  // and only then calls completeAnonymousEntry() (a Server Action — this
+  // middleware can't run browser JS to solve the challenge). The
+  // handle_new_customer trigger provisions the profile row as soon as that
+  // auth.users row exists; the customers/threads row for whichever org
+  // they're visiting is provisioned on demand by getCustomerContext() (a
+  // shared login may be a customer of several orgs).
+  await supabase.auth.getUser();
 
   const response = targetUrl
     ? NextResponse.rewrite(targetUrl, { request: { headers: requestHeaders } })

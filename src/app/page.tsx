@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { getCustomerContext, getMenus, getMyCompanies, getReferralSignupUrl, getRefundPolicies, getThreadMessages, getVaultItems } from "@/lib/data";
+import { getCustomerContext, getMenus, getMyCompanies, getReferralSignupUrl, getRefundPolicies, getThreadMessages, getVaultItems, hasAuthSession } from "@/lib/data";
 import ChatScreen from "@/components/chat/ChatScreen";
+import VerifyGate from "@/components/chat/VerifyGate";
 
 export async function generateMetadata(): Promise<Metadata> {
   const ctx = await getCustomerContext();
@@ -8,12 +9,19 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
+  // 初回訪問はまだ匿名セッションが存在しない（proxy.tsはもう自動でサイン
+  // インしない）。これは想定内の状態なので、VerifyGateで見えない認証を
+  // 済ませてから完了させる。以下の「読み込みに失敗しました」は、認証済み
+  // なのにctxが取れない、本当の異常時だけに出す。
+  if (!(await hasAuthSession())) {
+    return <VerifyGate />;
+  }
+
   const ctx = await getCustomerContext();
 
   if (!ctx) {
-    // proxy.ts should have signed the visitor in anonymously before this
-    // renders; getting here means that failed (e.g. Supabase env vars are
-    // missing) or the DB bootstrap trigger hasn't run yet.
+    // 認証は済んでいるのにここに来た＝env設定漏れやDB側のトリガー未適用など
+    // の異常。
     return (
       <main
         style={{
