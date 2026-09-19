@@ -377,9 +377,12 @@ function validateSlug(rawSlug: string) {
 // （通常は30日）。
 async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createServiceRoleClient>, referredByUserId?: string | null) {
   const slug = validateSlug(fields.slug);
-  if (!fields.name.trim() || !fields.display_name.trim()) {
-    throw new Error("正式名称・表示名は必須です");
+  if (!fields.display_name.trim()) {
+    throw new Error("表示名は必須です");
   }
+  // 正式名称は「窓口を追加」系の簡易フォームでは入力欄自体を出していないため、
+  // 空欄なら表示名をそのまま使う。あとから会社情報タブで正式なものに直せる。
+  const name = fields.name.trim() || fields.display_name.trim();
 
   const { data: existing } = await admin.from("organizations").select("id").eq("slug", slug).maybeSingle();
   if (existing) throw new Error("このURLの合言葉はすでに使われています");
@@ -388,7 +391,7 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
   const { data: org, error: orgErr } = await admin
     .from("organizations")
     .insert({
-      name: fields.name.trim(),
+      name,
       display_name: fields.display_name.trim(),
       rep_name: fields.rep_name.trim() || null,
       tel: fields.tel.trim() || null,
@@ -434,13 +437,12 @@ async function createOrgCore(fields: OrgAccountFields, referredByUserId?: string
   }
   const userId = userRes.user.id;
 
-  // セルフサインアップでは正式名称・連絡用メールアドレスの入力欄自体を
-  // 出していないため、空欄なら表示名／ログインメールアドレスをそのまま
-  // 代わりに使う（連絡用メールはStripeの領収書送付先にもなる）。
-  // どちらも後から会社情報タブで正式なものに直せる。
+  // セルフサインアップでは連絡用メールアドレスの入力欄自体を出していない
+  // ため、空欄ならログインメールアドレスをそのまま代わりに使う（Stripeの
+  // 領収書送付先にもなる）。あとから会社情報タブで正式なものに直せる。
+  // 正式名称の表示名からのフォールバックは createOrgRow 側で行う。
   const orgFields = {
     ...fields,
-    name: fields.name.trim() || fields.display_name.trim(),
     email: fields.email.trim() || fields.owner_email.trim(),
   };
 
@@ -584,6 +586,15 @@ export async function switchStaffOrg(orgId: string) {
 async function clearStaffOrgCookieIfCurrent(orgId: string) {
   const jar = await cookies();
   if (jar.get("staff_org_id")?.value === orgId) jar.delete("staff_org_id");
+}
+
+// ログアウト時に呼ぶ。staff_org_id はhttpOnlyなのでクライアント側から消せず、
+// signOut() だけでは残ってしまう。残ったまま別アカウントで再ログインすると、
+// auth_org() がそのCookieの事業者IDを優先してしまい（新しいアカウントには
+// その事業者への権限がないため）「受付画面の権限がありません」になる。
+export async function clearStaffOrgCookie() {
+  const jar = await cookies();
+  jar.delete("staff_org_id");
 }
 
 // 事業者の完全削除（PORT本部のみ）。他社の事業者を丸ごと畳むためのもの。

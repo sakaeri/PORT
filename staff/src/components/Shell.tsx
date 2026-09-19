@@ -9,6 +9,7 @@ import { useIsMobile } from "@/lib/useIsMobile";
 import { headingWeight } from "@/lib/style";
 import OrgSwitcher from "@/components/OrgSwitcher";
 import BillingModal from "@/components/BillingModal";
+import { clearStaffOrgCookie } from "@/app/actions";
 import type { StaffContext } from "@/lib/data";
 
 const NAV = [
@@ -98,6 +99,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    await clearStaffOrgCookie();
     router.push("/login");
     router.refresh();
   }

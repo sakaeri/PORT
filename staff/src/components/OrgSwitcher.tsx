@@ -330,7 +330,7 @@ function AddOrgDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
             <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
               今のログインのまま、新しい窓口（事業者）をもう1つ追加します。新しいログイン情報は作りません。
             </div>
-            <OrgAccountFields form={form} set={set} showOwnerLogin={false} />
+            <OrgAccountFields form={form} set={set} showOwnerLogin={false} selfServe />
             {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
             <div style={{ display: "flex", gap: 8 }}>
               <button
