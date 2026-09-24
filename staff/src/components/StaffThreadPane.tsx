@@ -7,6 +7,7 @@ import { ensureStaffThread, sendInternalMessage, deleteMessage, markThreadRead, 
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 import { ROLE_LABEL, INVITE_ROLES, isDeptScoped } from "@/lib/roles";
+import RoleTags from "@/components/RoleTags";
 import type { AppRole, StaffRole } from "@/lib/supabase/types";
 import type { Department } from "@/components/StaffAdmin";
 
@@ -371,6 +372,7 @@ function StaffEditPanel({
           </div>
         )}
       </div>
+      <RoleTags role={role} />
 
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
 

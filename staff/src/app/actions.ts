@@ -1262,14 +1262,15 @@ async function replaceStaffDepartments(admin: ReturnType<typeof createServiceRol
 
 // メールアドレス・パスワードをこちらで発行する代わりに、招待リンクを発行する。
 // 招待された本人が /join/<id> を開いて自分でログイン情報を設定する
-// （公開セルフサインアップの signUpSelfServe と同じ考え方）。
-export async function createStaffInvite(role: StaffRoleInput, departmentIds: string[]) {
+// （公開セルフサインアップの signUpSelfServe と同じ考え方）。担当窓口は
+// ここでは決めず、参加後にチャット画面の歯車パネルから設定する
+// （招待の時点で決め切る必要はない）。
+export async function createStaffInvite(role: StaffRoleInput) {
   const ctx = await requireOwnerOrSupervisor();
-  const resolvedDepartmentIds = normalizeStaffDepartments(role, departmentIds);
   const admin = createServiceRoleClient();
   const { data, error } = await admin
     .from("staff_invites")
-    .insert({ org_id: ctx.orgId, role, department_ids: resolvedDepartmentIds, created_by: ctx.userId })
+    .insert({ org_id: ctx.orgId, role, department_ids: [], created_by: ctx.userId })
     .select("id")
     .single();
   if (error || !data) throw error ?? new Error("招待リンクを作成できませんでした");
