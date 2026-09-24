@@ -128,11 +128,13 @@ export async function getThreadMessages(threadId: string): Promise<{ messages: M
   return { messages: rows.map(mapMessageRow), hasMoreOlder: data.length === MESSAGE_PAGE_SIZE };
 }
 
+// 依頼主には価格を一切見せない（見積りで初めて金額が決まる）。price/payout/
+// department_id は受付側の内部情報なので、依頼主のブラウザには送らない。
 export async function getMenus(orgId: string) {
   const supabase = await createClient();
   const { data: menus } = await supabase
     .from("menus")
-    .select("*, menu_questions(*)")
+    .select("id, label, icon, note, menu_questions(id, label)")
     .eq("org_id", orgId)
     .eq("active", true)
     .order("sort", { ascending: true });

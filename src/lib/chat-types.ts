@@ -5,8 +5,10 @@ export type RequestRow = Database["public"]["Tables"]["requests"]["Row"];
 export type RequestItemRow = Database["public"]["Tables"]["request_items"]["Row"];
 export type CompletionReportRow = Database["public"]["Tables"]["completion_reports"]["Row"];
 export type RatingRow = Database["public"]["Tables"]["ratings"]["Row"];
-export type MenuRow = Database["public"]["Tables"]["menus"]["Row"] & {
-  menu_questions: Database["public"]["Tables"]["menu_questions"]["Row"][];
+// 依頼主のブラウザに送るメニューは、価格など受付側の内部情報を含まない
+// 絞り込んだ形（getMenus() / ChatScreen.tsx の MENU_SELECT と対応）。
+export type MenuRow = Pick<Database["public"]["Tables"]["menus"]["Row"], "id" | "label" | "icon" | "note"> & {
+  menu_questions: Pick<Database["public"]["Tables"]["menu_questions"]["Row"], "id" | "label">[];
 };
 export type VaultRow = Database["public"]["Tables"]["customer_vault_items"]["Row"];
 export type AttachmentRow = Database["public"]["Tables"]["message_attachments"]["Row"];

@@ -30,7 +30,8 @@ interface Props {
   referralSignupUrl: string;
 }
 
-const MENU_SELECT = "*, menu_questions(*)";
+// 依頼主には価格を一切見せない。getMenus() と同じ絞り込み。
+const MENU_SELECT = "id, label, icon, note, menu_questions(id, label)";
 
 const ACKED_KEY = "VID_acked_reports";
 
