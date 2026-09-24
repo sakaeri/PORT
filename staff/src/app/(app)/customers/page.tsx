@@ -19,6 +19,7 @@ export default async function CustomersPage() {
       .order("created_at", { ascending: false }),
     supabase.rpc("customer_thread_summaries", { p_org_id: ctx.orgId }),
   ]);
+  if (error) console.error("customers select failed:", error);
   if (summariesError) console.error("customer_thread_summaries failed:", summariesError);
 
   const summaryByCustomerId = new Map((summaries ?? []).map((s) => [s.customer_id, s]));

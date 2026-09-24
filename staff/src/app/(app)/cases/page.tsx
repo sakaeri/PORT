@@ -8,7 +8,7 @@ export default async function CasesPage() {
   if (!ctx) return null;
 
   const supabase = await createClient();
-  const [{ data: requests, error }, { data: caseThreads }] = await Promise.all([
+  const [{ data: requests, error }, { data: caseThreads, error: threadsError }] = await Promise.all([
     supabase
       .from("requests")
       .select("id, title, amount, phase, created_at, customers(name)")
@@ -16,6 +16,8 @@ export default async function CasesPage() {
       .order("created_at", { ascending: false }),
     supabase.from("threads").select("id, request_id, archived_at").eq("org_id", ctx.orgId).eq("kind", "case"),
   ]);
+  if (error) console.error("requests select failed:", error);
+  if (threadsError) console.error("case threads select failed:", threadsError);
 
   const threadByRequestId = new Map((caseThreads ?? []).map((t) => [t.request_id, t]));
   const rows: CaseRow[] = (requests ?? []).map((r) => {
