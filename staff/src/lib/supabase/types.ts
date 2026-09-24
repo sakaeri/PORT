@@ -290,6 +290,7 @@ export interface Database {
           bank_transfer_info: BankTransferInfo | null;
           card_payment_link: string | null;
           final_card_payment_link: string | null;
+          reminder_sent_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]> & { customer_id: string; title: string };

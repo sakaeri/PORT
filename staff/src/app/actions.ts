@@ -5,6 +5,7 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
 import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
+import { notifyCustomerCompletionReport, notifyCustomerPaymentConfirmed, notifyCustomerQuoteCreated } from "@/lib/notify";
 import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage } from "@/lib/supabase/types";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
@@ -835,6 +836,8 @@ export async function createCaseRequest(
     body: `見積もりを送信しました（¥${amount.toLocaleString("ja-JP")}）`,
   });
 
+  await notifyCustomerQuoteCreated(admin, ctx.orgId, customerId, amount, title);
+
   return request.id as string;
 }
 
@@ -899,10 +902,11 @@ export async function confirmPayment(requestId: string) {
     .eq("org_id", ctx.orgId)
     .eq("phase", "quoted")
     .eq("payment_timing", "prepay_full")
-    .select("id");
+    .select("id, customer_id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
   await postCaseNotice(supabase, requestId, "入金を確認しました");
+  await notifyCustomerPaymentConfirmed(createServiceRoleClient(), ctx.orgId, data[0].customer_id, "ご入金");
 }
 
 // 予約金：予約金分だけの入金確認で着手できるようにする。quoted → preparing、pay_statusはprocessing止まり。
@@ -923,10 +927,11 @@ export async function confirmDeposit(requestId: string) {
     .eq("org_id", ctx.orgId)
     .eq("phase", "quoted")
     .eq("payment_timing", "deposit")
-    .select("id");
+    .select("id, customer_id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
   await postCaseNotice(supabase, requestId, "予約金の入金を確認しました");
+  await notifyCustomerPaymentConfirmed(createServiceRoleClient(), ctx.orgId, data[0].customer_id, "予約金のご入金");
 }
 
 // 残金（予約金の場合）・全額（発送前入金・後払いの場合）の入金確認。フェーズは変えない。
@@ -940,10 +945,12 @@ export async function confirmFinalPayment(requestId: string) {
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
     .neq("pay_status", "paid")
-    .select("id, payment_timing");
+    .select("id, payment_timing, customer_id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
+  const label = data[0].payment_timing === "deposit" ? "残金のご入金" : "ご入金";
   await postCaseNotice(supabase, requestId, data[0].payment_timing === "deposit" ? "残金の入金を確認しました" : "入金を確認しました");
+  await notifyCustomerPaymentConfirmed(createServiceRoleClient(), ctx.orgId, data[0].customer_id, label);
 }
 
 export async function submitCaseReport(
@@ -958,7 +965,7 @@ export async function submitCaseReport(
   const trimmed = summary.trim();
   if (!trimmed) throw new Error("完了報告の内容を入力してください");
 
-  const { data: request } = await supabase.from("requests").select("id, phase").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
+  const { data: request } = await supabase.from("requests").select("id, phase, customer_id").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
   if (!request) throw new Error("案件が見つかりません");
   if (request.phase !== "started") throw new Error("着手中の案件のみ完了報告できます");
 
@@ -981,6 +988,7 @@ export async function submitCaseReport(
   const { error: reqError } = await supabase.from("requests").update({ phase: "completed", completed_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
   if (reqError) throw reqError;
   await postCaseNotice(supabase, requestId, "完了報告を送信しました");
+  await notifyCustomerCompletionReport(createServiceRoleClient(), ctx.orgId, request.customer_id);
 }
 
 // 予約金＋カード決済のとき、残金用の決済リンクを新しく発行して依頼主トークに
