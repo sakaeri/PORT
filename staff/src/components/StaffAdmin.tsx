@@ -11,6 +11,8 @@ import {
   inviteStaffMember,
   updateStaffMember,
   removeStaffMember,
+  inviteCreator,
+  removeCreator,
 } from "@/app/actions";
 import type { StaffRole } from "@/lib/supabase/types";
 
@@ -25,6 +27,15 @@ interface StaffRow {
   departmentId: string | null;
   displayName: string;
   email: string;
+}
+
+interface CreatorRow {
+  id: string;
+  profileId: string;
+  displayName: string;
+  email: string;
+  bio: string | null;
+  wipLimit: number;
 }
 
 const ROLE_LABEL: Record<StaffRole, string> = {
@@ -75,14 +86,17 @@ export default function StaffAdmin({
   currentRole,
   departments: initialDepartments,
   staff: initialStaff,
+  creators: initialCreators,
 }: {
   currentUserId: string;
   currentRole: StaffRole | "reception";
   departments: Department[];
   staff: StaffRow[];
+  creators: CreatorRow[];
 }) {
   const [departments, setDepartments] = useState(initialDepartments);
   const [staff, setStaff] = useState(initialStaff);
+  const [creators, setCreators] = useState(initialCreators);
   const canManage = currentRole === "owner" || currentRole === "supervisor";
   const canDelete = currentRole === "owner";
 
@@ -99,6 +113,155 @@ export default function StaffAdmin({
         canManage={canManage}
         canDelete={canDelete}
       />
+      <CreatorsCard creators={creators} setCreators={setCreators} canManage={canManage} canDelete={canDelete} />
+    </div>
+  );
+}
+
+function CreatorsCard({
+  creators,
+  setCreators,
+  canManage,
+  canDelete,
+}: {
+  creators: CreatorRow[];
+  setCreators: React.Dispatch<React.SetStateAction<CreatorRow[]>>;
+  canManage: boolean;
+  canDelete: boolean;
+}) {
+  const [inviting, setInviting] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  async function remove(c: CreatorRow) {
+    if (removingId || !confirm(`「${c.displayName}」を削除します。ログインもできなくなります。よろしいですか？`)) return;
+    setError("");
+    setRemovingId(c.id);
+    try {
+      await removeCreator(c.id, c.profileId);
+      setCreators((rows) => rows.filter((r) => r.id !== c.id));
+    } catch (e) {
+      setError(errorMessage(e, "削除できませんでした"));
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  return (
+    <div style={card}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>制作者</div>
+        <div style={{ flex: 1 }} />
+        {canManage && !inviting && (
+          <button onClick={() => setInviting(true)} style={smallBtn}>
+            <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
+            制作者を追加
+          </button>
+        )}
+      </div>
+      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+        案件の実作業を担当する外部の制作者用のログインです。案件詳細画面から個別の案件に割り当てられます。
+      </div>
+
+      {creators.length === 0 && !inviting && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ制作者がいません。</div>}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {creators.map((c) => (
+          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+            <div style={{ minWidth: 0, flex: "1 1 160px" }}>
+              <div style={{ fontSize: 13 }}>{c.displayName}</div>
+              <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{c.email}</div>
+            </div>
+            {canDelete && (
+              <button
+                onClick={() => remove(c)}
+                disabled={removingId === c.id}
+                aria-label="削除"
+                style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+              >
+                <Trash size={13} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {inviting && (
+        <InviteCreatorForm
+          onClose={() => setInviting(false)}
+          onCreated={(row) => {
+            setCreators((rows) => [...rows, row]);
+            setInviting(false);
+          }}
+        />
+      )}
+
+      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+    </div>
+  );
+}
+
+function InviteCreatorForm({ onClose, onCreated }: { onClose: () => void; onCreated: (row: CreatorRow) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [bio, setBio] = useState("");
+  const [wipLimit, setWipLimit] = useState(3);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit() {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await inviteCreator({ email, password, displayName, bio, wipLimit });
+      onCreated({
+        id: crypto.randomUUID(), // 一覧の再取得は次回のページ読み込みで正しいIDに揃う
+        profileId: crypto.randomUUID(),
+        displayName: displayName.trim() || email.trim(),
+        email: email.trim(),
+        bio: bio.trim() || null,
+        wipLimit,
+      });
+    } catch (e) {
+      setError(errorMessage(e, "作成できませんでした"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        <span style={label}>表示名</span>
+        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="vid-input" style={input} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        <span style={label}>ログインメールアドレス</span>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="vid-input" style={input} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        <span style={label}>初期パスワード（8文字以上）</span>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="vid-input" style={input} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        <span style={label}>受け入れ上限（同時に担当できる案件数）</span>
+        <input type="number" min={1} value={wipLimit} onChange={(e) => setWipLimit(Number(e.target.value))} className="vid-input" style={{ ...input, width: 100 }} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        <span style={label}>メモ（任意）</span>
+        <input value={bio} onChange={(e) => setBio(e.target.value)} className="vid-input" style={input} />
+      </div>
+      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={submit} disabled={saving} style={{ ...smallBtn, height: 36 }}>
+          {saving ? "作成中…" : "この内容で追加"}
+        </button>
+        <button onClick={onClose} disabled={saving} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+          キャンセル
+        </button>
+      </div>
     </div>
   );
 }

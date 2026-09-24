@@ -18,8 +18,9 @@ import {
   setFinalPaymentLink,
   archiveCaseThread,
   unarchiveCaseThread,
+  assignCreatorToRequest,
 } from "@/app/actions";
-import type { BankTransferInfo, Database, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
+import type { BankTransferInfo, Database, PaymentMethod, PaymentTiming, RequestPhase, StaffRole } from "@/lib/supabase/types";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
@@ -66,6 +67,8 @@ export default function CaseDetail({
   caseMessages,
   orgId,
   currentUserId,
+  role,
+  creators,
 }: {
   request: {
     id: string;
@@ -85,6 +88,7 @@ export default function CaseDetail({
     bankTransferInfo: BankTransferInfo | null;
     cardPaymentLink: string | null;
     finalCardPaymentLink: string | null;
+    creatorId: string | null;
   };
   refundPolicies: RefundPolicyRow[];
   customer: { id: string; name: string } | null;
@@ -94,6 +98,8 @@ export default function CaseDetail({
   caseMessages: CaseMessage[];
   orgId: string;
   currentUserId: string;
+  role: StaffRole | "reception" | "creator";
+  creators: { id: string; displayName: string }[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -161,6 +167,9 @@ export default function CaseDetail({
           <ArrowLeft size={17} />
         </Link>
         <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>{request.title}</div>
+        {role !== "creator" && creators.length > 0 && (
+          <CreatorAssignControl requestId={request.id} creators={creators} initialCreatorId={request.creatorId} />
+        )}
         {caseThread && (
           <button
             onClick={handleToggleArchive}
@@ -460,5 +469,63 @@ function FinalPaymentLinkForm({ requestId, currentLink }: { requestId: string; c
         </button>
       </div>
     </div>
+  );
+}
+
+// 話の実作業を誰が担当するかをその場で割り当てる。案件トーク
+// （kind='case'）のcreator_idも合わせて更新されるので、選んだ制作者は
+// その時点からこの案件のトークにアクセスできるようになる。
+function CreatorAssignControl({
+  requestId,
+  creators,
+  initialCreatorId,
+}: {
+  requestId: string;
+  creators: { id: string; displayName: string }[];
+  initialCreatorId: string | null;
+}) {
+  const [creatorId, setCreatorId] = useState(initialCreatorId ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function change(next: string) {
+    if (saving) return;
+    const prev = creatorId;
+    setCreatorId(next);
+    setSaving(true);
+    try {
+      await assignCreatorToRequest(requestId, next || null);
+    } catch {
+      setCreatorId(prev);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <select
+      value={creatorId}
+      onChange={(e) => change(e.target.value)}
+      disabled={saving}
+      aria-label="担当制作者"
+      className="vid-input"
+      style={{
+        flex: "none",
+        height: 32,
+        padding: "0 8px",
+        fontSize: 11.5,
+        color: "var(--color-text)",
+        background: "var(--color-bg)",
+        border: "1px solid var(--color-divider)",
+        borderRadius: "var(--radius-md)",
+        outline: "none",
+      }}
+    >
+      <option value="">担当者未定</option>
+      {creators.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.displayName}
+        </option>
+      ))}
+    </select>
   );
 }

@@ -13,7 +13,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const { data: request } = await supabase
     .from("requests")
     .select(
-      "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, customers(id, name), completion_reports(*), ratings(*)",
+      "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, creator_id, customers(id, name), completion_reports(*), ratings(*)",
     )
     .eq("id", id)
     .eq("org_id", ctx.orgId)
@@ -21,6 +21,14 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   if (!request) notFound();
 
   const { data: refundPolicies } = await supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId);
+  const { data: creatorRows } =
+    ctx.role === "creator"
+      ? { data: [] }
+      : await supabase.from("creators").select("id, profiles!creators_profile_id_fkey(display_name)").eq("org_id", ctx.orgId).eq("active", true);
+  const creators = (creatorRows ?? []).map((c) => {
+    const profile = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
+    return { id: c.id, displayName: profile?.display_name ?? "" };
+  });
 
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
@@ -60,6 +68,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         bankTransferInfo: request.bank_transfer_info,
         cardPaymentLink: request.card_payment_link,
         finalCardPaymentLink: request.final_card_payment_link,
+        creatorId: request.creator_id,
       }}
       refundPolicies={refundPolicies ?? []}
       customer={customer ? { id: customer.id, name: customer.name } : null}
@@ -69,6 +78,8 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       caseMessages={caseMessages}
       orgId={ctx.orgId}
       currentUserId={ctx.userId}
+      role={ctx.role}
+      creators={creators}
     />
   );
 }

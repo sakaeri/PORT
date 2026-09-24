@@ -1271,3 +1271,68 @@ export async function removeStaffMember(profileId: string) {
   if (error) throw error;
   await admin.auth.admin.deleteUser(profileId);
 }
+
+// ============================================================
+// 制作者（外部の実作業担当者）。今はログインの発行と案件への割り当て
+// だけ。報酬（payout）の計算・確定はまだ何も作っていない — 実際に稼働が
+// 始まってから対応する。
+// ============================================================
+export async function inviteCreator(fields: { email: string; password: string; displayName: string; bio: string; wipLimit: number }) {
+  const ctx = await requireOwnerOrSupervisor();
+  if (fields.password.length < 8) throw new Error("パスワードは8文字以上にしてください");
+  if (!fields.email.trim()) throw new Error("メールアドレスは必須です");
+
+  const admin = createServiceRoleClient();
+  const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
+    email: fields.email.trim(),
+    password: fields.password,
+    email_confirm: true,
+  });
+  if (userErr || !userRes.user) {
+    throw new Error(userErr?.message.includes("already been registered") ? "このメールアドレスはすでに使われています" : (userErr?.message ?? "アカウントを作成できませんでした"));
+  }
+
+  const { error: profileErr } = await admin.from("profiles").insert({
+    id: userRes.user.id,
+    org_id: ctx.orgId,
+    role: "creator",
+    display_name: fields.displayName.trim() || fields.email.trim(),
+  });
+  if (profileErr) {
+    await admin.auth.admin.deleteUser(userRes.user.id);
+    throw profileErr;
+  }
+
+  const { error: creatorErr } = await admin.from("creators").insert({
+    org_id: ctx.orgId,
+    profile_id: userRes.user.id,
+    bio: fields.bio.trim() || null,
+    wip_limit: fields.wipLimit,
+    joined_on: new Date().toISOString().slice(0, 10),
+  });
+  if (creatorErr) {
+    await admin.from("profiles").delete().eq("id", userRes.user.id);
+    await admin.auth.admin.deleteUser(userRes.user.id);
+    throw creatorErr;
+  }
+}
+
+export async function removeCreator(creatorId: string, profileId: string) {
+  const ctx = await requireContext();
+  if (ctx.role !== "owner") throw new Error("削除はオーナーのみ行えます");
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("creators").delete().eq("id", creatorId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+  await admin.from("profiles").delete().eq("id", profileId);
+  await admin.auth.admin.deleteUser(profileId);
+}
+
+// 案件トーク（kind='case'）のcreator_idも合わせて更新する。これでアクセス
+// 権限（creator_id = my_creator_id()）が実際にその制作者に開放される。
+export async function assignCreatorToRequest(requestId: string, creatorId: string | null) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("requests").update({ creator_id: creatorId }).eq("id", requestId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+  await supabase.from("threads").update({ creator_id: creatorId }).eq("request_id", requestId).eq("kind", "case");
+}

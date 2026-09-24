@@ -15,7 +15,7 @@ export interface StaffContext {
   userId: string;
   orgId: string;
   orgDisplayName: string;
-  role: StaffRole | "reception";
+  role: StaffRole | "reception" | "creator";
   departmentId: string | null;
   displayName: string;
   solo: boolean;
@@ -29,11 +29,11 @@ export interface StaffContext {
   isLocked: boolean;
 }
 
-const STAFF_ROLES = ["owner", "reception", "supervisor", "dept_manager", "dept_leader"] as const;
+const STAFF_ROLES = ["owner", "reception", "supervisor", "dept_manager", "dept_leader", "creator"] as const;
 
-// null means: not logged in, or logged in but not one of STAFF_ROLES (e.g. a
-// creator-role account, which belongs to the separate not-yet-built staff
-// app for production work, not this reception app).
+// null means: not logged in, or logged in but not one of STAFF_ROLES. creator
+// はこの同じアプリの絞り込んだ画面（自分の担当案件だけ）を使う。Shell.tsx
+// がロールでナビゲーションを絞り込む。
 //
 // orgId is whichever org the staff_org_id cookie (set by the sidebar org
 // switcher) currently points to, defaulting to the login's own primary org
@@ -59,7 +59,7 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
     userId: auth.user.id,
     orgId: ctx.org_id,
     orgDisplayName: ctx.org_display_name ?? "窓口",
-    role: ctx.role as StaffRole | "reception",
+    role: ctx.role as StaffRole | "reception" | "creator",
     departmentId: ctx.department_id ?? null,
     displayName: ctx.display_name ?? "スタッフ",
     solo: ctx.solo ?? false,
