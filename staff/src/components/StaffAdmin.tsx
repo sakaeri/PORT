@@ -94,6 +94,7 @@ export default function StaffAdmin({
         staff={staff}
         setStaff={setStaff}
         departments={departments}
+        setDepartments={setDepartments}
         currentUserId={currentUserId}
         canManage={canManage}
         canDelete={canDelete}
@@ -250,10 +251,100 @@ function DepartmentsCard({
   );
 }
 
+// 招待・役職変更フォームの中で使う、窓口の選択欄。「＋新しい窓口を作る」
+// を選ぶとその場で窓口名を入力して作成でき、窓口作成→スタッフ招待が
+// 別々の2画面にならずに済む。
+function DepartmentSelect({
+  departments,
+  setDepartments,
+  value,
+  onChange,
+}: {
+  departments: Department[];
+  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
+  value: string;
+  onChange: (departmentId: string) => void;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function confirmCreate() {
+    if (busy || !newName.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const id = await createDepartment(newName);
+      setDepartments((d) => [...d, { id, name: newName.trim() }]);
+      onChange(id);
+      setCreating(false);
+      setNewName("");
+    } catch (e) {
+      setError(errorMessage(e, "作成できませんでした"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (creating) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        <span style={label}>新しい窓口名</span>
+        <div style={{ display: "flex", gap: 6 }}>
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="例：経理関係"
+            className="vid-input"
+            style={{ ...input, width: 160, height: 34 }}
+            autoFocus
+          />
+          <button type="button" onClick={confirmCreate} disabled={busy} style={{ ...smallBtn, height: 34 }}>
+            {busy ? "作成中…" : "作成"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCreating(false);
+              setNewName("");
+            }}
+            style={{ ...smallBtn, height: 34, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}
+          >
+            キャンセル
+          </button>
+        </div>
+        {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <span style={label}>担当窓口</span>
+      <select
+        value={value}
+        onChange={(e) => (e.target.value === "__new__" ? setCreating(true) : onChange(e.target.value))}
+        className="vid-input"
+        style={{ ...input, width: 180, height: 34 }}
+      >
+        <option value="">窓口を選択</option>
+        {departments.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
+        ))}
+        <option value="__new__">＋新しい窓口を作る</option>
+      </select>
+    </div>
+  );
+}
+
 function StaffListCard({
   staff,
   setStaff,
   departments,
+  setDepartments,
   currentUserId,
   canManage,
   canDelete,
@@ -261,6 +352,7 @@ function StaffListCard({
   staff: StaffRow[];
   setStaff: React.Dispatch<React.SetStateAction<StaffRow[]>>;
   departments: Department[];
+  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
   currentUserId: string;
   canManage: boolean;
   canDelete: boolean;
@@ -302,6 +394,7 @@ function StaffListCard({
             key={s.id}
             row={s}
             departments={departments}
+            setDepartments={setDepartments}
             isSelf={s.id === currentUserId}
             canManage={canManage}
             canDelete={canDelete}
@@ -315,6 +408,7 @@ function StaffListCard({
       {inviting && (
         <InviteForm
           departments={departments}
+          setDepartments={setDepartments}
           onClose={() => setInviting(false)}
           onCreated={(row) => {
             setStaff((rows) => [...rows, row]);
@@ -331,6 +425,7 @@ function StaffListCard({
 function StaffRowItem({
   row,
   departments,
+  setDepartments,
   isSelf,
   canManage,
   canDelete,
@@ -340,6 +435,7 @@ function StaffRowItem({
 }: {
   row: StaffRow;
   departments: Department[];
+  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
   isSelf: boolean;
   canManage: boolean;
   canDelete: boolean;
@@ -414,14 +510,7 @@ function StaffRowItem({
               ))}
             </select>
             {isDeptScoped(role) && (
-              <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="vid-input" style={{ ...input, width: 180, height: 34 }}>
-                <option value="">窓口を選択</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+              <DepartmentSelect departments={departments} setDepartments={setDepartments} value={departmentId} onChange={setDepartmentId} />
             )}
           </div>
           {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
@@ -441,10 +530,12 @@ function StaffRowItem({
 
 function InviteForm({
   departments,
+  setDepartments,
   onClose,
   onCreated,
 }: {
   departments: Department[];
+  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
   onClose: () => void;
   onCreated: (row: StaffRow) => void;
 }) {
@@ -512,17 +603,7 @@ function InviteForm({
           </select>
         </div>
         {isDeptScoped(role) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={label}>担当窓口</span>
-            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="vid-input" style={{ ...input, width: 180 }}>
-              <option value="">窓口を選択</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <DepartmentSelect departments={departments} setDepartments={setDepartments} value={departmentId} onChange={setDepartmentId} />
         )}
       </div>
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
