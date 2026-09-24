@@ -4,12 +4,14 @@ import { useState } from "react";
 import { GearSix } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import StaffThreadPane from "@/components/StaffThreadPane";
-import StaffAdmin, { type Department, type MenuOption, type StaffRow } from "@/components/StaffAdmin";
+import StaffAdmin, { type Department, type MenuOption, type PendingInvite } from "@/components/StaffAdmin";
 import type { StaffRole } from "@/lib/supabase/types";
 
-interface StaffListRow {
+export interface StaffDirectoryRow {
   id: string;
   displayName: string;
+  role: StaffRole;
+  departmentIds: string[];
 }
 
 export default function StaffChat({
@@ -17,22 +19,26 @@ export default function StaffChat({
   currentRole,
   orgId,
   canManage,
-  staffList,
+  staff: initialStaff,
   departments,
-  staffRows,
   menus,
+  pendingInvites,
 }: {
   currentUserId: string;
   currentRole: StaffRole | "reception";
   orgId: string;
   canManage: boolean;
-  staffList: StaffListRow[];
+  staff: StaffDirectoryRow[];
   departments: Department[];
-  staffRows: StaffRow[];
   menus: MenuOption[];
+  pendingInvites: PendingInvite[];
 }) {
+  const [staff, setStaff] = useState(initialStaff);
   const [selectedId, setSelectedId] = useState<string | null>(canManage ? null : currentUserId);
   const [showAdmin, setShowAdmin] = useState(false);
+
+  const otherStaff = staff.filter((s) => s.id !== currentUserId);
+  const selected = selectedId ? staff.find((s) => s.id === selectedId) : null;
 
   const header = (
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: "var(--space-6) var(--space-6) 0" }}>
@@ -71,20 +77,31 @@ export default function StaffChat({
           <div style={{ flex: 1, minHeight: 0, border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-surface)" }}>
             <StaffThreadPane staffProfileId={currentUserId} title="本部" currentUserId={currentUserId} orgId={orgId} />
           </div>
-        ) : selectedId ? (
+        ) : selected ? (
           <div style={{ flex: 1, minHeight: 0, border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-surface)" }}>
             <StaffThreadPane
-              staffProfileId={selectedId}
-              title={staffList.find((s) => s.id === selectedId)?.displayName ?? "スタッフ"}
+              staffProfileId={selected.id}
+              title={selected.displayName}
               currentUserId={currentUserId}
               orgId={orgId}
               onBack={() => setSelectedId(null)}
+              editable={{
+                role: selected.role,
+                departmentIds: selected.departmentIds,
+                departments,
+                canDelete: currentRole === "owner" && selected.role !== "owner",
+                onSaved: (patch) => setStaff((rows) => rows.map((r) => (r.id === selected.id ? { ...r, ...patch } : r))),
+                onRemoved: () => {
+                  setStaff((rows) => rows.filter((r) => r.id !== selected.id));
+                  setSelectedId(null);
+                },
+              }}
             />
           </div>
         ) : (
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-            {staffList.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ほかにスタッフがいません。</div>}
-            {staffList.map((s) => (
+            {otherStaff.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ほかにスタッフがいません。</div>}
+            {otherStaff.map((s) => (
               <button
                 key={s.id}
                 onClick={() => setSelectedId(s.id)}
@@ -117,7 +134,7 @@ export default function StaffChat({
             onClick={(e) => e.stopPropagation()}
             style={{ width: "min(820px, 100%)", maxHeight: "88vh", overflowY: "auto", borderRadius: "var(--radius-lg)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}
           >
-            <StaffAdmin currentUserId={currentUserId} currentRole={currentRole} departments={departments} staff={staffRows} menus={menus} onClose={() => setShowAdmin(false)} />
+            <StaffAdmin currentRole={currentRole} departments={departments} menus={menus} pendingInvites={pendingInvites} onClose={() => setShowAdmin(false)} />
           </div>
         </div>
       )}

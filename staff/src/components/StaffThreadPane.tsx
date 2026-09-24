@@ -1,12 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, PaperPlaneTilt, Trash } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Trash, GearSix, Check } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
-import { ensureStaffThread, sendInternalMessage, deleteMessage, markThreadRead } from "@/app/actions";
+import { ensureStaffThread, sendInternalMessage, deleteMessage, markThreadRead, updateStaffMember, removeStaffMember } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
-import type { AppRole } from "@/lib/supabase/types";
+import { ROLE_LABEL, INVITE_ROLES, isDeptScoped } from "@/lib/roles";
+import type { AppRole, StaffRole } from "@/lib/supabase/types";
+import type { Department } from "@/components/StaffAdmin";
+
+interface EditableStaffProps {
+  role: StaffRole;
+  departmentIds: string[];
+  departments: Department[];
+  canDelete: boolean;
+  onSaved: (patch: { role: StaffRole; departmentIds: string[] }) => void;
+  onRemoved: () => void;
+}
 
 interface InternalMessage {
   id: string;
@@ -25,13 +36,16 @@ export default function StaffThreadPane({
   currentUserId,
   orgId,
   onBack,
+  editable,
 }: {
   staffProfileId: string;
   title: string;
   currentUserId: string;
   orgId: string;
   onBack?: () => void;
+  editable?: EditableStaffProps;
 }) {
+  const [showEdit, setShowEdit] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<InternalMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -66,6 +80,7 @@ export default function StaffThreadPane({
     setThreadId(null);
     setMessages([]);
     setError("");
+    setShowEdit(false);
     (async () => {
       try {
         const id = await ensureStaffThread(staffProfileId);
@@ -141,7 +156,25 @@ export default function StaffThreadPane({
           </button>
         )}
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>{title}</div>
+        <div style={{ flex: 1 }} />
+        {editable && (
+          <button
+            onClick={() => setShowEdit((v) => !v)}
+            aria-label="役職・窓口の設定"
+            style={{ display: "flex", cursor: "pointer", color: showEdit ? "var(--color-accent)" : "var(--color-neutral-400)", background: "transparent", border: "none" }}
+          >
+            <GearSix size={18} />
+          </button>
+        )}
       </div>
+
+      {editable && showEdit && (
+        <StaffEditPanel
+          staffProfileId={staffProfileId}
+          editable={editable}
+          onClose={() => setShowEdit(false)}
+        />
+      )}
 
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "var(--space-4)" }}>
         {error && <div style={{ fontSize: 12.5, color: "var(--color-accent-200)" }}>{error}</div>}
@@ -221,6 +254,144 @@ export default function StaffThreadPane({
         >
           <PaperPlaneTilt size={15} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+const editInput: React.CSSProperties = {
+  width: "100%",
+  height: 34,
+  padding: "0 10px",
+  fontSize: 13,
+  color: "var(--color-text)",
+  background: "var(--color-bg)",
+  border: "1px solid var(--color-divider)",
+  borderRadius: "var(--radius-md)",
+  outline: "none",
+};
+const editLabel: React.CSSProperties = { fontSize: 11.5, color: "var(--color-neutral-500)" };
+
+function StaffEditPanel({
+  staffProfileId,
+  editable,
+  onClose,
+}: {
+  staffProfileId: string;
+  editable: EditableStaffProps;
+  onClose: () => void;
+}) {
+  const [role, setRole] = useState(editable.role);
+  const [departmentIds, setDepartmentIds] = useState(editable.departmentIds);
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [error, setError] = useState("");
+
+  function toggleDept(id: string) {
+    setDepartmentIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  async function save() {
+    if (saving) return;
+    if (isDeptScoped(role) && departmentIds.length === 0) {
+      setError("担当する窓口を1つ以上選んでください");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const resolved = isDeptScoped(role) ? departmentIds : [];
+      await updateStaffMember(staffProfileId, role, resolved);
+      editable.onSaved({ role, departmentIds: resolved });
+      onClose();
+    } catch (e) {
+      setError(errorMessage(e, "変更できませんでした"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove() {
+    if (removing || !confirm("このスタッフを削除します。ログインもできなくなります。よろしいですか？")) return;
+    setRemoving(true);
+    setError("");
+    try {
+      await removeStaffMember(staffProfileId);
+      editable.onRemoved();
+    } catch (e) {
+      setError(errorMessage(e, "削除できませんでした"));
+      setRemoving(false);
+    }
+  }
+
+  return (
+    <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 10, padding: "var(--space-4)", borderBottom: "1px solid var(--color-divider)", background: "var(--color-bg)" }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={editLabel}>役職</span>
+          <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={{ ...editInput, width: 170 }}>
+            {INVITE_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_LABEL[r]}
+              </option>
+            ))}
+          </select>
+        </div>
+        {isDeptScoped(role) && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={editLabel}>担当窓口（複数選択可）</span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 320 }}>
+              {editable.departments.map((d) => {
+                const on = departmentIds.includes(d.id);
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => toggleDept(d.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      height: 28,
+                      padding: "0 10px",
+                      cursor: "pointer",
+                      fontSize: 11.5,
+                      color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
+                      background: on ? "var(--color-accent-900)" : "transparent",
+                      border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
+                      borderRadius: "var(--radius-md)",
+                    }}
+                  >
+                    {on && <Check size={11} weight="bold" />}
+                    {d.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={save}
+          disabled={saving}
+          style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+        >
+          {saving ? "保存中…" : "保存"}
+        </button>
+        {editable.canDelete && (
+          <button
+            onClick={remove}
+            disabled={removing}
+            style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+          >
+            <Trash size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
+            削除
+          </button>
+        )}
       </div>
     </div>
   );

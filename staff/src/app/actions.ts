@@ -1246,26 +1246,83 @@ export async function updateMenuDepartment(menuId: string, departmentId: string 
 
 type StaffRoleInput = "owner" | "supervisor" | "dept_manager" | "dept_leader";
 
-function normalizeStaffDepartment(role: StaffRoleInput, departmentId: string | null) {
-  if (role !== "dept_manager" && role !== "dept_leader") return null;
-  if (!departmentId) throw new Error("窓口マネージャー・窓口リーダーは担当する窓口を選んでください");
-  return departmentId;
+function normalizeStaffDepartments(role: StaffRoleInput, departmentIds: string[]) {
+  if (role !== "dept_manager" && role !== "dept_leader") return [];
+  if (departmentIds.length === 0) throw new Error("窓口マネージャー・窓口リーダーは担当する窓口を1つ以上選んでください");
+  return departmentIds;
 }
 
-// 新しいログイン情報を発行して、今の事業者にスタッフとして追加する。
-export async function inviteStaffMember(fields: {
-  email: string;
-  password: string;
-  displayName: string;
-  role: StaffRoleInput;
-  departmentId: string | null;
-}) {
+async function replaceStaffDepartments(admin: ReturnType<typeof createServiceRoleClient>, profileId: string, departmentIds: string[]) {
+  await admin.from("staff_departments").delete().eq("profile_id", profileId);
+  if (departmentIds.length > 0) {
+    const { error } = await admin.from("staff_departments").insert(departmentIds.map((department_id) => ({ profile_id: profileId, department_id })));
+    if (error) throw error;
+  }
+}
+
+// メールアドレス・パスワードをこちらで発行する代わりに、招待リンクを発行する。
+// 招待された本人が /join/<id> を開いて自分でログイン情報を設定する
+// （公開セルフサインアップの signUpSelfServe と同じ考え方）。
+export async function createStaffInvite(role: StaffRoleInput, departmentIds: string[]) {
   const ctx = await requireOwnerOrSupervisor();
+  const resolvedDepartmentIds = normalizeStaffDepartments(role, departmentIds);
+  const admin = createServiceRoleClient();
+  const { data, error } = await admin
+    .from("staff_invites")
+    .insert({ org_id: ctx.orgId, role, department_ids: resolvedDepartmentIds, created_by: ctx.userId })
+    .select("id")
+    .single();
+  if (error || !data) throw error ?? new Error("招待リンクを作成できませんでした");
+  return data.id as string;
+}
+
+export async function listStaffInvites() {
+  const ctx = await requireOwnerOrSupervisor();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("staff_invites")
+    .select("id, role, department_ids, created_at")
+    .eq("org_id", ctx.orgId)
+    .is("used_at", null)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function revokeStaffInvite(id: string) {
+  const ctx = await requireOwnerOrSupervisor();
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("staff_invites").delete().eq("id", id).eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
+// /join/<id> ページから、まだ未ログインの状態で呼ばれる。招待リンクの
+// 有効性チェックは acceptStaffInvite 側でも行う（このプレビューはUI表示用）。
+export async function getInvitePreview(inviteId: string) {
+  const admin = createServiceRoleClient();
+  const { data: invite } = await admin
+    .from("staff_invites")
+    .select("role, used_at, organizations(display_name)")
+    .eq("id", inviteId)
+    .maybeSingle();
+  if (!invite) return null;
+  const org = Array.isArray(invite.organizations) ? invite.organizations[0] : invite.organizations;
+  return { role: invite.role as StaffRoleInput, valid: !invite.used_at, orgDisplayName: org?.display_name ?? "" };
+}
+
+export async function acceptStaffInvite(inviteId: string, fields: { email: string; password: string; displayName: string }) {
   if (fields.password.length < 8) throw new Error("パスワードは8文字以上にしてください");
   if (!fields.email.trim()) throw new Error("メールアドレスは必須です");
-  const departmentId = normalizeStaffDepartment(fields.role, fields.departmentId);
 
   const admin = createServiceRoleClient();
+  const { data: invite } = await admin
+    .from("staff_invites")
+    .select("id, org_id, role, department_ids, used_at")
+    .eq("id", inviteId)
+    .maybeSingle();
+  if (!invite) throw new Error("この招待リンクは無効です");
+  if (invite.used_at) throw new Error("この招待リンクはすでに使われています");
+
   const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
     email: fields.email.trim(),
     password: fields.password,
@@ -1277,27 +1334,30 @@ export async function inviteStaffMember(fields: {
 
   const { error: profileErr } = await admin.from("profiles").insert({
     id: userRes.user.id,
-    org_id: ctx.orgId,
-    role: fields.role,
-    department_id: departmentId,
+    org_id: invite.org_id,
+    role: invite.role,
     display_name: fields.displayName.trim() || fields.email.trim(),
   });
   if (profileErr) {
     await admin.auth.admin.deleteUser(userRes.user.id);
     throw profileErr;
   }
+
+  if (invite.department_ids.length > 0) {
+    await admin.from("staff_departments").insert(invite.department_ids.map((department_id: string) => ({ profile_id: userRes.user.id, department_id })));
+  }
+  await admin.from("staff_invites").update({ used_at: new Date().toISOString(), used_by: userRes.user.id }).eq("id", inviteId);
+
+  return { email: fields.email.trim() };
 }
 
-export async function updateStaffMember(profileId: string, role: StaffRoleInput, departmentId: string | null) {
+export async function updateStaffMember(profileId: string, role: StaffRoleInput, departmentIds: string[]) {
   const ctx = await requireOwnerOrSupervisor();
-  const resolvedDepartmentId = normalizeStaffDepartment(role, departmentId);
+  const resolvedDepartmentIds = normalizeStaffDepartments(role, departmentIds);
   const admin = createServiceRoleClient();
-  const { error } = await admin
-    .from("profiles")
-    .update({ role, department_id: resolvedDepartmentId })
-    .eq("id", profileId)
-    .eq("org_id", ctx.orgId);
+  const { error } = await admin.from("profiles").update({ role }).eq("id", profileId).eq("org_id", ctx.orgId);
   if (error) throw error;
+  await replaceStaffDepartments(admin, profileId, resolvedDepartmentIds);
 }
 
 export async function removeStaffMember(profileId: string) {

@@ -16,7 +16,6 @@ export interface StaffContext {
   orgId: string;
   orgDisplayName: string;
   role: StaffRole | "reception";
-  departmentId: string | null;
   displayName: string;
   solo: boolean;
   isHq: boolean;
@@ -60,7 +59,6 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
     orgId: ctx.org_id,
     orgDisplayName: ctx.org_display_name ?? "窓口",
     role: ctx.role as StaffRole | "reception",
-    departmentId: ctx.department_id ?? null,
     displayName: ctx.display_name ?? "スタッフ",
     solo: ctx.solo ?? false,
     isHq,

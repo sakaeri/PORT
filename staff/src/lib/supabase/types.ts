@@ -115,12 +115,35 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["departments"]["Row"]>;
         Relationships: [];
       };
+      staff_departments: {
+        Row: {
+          profile_id: string;
+          department_id: string;
+        };
+        Insert: Database["public"]["Tables"]["staff_departments"]["Row"];
+        Update: Partial<Database["public"]["Tables"]["staff_departments"]["Row"]>;
+        Relationships: [];
+      };
+      staff_invites: {
+        Row: {
+          id: string;
+          org_id: string;
+          role: AppRole;
+          department_ids: string[];
+          created_by: string | null;
+          created_at: string;
+          used_at: string | null;
+          used_by: string | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["staff_invites"]["Row"]> & { org_id: string; role: AppRole };
+        Update: Partial<Database["public"]["Tables"]["staff_invites"]["Row"]>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
           org_id: string;
           role: AppRole;
-          department_id: string | null;
           display_name: string;
           avatar_url: string | null;
           theme: "dark" | "light";
@@ -490,7 +513,6 @@ export interface Database {
           solo: boolean;
           is_hq: boolean;
           role: AppRole;
-          department_id: string | null;
           display_name: string;
           plan_status: "trial" | "active" | "past_due" | "paused" | "cancelled";
           trial_ends_on: string | null;

@@ -1,31 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash, PencilSimple, X } from "@phosphor-icons/react";
+import { Plus, Trash, PencilSimple, X, Check, Copy } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
-import {
-  createDepartment,
-  renameDepartment,
-  deleteDepartment,
-  inviteStaffMember,
-  updateStaffMember,
-  removeStaffMember,
-  updateMenuDepartment,
-} from "@/app/actions";
+import { createDepartment, renameDepartment, deleteDepartment, updateMenuDepartment, createStaffInvite, revokeStaffInvite } from "@/app/actions";
+import { ROLE_LABEL, INVITE_ROLES, isDeptScoped } from "@/lib/roles";
 import type { StaffRole } from "@/lib/supabase/types";
 
 export interface Department {
   id: string;
   name: string;
-}
-
-export interface StaffRow {
-  id: string;
-  role: StaffRole;
-  departmentId: string | null;
-  displayName: string;
-  email: string;
 }
 
 export interface MenuOption {
@@ -34,14 +19,11 @@ export interface MenuOption {
   departmentId: string | null;
 }
 
-const ROLE_LABEL: Record<StaffRole, string> = {
-  owner: "オーナー",
-  supervisor: "統括担当",
-  dept_manager: "窓口マネージャー",
-  dept_leader: "窓口リーダー",
-};
-const INVITE_ROLES: StaffRole[] = ["supervisor", "dept_manager", "dept_leader"];
-const isDeptScoped = (role: StaffRole) => role === "dept_manager" || role === "dept_leader";
+export interface PendingInvite {
+  id: string;
+  role: StaffRole;
+  departmentIds: string[];
+}
 
 const card: React.CSSProperties = {
   padding: 16,
@@ -78,23 +60,21 @@ const input: React.CSSProperties = {
 const label: React.CSSProperties = { fontSize: 12, color: "var(--color-neutral-500)" };
 
 export default function StaffAdmin({
-  currentUserId,
   currentRole,
   departments: initialDepartments,
-  staff: initialStaff,
   menus: initialMenus,
+  pendingInvites: initialInvites,
   onClose,
 }: {
-  currentUserId: string;
   currentRole: StaffRole | "reception";
   departments: Department[];
-  staff: StaffRow[];
   menus: MenuOption[];
+  pendingInvites: PendingInvite[];
   onClose?: () => void;
 }) {
   const [departments, setDepartments] = useState(initialDepartments);
-  const [staff, setStaff] = useState(initialStaff);
   const [menus, setMenus] = useState(initialMenus);
+  const [invites, setInvites] = useState(initialInvites);
   const canManage = currentRole === "owner" || currentRole === "supervisor";
   const canDelete = currentRole === "owner";
 
@@ -110,15 +90,7 @@ export default function StaffAdmin({
         )}
       </div>
       <DepartmentsCard departments={departments} setDepartments={setDepartments} menus={menus} setMenus={setMenus} canManage={canManage} canDelete={canDelete} />
-      <StaffListCard
-        staff={staff}
-        setStaff={setStaff}
-        departments={departments}
-        setDepartments={setDepartments}
-        currentUserId={currentUserId}
-        canManage={canManage}
-        canDelete={canDelete}
-      />
+      {canManage && <InviteLinkCard departments={departments} invites={invites} setInvites={setInvites} />}
     </div>
   );
 }
@@ -279,7 +251,8 @@ function DepartmentsCard({
 }
 
 // 窓口ごとの「対応メニュー」選択。メニューは1つの窓口にしか属さないので、
-// 別の窓口ですでにONのメニューを押すとこちらに付け替わる。
+// 別の窓口ですでにONのメニューを押すとこちらに付け替わる。タップ後の状態が
+// ひと目でわかるよう、選択中はチェックマーク付きで塗りつぶす。
 function DepartmentMenuPicker({
   department,
   menus,
@@ -311,7 +284,7 @@ function DepartmentMenuPicker({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
-      <span style={label}>対応メニュー</span>
+      <span style={label}>対応メニュー（タップで選択・解除。他の窓口の担当だったメニューはこちらに移ります）</span>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {menus.map((m) => {
           const on = m.departmentId === department.id;
@@ -321,6 +294,9 @@ function DepartmentMenuPicker({
               onClick={() => toggle(m)}
               disabled={busyId === m.id}
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
                 height: 28,
                 padding: "0 10px",
                 cursor: "pointer",
@@ -331,6 +307,7 @@ function DepartmentMenuPicker({
                 borderRadius: "var(--radius-md)",
               }}
             >
+              {on && <Check size={11} weight="bold" />}
               {m.label}
             </button>
           );
@@ -341,350 +318,78 @@ function DepartmentMenuPicker({
   );
 }
 
-// 招待・役職変更フォームの中で使う、窓口の選択欄。「＋新しい窓口を作る」
-// を選ぶとその場で窓口名を入力して作成でき、窓口作成→スタッフ招待が
-// 別々の2画面にならずに済む。
-function DepartmentSelect({
+function InviteLinkCard({
   departments,
-  setDepartments,
-  value,
-  onChange,
+  invites,
+  setInvites,
 }: {
   departments: Department[];
-  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
-  value: string;
-  onChange: (departmentId: string) => void;
+  invites: PendingInvite[];
+  setInvites: React.Dispatch<React.SetStateAction<PendingInvite[]>>;
 }) {
+  const [role, setRole] = useState<StaffRole>("dept_leader");
+  const [departmentIds, setDepartmentIds] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  async function confirmCreate() {
-    if (busy || !newName.trim()) return;
-    setBusy(true);
+  function toggleDept(id: string) {
+    setDepartmentIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  async function create() {
+    if (creating) return;
+    if (isDeptScoped(role) && departmentIds.length === 0) {
+      setError("担当する窓口を1つ以上選んでください");
+      return;
+    }
     setError("");
+    setCreating(true);
     try {
-      const id = await createDepartment(newName);
-      setDepartments((d) => [...d, { id, name: newName.trim() }]);
-      onChange(id);
-      setCreating(false);
-      setNewName("");
+      const id = await createStaffInvite(role, isDeptScoped(role) ? departmentIds : []);
+      setInvites((rows) => [{ id, role, departmentIds: isDeptScoped(role) ? departmentIds : [] }, ...rows]);
+      setCreatedUrl(`${window.location.origin}/join/${id}`);
+      setDepartmentIds([]);
     } catch (e) {
       setError(errorMessage(e, "作成できませんでした"));
     } finally {
-      setBusy(false);
+      setCreating(false);
     }
   }
 
-  if (creating) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        <span style={label}>新しい窓口名</span>
-        <div style={{ display: "flex", gap: 6 }}>
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="例：経理関係"
-            className="vid-input"
-            style={{ ...input, width: 160, height: 34 }}
-            autoFocus
-          />
-          <button type="button" onClick={confirmCreate} disabled={busy} style={{ ...smallBtn, height: 34 }}>
-            {busy ? "作成中…" : "作成"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setCreating(false);
-              setNewName("");
-            }}
-            style={{ ...smallBtn, height: 34, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}
-          >
-            キャンセル
-          </button>
-        </div>
-        {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <span style={label}>担当窓口</span>
-      <select
-        value={value}
-        onChange={(e) => (e.target.value === "__new__" ? setCreating(true) : onChange(e.target.value))}
-        className="vid-input"
-        style={{ ...input, width: 180, height: 34 }}
-      >
-        <option value="">窓口を選択</option>
-        {departments.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-        <option value="__new__">＋新しい窓口を作る</option>
-      </select>
-    </div>
-  );
-}
-
-function StaffListCard({
-  staff,
-  setStaff,
-  departments,
-  setDepartments,
-  currentUserId,
-  canManage,
-  canDelete,
-}: {
-  staff: StaffRow[];
-  setStaff: React.Dispatch<React.SetStateAction<StaffRow[]>>;
-  departments: Department[];
-  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
-  currentUserId: string;
-  canManage: boolean;
-  canDelete: boolean;
-}) {
-  const [inviting, setInviting] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
-  const [error, setError] = useState("");
-
-  async function remove(s: StaffRow) {
-    if (removingId || !confirm(`「${s.displayName}」を削除します。ログインもできなくなります。よろしいですか？`)) return;
-    setError("");
-    setRemovingId(s.id);
+  async function revoke(id: string) {
+    if (!confirm("この招待リンクを無効にしますか？")) return;
     try {
-      await removeStaffMember(s.id);
-      setStaff((rows) => rows.filter((r) => r.id !== s.id));
-    } catch (e) {
-      setError(errorMessage(e, "削除できませんでした"));
-    } finally {
-      setRemovingId(null);
+      await revokeStaffInvite(id);
+      setInvites((rows) => rows.filter((r) => r.id !== id));
+    } catch {
+      /* 一覧はそのまま。次の操作でまた消せる */
     }
+  }
+
+  function departmentNames(ids: string[]) {
+    return ids.map((id) => departments.find((d) => d.id === id)?.name).filter(Boolean).join("・");
   }
 
   return (
     <div style={card}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>スタッフ一覧</div>
-        <div style={{ flex: 1 }} />
-        {canManage && !inviting && (
-          <button onClick={() => setInviting(true)} style={smallBtn}>
-            <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-            スタッフを追加
-          </button>
-        )}
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>スタッフを招待</div>
+      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+        役職（と担当窓口）を選んでリンクを発行し、そのURLを本人に送ってください。ログイン情報は本人が自分で設定します。
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {staff.map((s) => (
-          <StaffRowItem
-            key={s.id}
-            row={s}
-            departments={departments}
-            setDepartments={setDepartments}
-            isSelf={s.id === currentUserId}
-            canManage={canManage}
-            canDelete={canDelete}
-            onSaved={(patch) => setStaff((rows) => rows.map((r) => (r.id === s.id ? { ...r, ...patch } : r)))}
-            onRemove={() => remove(s)}
-            removing={removingId === s.id}
-          />
-        ))}
-      </div>
-
-      {inviting && (
-        <InviteForm
-          departments={departments}
-          setDepartments={setDepartments}
-          onClose={() => setInviting(false)}
-          onCreated={(row) => {
-            setStaff((rows) => [...rows, row]);
-            setInviting(false);
-          }}
-        />
-      )}
-
-      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-    </div>
-  );
-}
-
-function StaffRowItem({
-  row,
-  departments,
-  setDepartments,
-  isSelf,
-  canManage,
-  canDelete,
-  onSaved,
-  onRemove,
-  removing,
-}: {
-  row: StaffRow;
-  departments: Department[];
-  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
-  isSelf: boolean;
-  canManage: boolean;
-  canDelete: boolean;
-  onSaved: (patch: Partial<StaffRow>) => void;
-  onRemove: () => void;
-  removing: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [role, setRole] = useState<StaffRole>(row.role);
-  const [departmentId, setDepartmentId] = useState(row.departmentId ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const canEditThisRow = canManage && row.role !== "owner";
-
-  async function save() {
-    if (saving) return;
-    if (isDeptScoped(role) && !departmentId) {
-      setError("担当する窓口を選んでください");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      await updateStaffMember(row.id, role, isDeptScoped(role) ? departmentId : null);
-      onSaved({ role, departmentId: isDeptScoped(role) ? departmentId : null });
-      setEditing(false);
-    } catch (e) {
-      setError(errorMessage(e, "変更できませんでした"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const departmentName = departments.find((d) => d.id === row.departmentId)?.name;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ minWidth: 0, flex: "1 1 160px" }}>
-          <div style={{ fontSize: 13 }}>{row.displayName}{isSelf && "（自分）"}</div>
-          <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{row.email}</div>
-        </div>
-        <div style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-400)" }}>
-          {ROLE_LABEL[row.role]}
-          {isDeptScoped(row.role) && departmentName ? `（${departmentName}）` : ""}
-        </div>
-        {canEditThisRow && !editing && (
-          <button onClick={() => setEditing(true)} style={{ ...smallBtn, height: 30 }}>
-            変更
-          </button>
-        )}
-        {canDelete && !isSelf && row.role !== "owner" && (
-          <button
-            onClick={onRemove}
-            disabled={removing}
-            aria-label="削除"
-            style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-          >
-            <Trash size={13} />
-          </button>
-        )}
-      </div>
-
-      {editing && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={{ ...input, width: 180, height: 34 }}>
-              {INVITE_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABEL[r]}
-                </option>
-              ))}
-            </select>
-            {isDeptScoped(role) && (
-              <DepartmentSelect departments={departments} setDepartments={setDepartments} value={departmentId} onChange={setDepartmentId} />
-            )}
-          </div>
-          {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={save} disabled={saving} style={{ ...smallBtn, height: 32 }}>
-              {saving ? "保存中…" : "保存"}
-            </button>
-            <button onClick={() => setEditing(false)} style={{ ...smallBtn, height: 32, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-              キャンセル
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function InviteForm({
-  departments,
-  setDepartments,
-  onClose,
-  onCreated,
-}: {
-  departments: Department[];
-  setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
-  onClose: () => void;
-  onCreated: (row: StaffRow) => void;
-}) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [role, setRole] = useState<StaffRole>("dept_leader");
-  const [departmentId, setDepartmentId] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  async function submit() {
-    if (saving) return;
-    if (isDeptScoped(role) && !departmentId) {
-      setError("担当する窓口を選んでください");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      await inviteStaffMember({
-        email,
-        password,
-        displayName,
-        role,
-        departmentId: isDeptScoped(role) ? departmentId : null,
-      });
-      onCreated({
-        id: crypto.randomUUID(), // 一覧の再取得は次回のページ読み込みで正しいIDに揃う
-        role,
-        departmentId: isDeptScoped(role) ? departmentId : null,
-        displayName: displayName.trim() || email.trim(),
-        email: email.trim(),
-      });
-    } catch (e) {
-      setError(errorMessage(e, "作成できませんでした"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        <span style={label}>表示名</span>
-        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="vid-input" style={input} />
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        <span style={label}>ログインメールアドレス</span>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="vid-input" style={input} />
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        <span style={label}>初期パスワード（8文字以上）</span>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="vid-input" style={input} />
-      </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <span style={label}>役職</span>
-          <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={{ ...input, width: 180 }}>
+          <select
+            value={role}
+            onChange={(e) => {
+              setRole(e.target.value as StaffRole);
+              setDepartmentIds([]);
+            }}
+            className="vid-input"
+            style={{ ...input, width: 180 }}
+          >
             {INVITE_ROLES.map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r]}
@@ -693,18 +398,79 @@ function InviteForm({
           </select>
         </div>
         {isDeptScoped(role) && (
-          <DepartmentSelect departments={departments} setDepartments={setDepartments} value={departmentId} onChange={setDepartmentId} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={label}>担当窓口（複数選択可）</span>
+            {departments.length === 0 ? (
+              <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>先に窓口を作成してください</span>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 320 }}>
+                {departments.map((d) => {
+                  const on = departmentIds.includes(d.id);
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => toggleDept(d.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        height: 28,
+                        padding: "0 10px",
+                        cursor: "pointer",
+                        fontSize: 11.5,
+                        color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
+                        background: on ? "var(--color-accent-900)" : "transparent",
+                        border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
+                        borderRadius: "var(--radius-md)",
+                      }}
+                    >
+                      {on && <Check size={11} weight="bold" />}
+                      {d.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
       </div>
+
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={submit} disabled={saving} style={{ ...smallBtn, height: 36 }}>
-          {saving ? "作成中…" : "この内容で追加"}
-        </button>
-        <button onClick={onClose} disabled={saving} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-          キャンセル
-        </button>
-      </div>
+
+      <button onClick={create} disabled={creating} style={{ ...smallBtn, alignSelf: "flex-start" }}>
+        {creating ? "作成中…" : "招待リンクを作成"}
+      </button>
+
+      {createdUrl && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{createdUrl}</span>
+          <button
+            onClick={() => navigator.clipboard.writeText(createdUrl)}
+            aria-label="コピー"
+            style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+          >
+            <Copy size={13} />
+          </button>
+        </div>
+      )}
+
+      {invites.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
+          <span style={label}>発行済み・未使用の招待リンク</span>
+          {invites.map((inv) => (
+            <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                {ROLE_LABEL[inv.role]}
+                {inv.departmentIds.length > 0 && `（${departmentNames(inv.departmentIds)}）`}
+              </span>
+              <button onClick={() => revoke(inv.id)} style={{ ...smallBtn, height: 28, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+                取り消す
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
