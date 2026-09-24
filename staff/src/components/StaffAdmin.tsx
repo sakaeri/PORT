@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Trash, PencilSimple, X, Check, Copy } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
-import { createDepartment, renameDepartment, deleteDepartment, updateMenuDepartment, createStaffInvite, revokeStaffInvite } from "@/app/actions";
+import { createDepartment, renameDepartment, deleteDepartment, updateMenuDepartment, createStaffInvite } from "@/app/actions";
 import RoleTags from "@/components/RoleTags";
 import type { StaffRole } from "@/lib/supabase/types";
 
@@ -17,12 +17,6 @@ export interface MenuOption {
   id: string;
   label: string;
   departmentId: string | null;
-}
-
-export interface PendingInvite {
-  id: string;
-  role: StaffRole;
-  departmentIds: string[];
 }
 
 const card: React.CSSProperties = {
@@ -97,13 +91,11 @@ export function DepartmentAdmin({
   );
 }
 
-export function InviteAdmin({ pendingInvites: initialInvites, onClose }: { pendingInvites: PendingInvite[]; onClose?: () => void }) {
-  const [invites, setInvites] = useState(initialInvites);
-
+export function InviteAdmin({ onClose }: { onClose?: () => void }) {
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 520, width: "100%", margin: "0 auto" }}>
       <ModalHeader title="スタッフを招待" onClose={onClose} />
-      <InviteLinkCard invites={invites} setInvites={setInvites} />
+      <InviteLinkCard />
     </div>
   );
 }
@@ -297,7 +289,7 @@ function DepartmentMenuPicker({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
-      <span style={label}>対応メニュー（タップで選択・解除。他の窓口の担当だったメニューはこちらに移ります）</span>
+      <span style={label}>対応メニュー（このメニューで問い合わせが来ると、この窓口のスタッフが直接やり取りできるようになります。タップで選択・解除、他の窓口の担当だったメニューはこちらに移ります）</span>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {menus.map((m) => {
           const on = m.departmentId === department.id;
@@ -331,13 +323,7 @@ function DepartmentMenuPicker({
   );
 }
 
-function InviteLinkCard({
-  invites,
-  setInvites,
-}: {
-  invites: PendingInvite[];
-  setInvites: React.Dispatch<React.SetStateAction<PendingInvite[]>>;
-}) {
+function InviteLinkCard() {
   const [creating, setCreating] = useState(false);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -348,7 +334,6 @@ function InviteLinkCard({
     setCreating(true);
     try {
       const id = await createStaffInvite();
-      setInvites((rows) => [{ id, role: "dept_leader", departmentIds: [] }, ...rows]);
       setCreatedUrl(`${window.location.origin}/join/${id}`);
     } catch (e) {
       setError(errorMessage(e, "作成できませんでした"));
@@ -357,20 +342,10 @@ function InviteLinkCard({
     }
   }
 
-  async function revoke(id: string) {
-    if (!confirm("この招待リンクを無効にしますか？")) return;
-    try {
-      await revokeStaffInvite(id);
-      setInvites((rows) => rows.filter((r) => r.id !== id));
-    } catch {
-      /* 一覧はそのまま。次の操作でまた消せる */
-    }
-  }
-
   return (
     <div style={card}>
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        リンクを発行してURLを本人に送ってください。ログイン情報は本人が自分で設定します。役職・担当窓口はあとから何度でも変更できるので、まずは一番権限の小さい「窓口リーダー」として参加してもらい、必要になったらチャット画面から権限を上げてください。窓口が未設定の間は何も見えない状態になるので安全です。
+        リンクを発行してURLを本人に送ってください。ログイン情報は本人が自分で設定します。役職・担当窓口はあとから何度でも変更できるので、まずは一番権限の小さい「窓口リーダー」として参加してもらい、必要になったらチャット画面から権限を上げてください。窓口が未設定の間は何も見えない状態になるので安全です。参加すると、そのままスタッフ一覧に表示されます。
       </div>
       <RoleTags role="dept_leader" />
 
@@ -390,20 +365,6 @@ function InviteLinkCard({
           >
             <Copy size={13} />
           </button>
-        </div>
-      )}
-
-      {invites.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
-          <span style={label}>発行済み・未使用の招待リンク（{invites.length}件）</span>
-          {invites.map((inv) => (
-            <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
-              <span style={{ flex: 1, minWidth: 0, color: "var(--color-neutral-500)" }}>未使用</span>
-              <button onClick={() => revoke(inv.id)} style={{ ...smallBtn, height: 28, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-                取り消す
-              </button>
-            </div>
-          ))}
         </div>
       )}
     </div>

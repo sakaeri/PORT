@@ -1278,26 +1278,6 @@ export async function createStaffInvite() {
   return data.id as string;
 }
 
-export async function listStaffInvites() {
-  const ctx = await requireOwnerOrSupervisor();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("staff_invites")
-    .select("id, role, department_ids, created_at")
-    .eq("org_id", ctx.orgId)
-    .is("used_at", null)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function revokeStaffInvite(id: string) {
-  const ctx = await requireOwnerOrSupervisor();
-  const admin = createServiceRoleClient();
-  const { error } = await admin.from("staff_invites").delete().eq("id", id).eq("org_id", ctx.orgId);
-  if (error) throw error;
-}
-
 // /join/<id> ページから、まだ未ログインの状態で呼ばれる。招待リンクの
 // 有効性チェックは acceptStaffInvite 側でも行う（このプレビューはUI表示用）。
 export async function getInvitePreview(inviteId: string) {

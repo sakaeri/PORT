@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Buildings, UserPlus } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import StaffThreadPane from "@/components/StaffThreadPane";
-import { DepartmentAdmin, InviteAdmin, type Department, type MenuOption, type PendingInvite } from "@/components/StaffAdmin";
+import { DepartmentAdmin, InviteAdmin, type Department, type MenuOption } from "@/components/StaffAdmin";
 import type { StaffRole } from "@/lib/supabase/types";
 
 function Modal({ children, onClose, maxWidth }: { children: React.ReactNode; onClose: () => void; maxWidth: number }) {
@@ -38,7 +38,6 @@ export default function StaffChat({
   staff: initialStaff,
   departments,
   menus,
-  pendingInvites,
 }: {
   currentUserId: string;
   currentRole: StaffRole | "reception";
@@ -47,7 +46,6 @@ export default function StaffChat({
   staff: StaffDirectoryRow[];
   departments: Department[];
   menus: MenuOption[];
-  pendingInvites: PendingInvite[];
 }) {
   const [staff, setStaff] = useState(initialStaff);
   const [selectedId, setSelectedId] = useState<string | null>(canManage ? null : currentUserId);
@@ -91,7 +89,7 @@ export default function StaffChat({
   );
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       {header}
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "var(--space-4) var(--space-6) var(--space-6)" }}>
@@ -154,7 +152,7 @@ export default function StaffChat({
       )}
       {showInvite && (
         <Modal onClose={() => setShowInvite(false)} maxWidth={560}>
-          <InviteAdmin pendingInvites={pendingInvites} onClose={() => setShowInvite(false)} />
+          <InviteAdmin onClose={() => setShowInvite(false)} />
         </Modal>
       )}
     </div>
