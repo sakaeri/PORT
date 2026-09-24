@@ -5,7 +5,6 @@ import { Plus, Trash, PencilSimple, X, Check, Copy } from "@phosphor-icons/react
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { createDepartment, renameDepartment, deleteDepartment, updateMenuDepartment, createStaffInvite, revokeStaffInvite } from "@/app/actions";
-import { ROLE_LABEL, INVITE_ROLES } from "@/lib/roles";
 import RoleTags from "@/components/RoleTags";
 import type { StaffRole } from "@/lib/supabase/types";
 
@@ -60,38 +59,51 @@ const input: React.CSSProperties = {
 };
 const label: React.CSSProperties = { fontSize: 12, color: "var(--color-neutral-500)" };
 
-export default function StaffAdmin({
+function ModalHeader({ title, onClose }: { title: string; onClose?: () => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>{title}</div>
+      <div style={{ flex: 1 }} />
+      {onClose && (
+        <button onClick={onClose} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+          <X size={18} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function DepartmentAdmin({
   currentRole,
   departments: initialDepartments,
   menus: initialMenus,
-  pendingInvites: initialInvites,
   onClose,
 }: {
   currentRole: StaffRole | "reception";
   departments: Department[];
   menus: MenuOption[];
-  pendingInvites: PendingInvite[];
   onClose?: () => void;
 }) {
   const [departments, setDepartments] = useState(initialDepartments);
   const [menus, setMenus] = useState(initialMenus);
-  const [invites, setInvites] = useState(initialInvites);
   const canManage = currentRole === "owner" || currentRole === "supervisor";
   const canDelete = currentRole === "owner";
 
   return (
-    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 780, width: "100%", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>窓口・スタッフ管理</div>
-        <div style={{ flex: 1 }} />
-        {onClose && (
-          <button onClick={onClose} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
-            <X size={18} />
-          </button>
-        )}
-      </div>
+    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 600, width: "100%", margin: "0 auto" }}>
+      <ModalHeader title="窓口管理" onClose={onClose} />
       <DepartmentsCard departments={departments} setDepartments={setDepartments} menus={menus} setMenus={setMenus} canManage={canManage} canDelete={canDelete} />
-      {canManage && <InviteLinkCard invites={invites} setInvites={setInvites} />}
+    </div>
+  );
+}
+
+export function InviteAdmin({ pendingInvites: initialInvites, onClose }: { pendingInvites: PendingInvite[]; onClose?: () => void }) {
+  const [invites, setInvites] = useState(initialInvites);
+
+  return (
+    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 520, width: "100%", margin: "0 auto" }}>
+      <ModalHeader title="スタッフを招待" onClose={onClose} />
+      <InviteLinkCard invites={invites} setInvites={setInvites} />
     </div>
   );
 }
@@ -326,7 +338,6 @@ function InviteLinkCard({
   invites: PendingInvite[];
   setInvites: React.Dispatch<React.SetStateAction<PendingInvite[]>>;
 }) {
-  const [role, setRole] = useState<StaffRole>("dept_leader");
   const [creating, setCreating] = useState(false);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -336,8 +347,8 @@ function InviteLinkCard({
     setError("");
     setCreating(true);
     try {
-      const id = await createStaffInvite(role);
-      setInvites((rows) => [{ id, role, departmentIds: [] }, ...rows]);
+      const id = await createStaffInvite();
+      setInvites((rows) => [{ id, role: "dept_leader", departmentIds: [] }, ...rows]);
       setCreatedUrl(`${window.location.origin}/join/${id}`);
     } catch (e) {
       setError(errorMessage(e, "作成できませんでした"));
@@ -358,27 +369,14 @@ function InviteLinkCard({
 
   return (
     <div style={card}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>スタッフを招待</div>
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        役職を選んでリンクを発行し、そのURLを本人に送ってください。ログイン情報は本人が自分で設定します。担当窓口は参加後、チャット画面から設定できます。
+        リンクを発行してURLを本人に送ってください。ログイン情報は本人が自分で設定します。役職・担当窓口はあとから何度でも変更できるので、まずは一番権限の小さい「窓口リーダー」として参加してもらい、必要になったらチャット画面から権限を上げてください。窓口が未設定の間は何も見えない状態になるので安全です。
       </div>
+      <RoleTags role="dept_leader" />
 
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <span style={label}>役職</span>
-          <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={{ ...input, width: 180 }}>
-            {INVITE_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABEL[r]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button onClick={create} disabled={creating} style={smallBtn}>
-          {creating ? "作成中…" : "招待リンクを作成"}
-        </button>
-      </div>
-      <RoleTags role={role} />
+      <button onClick={create} disabled={creating} style={{ ...smallBtn, alignSelf: "flex-start" }}>
+        {creating ? "作成中…" : "招待リンクを作成"}
+      </button>
 
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
 
@@ -397,10 +395,10 @@ function InviteLinkCard({
 
       {invites.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
-          <span style={label}>発行済み・未使用の招待リンク</span>
+          <span style={label}>発行済み・未使用の招待リンク（{invites.length}件）</span>
           {invites.map((inv) => (
             <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
-              <span style={{ flex: 1, minWidth: 0 }}>{ROLE_LABEL[inv.role]}</span>
+              <span style={{ flex: 1, minWidth: 0, color: "var(--color-neutral-500)" }}>未使用</span>
               <button onClick={() => revoke(inv.id)} style={{ ...smallBtn, height: 28, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
                 取り消す
               </button>

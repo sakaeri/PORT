@@ -1,11 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { GearSix } from "@phosphor-icons/react";
+import { Buildings, UserPlus } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import StaffThreadPane from "@/components/StaffThreadPane";
-import StaffAdmin, { type Department, type MenuOption, type PendingInvite } from "@/components/StaffAdmin";
+import { DepartmentAdmin, InviteAdmin, type Department, type MenuOption, type PendingInvite } from "@/components/StaffAdmin";
 import type { StaffRole } from "@/lib/supabase/types";
+
+function Modal({ children, onClose, maxWidth }: { children: React.ReactNode; onClose: () => void; maxWidth: number }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: `min(${maxWidth}px, 100%)`, maxHeight: "88vh", overflowY: "auto", borderRadius: "var(--radius-lg)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export interface StaffDirectoryRow {
   id: string;
@@ -35,35 +51,41 @@ export default function StaffChat({
 }) {
   const [staff, setStaff] = useState(initialStaff);
   const [selectedId, setSelectedId] = useState<string | null>(canManage ? null : currentUserId);
-  const [showAdmin, setShowAdmin] = useState(false);
+  const [showDepartments, setShowDepartments] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
 
   const otherStaff = staff.filter((s) => s.id !== currentUserId);
   const selected = selectedId ? staff.find((s) => s.id === selectedId) : null;
+
+  const headerBtn: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    height: 34,
+    padding: "0 12px",
+    cursor: "pointer",
+    fontSize: 12.5,
+    color: "var(--color-accent)",
+    background: "transparent",
+    border: "1px solid var(--color-accent)",
+    borderRadius: "var(--radius-md)",
+  };
 
   const header = (
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: "var(--space-6) var(--space-6) 0" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>スタッフ</div>
       <div style={{ flex: 1 }} />
       {canManage && (
-        <button
-          onClick={() => setShowAdmin(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            height: 34,
-            padding: "0 12px",
-            cursor: "pointer",
-            fontSize: 12.5,
-            color: "var(--color-accent)",
-            background: "transparent",
-            border: "1px solid var(--color-accent)",
-            borderRadius: "var(--radius-md)",
-          }}
-        >
-          <GearSix size={14} />
-          窓口・スタッフ管理
-        </button>
+        <>
+          <button onClick={() => setShowDepartments(true)} style={headerBtn}>
+            <Buildings size={14} />
+            窓口管理
+          </button>
+          <button onClick={() => setShowInvite(true)} style={headerBtn}>
+            <UserPlus size={14} />
+            スタッフを招待
+          </button>
+        </>
       )}
     </div>
   );
@@ -125,18 +147,15 @@ export default function StaffChat({
         )}
       </div>
 
-      {showAdmin && (
-        <div
-          onClick={() => setShowAdmin(false)}
-          style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: "min(820px, 100%)", maxHeight: "88vh", overflowY: "auto", borderRadius: "var(--radius-lg)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}
-          >
-            <StaffAdmin currentRole={currentRole} departments={departments} menus={menus} pendingInvites={pendingInvites} onClose={() => setShowAdmin(false)} />
-          </div>
-        </div>
+      {showDepartments && (
+        <Modal onClose={() => setShowDepartments(false)} maxWidth={640}>
+          <DepartmentAdmin currentRole={currentRole} departments={departments} menus={menus} onClose={() => setShowDepartments(false)} />
+        </Modal>
+      )}
+      {showInvite && (
+        <Modal onClose={() => setShowInvite(false)} maxWidth={560}>
+          <InviteAdmin pendingInvites={pendingInvites} onClose={() => setShowInvite(false)} />
+        </Modal>
       )}
     </div>
   );
