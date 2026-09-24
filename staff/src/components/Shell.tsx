@@ -12,16 +12,13 @@ import BillingModal from "@/components/BillingModal";
 import { signOutStaff } from "@/lib/signOutStaff";
 import type { StaffContext } from "@/lib/data";
 
-// 制作者（creator）は同じアプリの中で、自分の担当案件だけに絞った画面
-// （案件トーク。RLSで自動的に自分の担当分だけに絞られる）を使う。それ以外の
-// ナビゲーションは受付・オーナー側の機能なので隠す。
 const NAV = [
-  { href: "/customers", label: "依頼主", icon: Users, hideWhenCreator: true },
+  { href: "/customers", label: "依頼主", icon: Users },
   { href: "/cases", label: "案件トーク", icon: ChatsCircle },
-  { href: "/stats", label: "売上・実績", icon: ChartBar, hideWhenCreator: true },
-  { href: "/staff", label: "スタッフ", icon: UsersThree, hideWhenSolo: true, hideWhenCreator: true },
-  { href: "/menu", label: "メニュー管理", icon: GearSix, hideWhenCreator: true },
-  { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true, hideWhenCreator: true },
+  { href: "/stats", label: "売上・実績", icon: ChartBar },
+  { href: "/staff", label: "スタッフ", icon: UsersThree, hideWhenSolo: true },
+  { href: "/menu", label: "メニュー管理", icon: GearSix },
+  { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true },
 ];
 
 export default function Shell({ ctx, children }: { ctx: StaffContext; children: React.ReactNode }) {
@@ -105,7 +102,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     router.refresh();
   }
 
-  const navItems = NAV.filter((n) => !(n.hideWhenSolo && ctx.solo) && !(n.hqOnly && !ctx.isHq) && !(n.hideWhenCreator && ctx.role === "creator"));
+  const navItems = NAV.filter((n) => !(n.hideWhenSolo && ctx.solo) && !(n.hqOnly && !ctx.isHq));
 
   // Date.now() はレンダー中に直接呼べない（純粋関数のルール）ため、
   // マウント後にeffectで計算する。初回描画では null のままバナーを出さない。

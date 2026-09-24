@@ -19,7 +19,7 @@ export default function OrgSwitcher({
 }: {
   orgId: string;
   orgDisplayName: string;
-  role: StaffRole | "reception" | "creator";
+  role: StaffRole | "reception";
   orgs: StaffOrgOption[];
   unreadCounts: Record<string, number>;
 }) {

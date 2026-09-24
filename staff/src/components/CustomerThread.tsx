@@ -233,7 +233,7 @@ export default function CustomerThread({
   departments: { id: string; name: string }[];
   initialMessages: Message[];
   initialHasMoreOlder?: boolean;
-  role: StaffRole | "reception" | "creator";
+  role: StaffRole | "reception";
   currentUserId: string;
   orgId: string;
   isHq: boolean;
