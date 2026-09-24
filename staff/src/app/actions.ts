@@ -1123,3 +1123,120 @@ export async function deleteWorkMemo(id: string) {
   const { error } = await supabase.from("work_memos").delete().eq("id", id).eq("author_id", ctx.userId);
   if (error) throw error;
 }
+
+// ============================================================
+// 窓口（部署）とスタッフの役職管理
+// ============================================================
+// 役職は4段階：オーナー（全て可）／統括担当（全て可、削除不可）／
+// 窓口マネージャー（自分の窓口のみ、削除可）／窓口リーダー（自分の窓口の
+// み、削除不可）。「削除」系の操作は現段階ではオーナーのみに絞っている
+// （統括担当も不可）。窓口ごとの閲覧範囲の絞り込み自体は次の段階で対応する
+// — 今はまだ全スタッフが全窓口のやり取りを見られる状態のまま。
+
+async function requireOwnerOrSupervisor() {
+  const ctx = await requireContext();
+  if (ctx.role !== "owner" && ctx.role !== "supervisor") throw new Error("この操作はオーナー・統括担当のみ行えます");
+  return ctx;
+}
+
+export async function createDepartment(name: string) {
+  const ctx = await requireOwnerOrSupervisor();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("窓口名を入力してください");
+  const admin = createServiceRoleClient();
+  const { data, error } = await admin.from("departments").insert({ org_id: ctx.orgId, name: trimmed }).select("id").single();
+  if (error || !data) throw error ?? new Error("窓口を作成できませんでした");
+  return data.id as string;
+}
+
+export async function renameDepartment(id: string, name: string) {
+  const ctx = await requireOwnerOrSupervisor();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("窓口名を入力してください");
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("departments").update({ name: trimmed }).eq("id", id).eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
+// 窓口を削除しても、紐付いていたメニュー・スタッフは「窓口未設定」に戻る
+// だけ（on delete set null）。案件やトーク自体は消えない。
+export async function deleteDepartment(id: string) {
+  const ctx = await requireContext();
+  if (ctx.role !== "owner") throw new Error("窓口の削除はオーナーのみ行えます");
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("departments").delete().eq("id", id).eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
+export async function updateMenuDepartment(menuId: string, departmentId: string | null) {
+  const ctx = await requireOwnerOrSupervisor();
+  const supabase = await createClient();
+  const { error } = await supabase.from("menus").update({ department_id: departmentId }).eq("id", menuId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
+type StaffRoleInput = "owner" | "supervisor" | "dept_manager" | "dept_leader";
+
+function normalizeStaffDepartment(role: StaffRoleInput, departmentId: string | null) {
+  if (role !== "dept_manager" && role !== "dept_leader") return null;
+  if (!departmentId) throw new Error("窓口マネージャー・窓口リーダーは担当する窓口を選んでください");
+  return departmentId;
+}
+
+// 新しいログイン情報を発行して、今の事業者にスタッフとして追加する。
+export async function inviteStaffMember(fields: {
+  email: string;
+  password: string;
+  displayName: string;
+  role: StaffRoleInput;
+  departmentId: string | null;
+}) {
+  const ctx = await requireOwnerOrSupervisor();
+  if (fields.password.length < 8) throw new Error("パスワードは8文字以上にしてください");
+  if (!fields.email.trim()) throw new Error("メールアドレスは必須です");
+  const departmentId = normalizeStaffDepartment(fields.role, fields.departmentId);
+
+  const admin = createServiceRoleClient();
+  const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
+    email: fields.email.trim(),
+    password: fields.password,
+    email_confirm: true,
+  });
+  if (userErr || !userRes.user) {
+    throw new Error(userErr?.message.includes("already been registered") ? "このメールアドレスはすでに使われています" : (userErr?.message ?? "アカウントを作成できませんでした"));
+  }
+
+  const { error: profileErr } = await admin.from("profiles").insert({
+    id: userRes.user.id,
+    org_id: ctx.orgId,
+    role: fields.role,
+    department_id: departmentId,
+    display_name: fields.displayName.trim() || fields.email.trim(),
+  });
+  if (profileErr) {
+    await admin.auth.admin.deleteUser(userRes.user.id);
+    throw profileErr;
+  }
+}
+
+export async function updateStaffMember(profileId: string, role: StaffRoleInput, departmentId: string | null) {
+  const ctx = await requireOwnerOrSupervisor();
+  const resolvedDepartmentId = normalizeStaffDepartment(role, departmentId);
+  const admin = createServiceRoleClient();
+  const { error } = await admin
+    .from("profiles")
+    .update({ role, department_id: resolvedDepartmentId })
+    .eq("id", profileId)
+    .eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
+export async function removeStaffMember(profileId: string) {
+  const ctx = await requireContext();
+  if (ctx.role !== "owner") throw new Error("スタッフの削除はオーナーのみ行えます");
+  if (profileId === ctx.userId) throw new Error("自分自身は削除できません");
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("profiles").delete().eq("id", profileId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+  await admin.auth.admin.deleteUser(profileId);
+}

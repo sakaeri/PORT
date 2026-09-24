@@ -27,6 +27,7 @@ import {
   updateIntakeField,
   deleteIntakeField,
   updateRefundPolicy,
+  updateMenuDepartment,
 } from "@/app/actions";
 import type { BankTransferInfo, RefundMode, RefundStage } from "@/lib/supabase/types";
 
@@ -54,7 +55,13 @@ interface Menu {
   price: number;
   lead_hours: number;
   active: boolean;
+  department_id: string | null;
   menu_questions: Question[];
+}
+
+interface Department {
+  id: string;
+  name: string;
 }
 
 interface IntakeField {
@@ -133,6 +140,8 @@ export default function MenuSettings({
   initialCardPaymentEnabled,
   initialBankInfo,
   initialCardPaymentLinks,
+  departments,
+  initialSolo,
 }: {
   orgId: string;
   referrerUserId: string;
@@ -146,6 +155,7 @@ export default function MenuSettings({
   initialCardPaymentEnabled: boolean;
   initialBankInfo: BankTransferInfo;
   initialCardPaymentLinks: CardPaymentLink[];
+  departments: Department[];
 }) {
   const [tab, setTab] = useState<TabKey>("company");
   const isMobile = useIsMobile();
@@ -218,10 +228,10 @@ export default function MenuSettings({
           <CompanyInfoCard initial={initialCompany} slug={slug} />
           <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} />
           <CardPaymentLinksCard initialLinks={initialCardPaymentLinks} />
-          {/* StaffModeCard は複数スタッフ運用が必要になるまで非表示にする */}
+          <StaffModeCard initialSolo={initialSolo} />
         </>
       )}
-      {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
+      {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} departments={departments} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
       {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} />}
       {tab === "login" && (
@@ -638,8 +648,6 @@ function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[
   );
 }
 
-// 複数スタッフ運用が必要になるまで未使用（呼び出し箇所を非表示にしている）。
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function StaffModeCard({ initialSolo }: { initialSolo: boolean }) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(!initialSolo);
@@ -666,7 +674,7 @@ function StaffModeCard({ initialSolo }: { initialSolo: boolean }) {
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>スタッフ連携</div>
-        <InfoTooltip text="オンにすると、左メニューに「スタッフ」が表示され、案件ごとに担当者を割り当てられるようになります。オフのままなら、受付が1人で全ての案件に対応する運用になります。" />
+        <InfoTooltip text="オンにすると、左メニューに「スタッフ」が表示され、窓口（部署）の作成や、追加のスタッフの招待・役職の割り当てができるようになります。オフのままなら、オーナー1人で全ての窓口に対応する運用になります。" />
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <button
@@ -705,14 +713,19 @@ function Field({ label: l, value, onChange }: { label: string; value: string; on
   );
 }
 
-function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Menu[] }) {
+function MenuListCard({ orgId, initialMenus, departments }: { orgId: string; initialMenus: Menu[]; departments: Department[] }) {
   const [menus, setMenus] = useState(initialMenus);
   const [openId, setOpenId] = useState<string | null>(null);
 
   async function handleAdd() {
     const id = await createMenu(orgId);
-    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, price: 0, lead_hours: 24, active: true, menu_questions: [] }]);
+    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, price: 0, lead_hours: 24, active: true, department_id: null, menu_questions: [] }]);
     setOpenId(id);
+  }
+
+  async function changeDepartment(id: string, departmentId: string) {
+    patchLocal(id, { department_id: departmentId || null });
+    await updateMenuDepartment(id, departmentId || null);
   }
 
   async function handleDelete(id: string) {
@@ -790,6 +803,20 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
                     <span style={label}>詳細内容</span>
                     <input value={m.note ?? ""} onChange={(e) => patchLocal(m.id, { note: e.target.value })} onBlur={() => commit(m)} className="vid-input" style={input} />
                   </div>
+
+                  {departments.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <span style={label}>担当窓口</span>
+                      <select value={m.department_id ?? ""} onChange={(e) => changeDepartment(m.id, e.target.value)} className="vid-input" style={input}>
+                        <option value="">窓口未設定</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} />
 

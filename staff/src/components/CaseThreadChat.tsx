@@ -4,11 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PaperPlaneTilt, Trash } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { sendCaseMessage, deleteMessage, markThreadRead } from "@/app/actions";
+import type { AppRole } from "@/lib/supabase/types";
 
 export interface CaseMessage {
   id: string;
   sender_id: string | null;
-  sender_role: "owner" | "reception" | "creator" | "client" | null;
+  sender_role: AppRole | null;
   kind: string;
   body: string | null;
   sent_at: string;

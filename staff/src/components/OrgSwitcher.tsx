@@ -8,6 +8,7 @@ import { errorMessage } from "@/lib/errors";
 import { switchStaffOrg, createOrgForCurrentUser, removeMyOrgLink } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import type { StaffOrgOption } from "@/lib/data";
+import type { StaffRole } from "@/lib/supabase/types";
 
 export default function OrgSwitcher({
   orgId,
@@ -18,7 +19,7 @@ export default function OrgSwitcher({
 }: {
   orgId: string;
   orgDisplayName: string;
-  role: "owner" | "reception";
+  role: StaffRole | "reception";
   orgs: StaffOrgOption[];
   unreadCounts: Record<string, number>;
 }) {

@@ -5,7 +5,8 @@
 // once the schema is pushed to a real Supabase project, then diff against
 // this file before trusting the replacement.
 
-export type AppRole = "owner" | "reception" | "creator" | "client";
+export type AppRole = "owner" | "reception" | "creator" | "client" | "supervisor" | "dept_manager" | "dept_leader";
+export type StaffRole = "owner" | "supervisor" | "dept_manager" | "dept_leader";
 
 export type RequestPhase =
   | "draft"
@@ -103,11 +104,23 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["organizations"]["Row"]>;
         Relationships: [];
       };
+      departments: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["departments"]["Row"]> & { org_id: string; name: string };
+        Update: Partial<Database["public"]["Tables"]["departments"]["Row"]>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
           org_id: string;
           role: AppRole;
+          department_id: string | null;
           display_name: string;
           avatar_url: string | null;
           theme: "dark" | "light";
@@ -175,6 +188,7 @@ export interface Database {
           lead_hours: number;
           sort: number;
           active: boolean;
+          department_id: string | null;
         };
         Insert: Partial<Database["public"]["Tables"]["menus"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["menus"]["Row"]>;
@@ -474,6 +488,7 @@ export interface Database {
           solo: boolean;
           is_hq: boolean;
           role: AppRole;
+          department_id: string | null;
           display_name: string;
           plan_status: "trial" | "active" | "past_due" | "paused" | "cancelled";
           trial_ends_on: string | null;

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import CaseDetail from "@/components/CaseDetail";
+import type { AppRole } from "@/lib/supabase/types";
 
 export default async function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,7 +27,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
 
   const { data: caseThread } = await supabase.from("threads").select("id, archived_at").eq("kind", "case").eq("request_id", id).maybeSingle();
-  let caseMessages: { id: string; sender_id: string | null; sender_role: "owner" | "reception" | "creator" | "client" | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null; senderName: string | null }[] = [];
+  let caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null; senderName: string | null }[] = [];
   if (caseThread) {
     const { data } = await supabase
       .from("messages")

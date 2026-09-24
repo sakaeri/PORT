@@ -12,7 +12,7 @@ import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, 
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import { PHASE_LABEL } from "@/lib/stage";
-import type { BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
+import type { AppRole, BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase, StaffRole } from "@/lib/supabase/types";
 
 export interface ThreadAttachment {
   id: string;
@@ -30,7 +30,7 @@ export interface ThreadReport {
 export interface ThreadMessage {
   id: string;
   sender_id: string | null;
-  sender_role: "owner" | "reception" | "creator" | "client" | null;
+  sender_role: AppRole | null;
   kind: string;
   body: string | null;
   payload: unknown;
@@ -231,7 +231,7 @@ export default function CustomerThread({
   thread: { id: string; archived: boolean } | null;
   initialMessages: Message[];
   initialHasMoreOlder?: boolean;
-  role: "owner" | "reception";
+  role: StaffRole | "reception";
   currentUserId: string;
   orgId: string;
   isHq: boolean;
@@ -442,7 +442,7 @@ export default function CustomerThread({
           </button>
         )}
         {messages.map((m) => {
-          const isStaff = m.sender_role === "owner" || m.sender_role === "reception";
+          const isStaff = m.sender_role !== "client" && m.sender_role !== "creator" && m.sender_role !== null;
           const isOwn = m.sender_id === currentUserId;
           return (
             <div key={m.id} style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: isStaff ? "flex-end" : "flex-start" }}>

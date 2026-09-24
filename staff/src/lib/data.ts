@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import type { StaffRole } from "@/lib/supabase/types";
 
 export interface StaffOrgOption {
   orgId: string;
@@ -14,7 +15,8 @@ export interface StaffContext {
   userId: string;
   orgId: string;
   orgDisplayName: string;
-  role: "owner" | "reception";
+  role: StaffRole | "reception";
+  departmentId: string | null;
   displayName: string;
   solo: boolean;
   isHq: boolean;
@@ -27,7 +29,9 @@ export interface StaffContext {
   isLocked: boolean;
 }
 
-// null means: not logged in, or logged in but not owner/reception (e.g. a
+const STAFF_ROLES = ["owner", "reception", "supervisor", "dept_manager", "dept_leader"] as const;
+
+// null means: not logged in, or logged in but not one of STAFF_ROLES (e.g. a
 // creator-role account, which belongs to the separate not-yet-built staff
 // app for production work, not this reception app).
 //
@@ -43,7 +47,7 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
     supabase.rpc("staff_context").maybeSingle(),
     supabase.rpc("my_staff_orgs"),
   ]);
-  if (!ctx || (ctx.role !== "owner" && ctx.role !== "reception")) return null;
+  if (!ctx || !(STAFF_ROLES as readonly string[]).includes(ctx.role)) return null;
 
   const isHq = ctx.is_hq ?? false;
   const planStatus = ctx.plan_status ?? "trial";
@@ -55,7 +59,8 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
     userId: auth.user.id,
     orgId: ctx.org_id,
     orgDisplayName: ctx.org_display_name ?? "窓口",
-    role: ctx.role,
+    role: ctx.role as StaffRole | "reception",
+    departmentId: ctx.department_id ?? null,
     displayName: ctx.display_name ?? "スタッフ",
     solo: ctx.solo ?? false,
     isHq,
