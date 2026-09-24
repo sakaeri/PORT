@@ -153,6 +153,7 @@ export interface Database {
           lead_hours: number;
           sort: number;
           active: boolean;
+          department_id: string | null;
         };
         Insert: Partial<Database["public"]["Tables"]["menus"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["menus"]["Row"]>;
@@ -234,6 +235,7 @@ export interface Database {
           customer_id: string | null;
           request_id: string | null;
           creator_id: string | null;
+          department_id: string | null;
           last_msg_at: string | null;
           created_at: string;
         };

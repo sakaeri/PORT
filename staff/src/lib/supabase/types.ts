@@ -334,6 +334,7 @@ export interface Database {
           customer_id: string | null;
           request_id: string | null;
           creator_id: string | null;
+          department_id: string | null;
           last_msg_at: string | null;
           archived_at: string | null;
           last_read_at: string | null;

@@ -25,6 +25,21 @@ async function requireHq() {
   return ctx;
 }
 
+// 統括担当・窓口リーダーは削除操作ができない役職。削除系のアクション全部
+// でこれを呼ぶ（自分が送ったメッセージの削除も対象— 見積もりチャットの
+// 削除は案件自体の完全削除につながるため）。
+function requireDeletePermission(ctx: { role: string }) {
+  if (ctx.role === "supervisor" || ctx.role === "dept_leader") {
+    throw new Error("削除は統括担当・窓口リーダーには許可されていません。オーナーまたは窓口マネージャーにご依頼ください。");
+  }
+}
+
+async function requireContextWithDelete(opts?: { allowLocked?: boolean }) {
+  const ctx = await requireContext(opts);
+  requireDeletePermission(ctx);
+  return ctx;
+}
+
 // ============================================================
 // PORT利用料の決済（Stripe）。オーナーのみ。支払い設定そのものなので
 // ロック中（トライアル終了・支払い滞納）でも呼べる必要がある（allowLocked）。
@@ -169,7 +184,7 @@ export async function renameCardPaymentLink(id: string, title: string) {
 }
 
 export async function deleteCardPaymentLink(id: string) {
-  const ctx = await requireContext();
+  const ctx = await requireContextWithDelete();
   const supabase = await createClient();
   const { error } = await supabase.from("card_payment_links").delete().eq("id", id).eq("org_id", ctx.orgId);
   if (error) throw error;
@@ -221,7 +236,7 @@ export async function updateMenu(
 }
 
 export async function deleteMenu(id: string) {
-  await requireContext();
+  await requireContextWithDelete();
   const supabase = await createClient();
   const { error } = await supabase.from("menus").delete().eq("id", id);
   if (error) throw error;
@@ -247,7 +262,7 @@ export async function updateMenuQuestion(id: string, label: string) {
 }
 
 export async function deleteMenuQuestion(id: string) {
-  await requireContext();
+  await requireContextWithDelete();
   const supabase = await createClient();
   const { error } = await supabase.from("menu_questions").delete().eq("id", id);
   if (error) throw error;
@@ -301,7 +316,7 @@ export async function updateIntakeForm(id: string, fields: { label: string; note
 }
 
 export async function deleteIntakeForm(id: string) {
-  await requireContext();
+  await requireContextWithDelete();
   const supabase = await createClient();
   const { error } = await supabase.from("intake_forms").delete().eq("id", id);
   if (error) throw error;
@@ -328,7 +343,7 @@ export async function updateIntakeField(id: string, fields: { label: string; kin
 }
 
 export async function deleteIntakeField(id: string) {
-  await requireContext();
+  await requireContextWithDelete();
   const supabase = await createClient();
   const { error } = await supabase.from("intake_fields").delete().eq("id", id);
   if (error) throw error;
@@ -660,7 +675,7 @@ export async function markThreadRead(threadId: string) {
 // 自分が送ったメッセージだけ削除できる（RLS の messages_sender_delete でも
 // 強制されるが、他人の分は0件更新になるだけで気付きにくいのでここで検知する）。
 export async function deleteMessage(messageId: string) {
-  const ctx = await requireContext();
+  const ctx = await requireContextWithDelete();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("messages")
@@ -696,6 +711,22 @@ export async function archiveThread(threadId: string) {
   await setCustomerActiveForThread(threadId, false);
 }
 
+// 話の内容が変わって担当窓口を切り替えたいとき用（人間秘書の担当交代と
+// 同じ発想）。今このトークが見えているスタッフだけが切り替えられる
+// （RLSのthreads_office_writeが、切り替え先ではなく「今の」窓口の閲覧権限を
+// 見ているため、他窓口のトークを勝手に奪うことはできない）。
+export async function reassignThreadDepartment(threadId: string, departmentId: string | null) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("threads")
+    .update({ department_id: departmentId })
+    .eq("id", threadId)
+    .eq("org_id", ctx.orgId)
+    .eq("kind", "customer");
+  if (error) throw error;
+}
+
 export async function unarchiveThread(threadId: string) {
   await requireContext();
   const supabase = await createClient();
@@ -723,7 +754,7 @@ export async function unarchiveCaseThread(threadId: string) {
 // 添付・案件・評価・作業メモ・紹介record も customers への on delete
 // cascade で連動して消える。アーカイブと違い元に戻せない。
 export async function deleteCustomer(customerId: string) {
-  const ctx = await requireContext();
+  const ctx = await requireContextWithDelete();
   const supabase = await createClient();
   const { error } = await supabase.from("customers").delete().eq("id", customerId).eq("org_id", ctx.orgId);
   if (error) throw error;

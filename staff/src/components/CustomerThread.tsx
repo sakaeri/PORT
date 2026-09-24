@@ -8,7 +8,7 @@ import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { createClient } from "@/lib/supabase/client";
-import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage } from "@/app/actions";
+import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage, reassignThreadDepartment } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import { PHASE_LABEL } from "@/lib/stage";
@@ -211,6 +211,7 @@ function IntakeAnswerBubble({ msg }: { msg: Message }) {
 export default function CustomerThread({
   customer,
   thread,
+  departments,
   initialMessages,
   role,
   currentUserId,
@@ -228,7 +229,8 @@ export default function CustomerThread({
   initialHasMoreOlder,
 }: {
   customer: { id: string; name: string; memberNo: string | null };
-  thread: { id: string; archived: boolean } | null;
+  thread: { id: string; archived: boolean; departmentId: string | null } | null;
+  departments: { id: string; name: string }[];
   initialMessages: Message[];
   initialHasMoreOlder?: boolean;
   role: StaffRole | "reception";
@@ -401,6 +403,9 @@ export default function CustomerThread({
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{customer.name}</div>
           <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{customer.memberNo ?? "—"}</div>
         </div>
+        {thread && departments.length > 0 && (
+          <ThreadDepartmentControl threadId={thread.id} departments={departments} initialDepartmentId={thread.departmentId} />
+        )}
         {isMobile && (
           <button
             onClick={() => setShowInfoPanel(true)}
@@ -730,6 +735,64 @@ function CaseSummarySection({
         </div>
       )}
     </div>
+  );
+}
+
+// 話の内容が別の窓口の担当になったときに、受付側でその場で切り替える
+// ためのコントロール。人間秘書の担当交代と同じ発想で、依頼主から見える
+// 表示（「受付」）は変わらない。
+function ThreadDepartmentControl({
+  threadId,
+  departments,
+  initialDepartmentId,
+}: {
+  threadId: string;
+  departments: { id: string; name: string }[];
+  initialDepartmentId: string | null;
+}) {
+  const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function change(next: string) {
+    if (saving) return;
+    const prev = departmentId;
+    setDepartmentId(next);
+    setSaving(true);
+    try {
+      await reassignThreadDepartment(threadId, next || null);
+    } catch {
+      setDepartmentId(prev);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <select
+      value={departmentId}
+      onChange={(e) => change(e.target.value)}
+      disabled={saving}
+      aria-label="担当窓口"
+      className="vid-input"
+      style={{
+        flex: "none",
+        height: 30,
+        padding: "0 8px",
+        fontSize: 11.5,
+        color: "var(--color-text)",
+        background: "var(--color-bg)",
+        border: "1px solid var(--color-divider)",
+        borderRadius: "var(--radius-md)",
+        outline: "none",
+      }}
+    >
+      <option value="">窓口未設定</option>
+      {departments.map((d) => (
+        <option key={d.id} value={d.id}>
+          {d.name}
+        </option>
+      ))}
+    </select>
   );
 }
 

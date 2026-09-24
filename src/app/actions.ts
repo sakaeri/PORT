@@ -123,6 +123,18 @@ export async function submitMenuInquiry(
   if (error) throw error;
   await touchThread(ctx.threadId);
   await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
+  await assignThreadDepartmentFromMenu(ctx.threadId, menuId);
+}
+
+// 依頼主が最初にメニューを選んだ時点で、そのトーク全体を該当の窓口に
+// 紐付ける（一度紐付いたら、以後は受付が手動で切り替えるまで変わらない）。
+// これは受付側の窓口権限を絞るためのRLSにも使うため、依頼主自身の書き込み
+// 権限では更新できないようservice roleで行う。
+async function assignThreadDepartmentFromMenu(threadId: string, menuId: string) {
+  const admin = createServiceRoleClient();
+  const { data: menu } = await admin.from("menus").select("department_id").eq("id", menuId).maybeSingle();
+  if (!menu?.department_id) return;
+  await admin.from("threads").update({ department_id: menu.department_id }).eq("id", threadId).is("department_id", null);
 }
 
 // id が null（または DB にまだ存在しない一時ID）なら新規作成として扱い、

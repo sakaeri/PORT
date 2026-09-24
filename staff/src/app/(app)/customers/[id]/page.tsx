@@ -46,6 +46,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: latestRequestRow },
     { data: orgPayment },
     { data: cardPaymentLinks },
+    { data: departmentRows },
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -53,7 +54,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .eq("id", id)
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
-    supabase.from("threads").select("id, archived_at").eq("customer_id", id).eq("kind", "customer").maybeSingle(),
+    supabase.from("threads").select("id, archived_at, department_id").eq("customer_id", id).eq("kind", "customer").maybeSingle(),
     supabase.from("intake_forms").select("id, label, note, intake_fields(id, label, required, sort)").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
     supabase
       .from("menus")
@@ -77,6 +78,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .maybeSingle(),
     supabase.from("organizations").select("card_payment_enabled, bank_transfer_info").eq("id", ctx.orgId).single(),
     supabase.from("card_payment_links").select("id, title, url").eq("org_id", ctx.orgId).order("created_at", { ascending: false }),
+    supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
   ]);
 
   if (!customer) notFound();
@@ -118,7 +120,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   return (
     <CustomerThread
       customer={{ id: customer.id, name: customer.name, memberNo: customer.member_no }}
-      thread={thread ? { id: thread.id, archived: !!thread.archived_at } : null}
+      thread={thread ? { id: thread.id, archived: !!thread.archived_at, departmentId: thread.department_id } : null}
+      departments={(departmentRows ?? []).map((d) => ({ id: d.id, name: d.name }))}
       initialMessages={initialMessages}
       initialHasMoreOlder={hasMoreOlder}
       role={ctx.role}
