@@ -7,6 +7,9 @@ import CustomersList from "@/components/CustomersList";
 export default async function CustomersPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null; // layout already handles the access-denied state
+  // スタッフ（dept_leader）は依頼主とは直接やり取りしない役割。直接URLで
+  // 来ても弾く（RLSでも結局0件になるが、空欄より明示的な方がわかりやすい）。
+  if (ctx.role === "dept_leader") return null;
 
   const supabase = await createClient();
   // 依存のないクエリは並列で投げる。依頼主一覧に必要な「各依頼主の最新メッセージ・未読」は、

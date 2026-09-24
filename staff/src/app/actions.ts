@@ -25,12 +25,12 @@ async function requireHq() {
   return ctx;
 }
 
-// 統括担当・窓口リーダーは削除操作ができない役職。削除系のアクション全部
+// 統括担当・スタッフ（dept_leader）は削除操作ができない役職。削除系のアクション全部
 // でこれを呼ぶ（自分が送ったメッセージの削除も対象— 見積もりチャットの
 // 削除は案件自体の完全削除につながるため）。
 function requireDeletePermission(ctx: { role: string }) {
   if (ctx.role === "supervisor" || ctx.role === "dept_leader") {
-    throw new Error("削除は統括担当・窓口リーダーには許可されていません。オーナーまたは窓口マネージャーにご依頼ください。");
+    throw new Error("削除は統括担当・スタッフには許可されていません。オーナーまたはマネージャーにご依頼ください。");
   }
 }
 
@@ -1196,11 +1196,11 @@ export async function deleteWorkMemo(id: string) {
 // ============================================================
 // 窓口（部署）とスタッフの役職管理
 // ============================================================
-// 役職は4段階：オーナー（全て可）／統括担当（全て可、削除不可）／
-// 窓口マネージャー（自分の窓口のみ、削除可）／窓口リーダー（自分の窓口の
-// み、削除不可）。「削除」系の操作は現段階ではオーナーのみに絞っている
-// （統括担当も不可）。窓口ごとの閲覧範囲の絞り込み自体は次の段階で対応する
-// — 今はまだ全スタッフが全窓口のやり取りを見られる状態のまま。
+// 役職は4段階：オーナー（全窓口・依頼主対応可・全権限）／統括担当（全窓口・
+// 依頼主対応可・削除不可）／マネージャー=dept_manager（自分の窓口・依頼主
+// 対応可・削除可）／スタッフ=dept_leader（自分の窓口の案件について社内
+// トークでの作業のみ、依頼主とは直接やり取りしない・削除不可）。
+// dept_leader という値自体はDB上の名残で、表示・実際の役割は「スタッフ」。
 
 async function requireOwnerOrSupervisor() {
   const ctx = await requireContext();
@@ -1248,7 +1248,7 @@ type StaffRoleInput = "owner" | "supervisor" | "dept_manager" | "dept_leader";
 
 function normalizeStaffDepartments(role: StaffRoleInput, departmentIds: string[]) {
   if (role !== "dept_manager" && role !== "dept_leader") return [];
-  if (departmentIds.length === 0) throw new Error("窓口マネージャー・窓口リーダーは担当する窓口を1つ以上選んでください");
+  if (departmentIds.length === 0) throw new Error("マネージャー・スタッフは担当する窓口を1つ以上選んでください");
   return departmentIds;
 }
 
@@ -1265,7 +1265,7 @@ async function replaceStaffDepartments(admin: ReturnType<typeof createServiceRol
 // （公開セルフサインアップの signUpSelfServe と同じ考え方）。役職・担当窓口は
 // ここでは決めず、参加後にチャット画面の歯車パネルから設定する（役職も
 // あとで変更できるので、招待の時点で決め切る意味がない）。招待は常に
-// 一番権限の小さい窓口リーダーとして作られる。
+// 一番権限の小さいスタッフ（dept_leader）として作られる。
 export async function createStaffInvite() {
   const ctx = await requireOwnerOrSupervisor();
   const admin = createServiceRoleClient();

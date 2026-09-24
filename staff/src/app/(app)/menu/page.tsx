@@ -5,6 +5,9 @@ import MenuSettings from "@/components/MenuSettings";
 export default async function MenuSettingsPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
+  // スタッフ（dept_leader）は依頼主とは直接やり取りしない役割で、
+  // メニューや会社設定も編集させない。直接URLで来ても弾く。
+  if (ctx.role === "dept_leader") return null;
 
   const supabase = await createClient();
   const [{ data: org }, { data: menus }, { data: templates }, { data: policy }, { data: userData }, { data: cardPaymentLinks }] = await Promise.all([

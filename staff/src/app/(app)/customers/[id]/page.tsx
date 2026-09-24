@@ -32,6 +32,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   const ctx = await getStaffContext();
   if (!ctx) return null;
+  // スタッフ（dept_leader）は依頼主とは直接やり取りしない役割。直接URLで
+  // 来ても弾く。
+  if (ctx.role === "dept_leader") notFound();
 
   const supabase = await createClient();
 

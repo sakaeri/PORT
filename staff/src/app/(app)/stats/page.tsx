@@ -56,6 +56,9 @@ function monthRange(oldestKey: string | null): { key: string; label: string }[] 
 export default async function StatsPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
+  // スタッフ（dept_leader）は依頼主とは直接やり取りしない役割で、
+  // 売上・実績も見せない。直接URLで来ても弾く。
+  if (ctx.role === "dept_leader") return null;
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>
