@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash, PencilSimple } from "@phosphor-icons/react";
+import { Plus, Trash, PencilSimple, X } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import {
@@ -11,20 +11,27 @@ import {
   inviteStaffMember,
   updateStaffMember,
   removeStaffMember,
+  updateMenuDepartment,
 } from "@/app/actions";
 import type { StaffRole } from "@/lib/supabase/types";
 
-interface Department {
+export interface Department {
   id: string;
   name: string;
 }
 
-interface StaffRow {
+export interface StaffRow {
   id: string;
   role: StaffRole;
   departmentId: string | null;
   displayName: string;
   email: string;
+}
+
+export interface MenuOption {
+  id: string;
+  label: string;
+  departmentId: string | null;
 }
 
 const ROLE_LABEL: Record<StaffRole, string> = {
@@ -75,21 +82,34 @@ export default function StaffAdmin({
   currentRole,
   departments: initialDepartments,
   staff: initialStaff,
+  menus: initialMenus,
+  onClose,
 }: {
   currentUserId: string;
   currentRole: StaffRole | "reception";
   departments: Department[];
   staff: StaffRow[];
+  menus: MenuOption[];
+  onClose?: () => void;
 }) {
   const [departments, setDepartments] = useState(initialDepartments);
   const [staff, setStaff] = useState(initialStaff);
+  const [menus, setMenus] = useState(initialMenus);
   const canManage = currentRole === "owner" || currentRole === "supervisor";
   const canDelete = currentRole === "owner";
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 780, width: "100%", margin: "0 auto" }}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>スタッフ</div>
-      <DepartmentsCard departments={departments} setDepartments={setDepartments} canManage={canManage} canDelete={canDelete} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>窓口・スタッフ管理</div>
+        <div style={{ flex: 1 }} />
+        {onClose && (
+          <button onClick={onClose} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+            <X size={18} />
+          </button>
+        )}
+      </div>
+      <DepartmentsCard departments={departments} setDepartments={setDepartments} menus={menus} setMenus={setMenus} canManage={canManage} canDelete={canDelete} />
       <StaffListCard
         staff={staff}
         setStaff={setStaff}
@@ -106,11 +126,15 @@ export default function StaffAdmin({
 function DepartmentsCard({
   departments,
   setDepartments,
+  menus,
+  setMenus,
   canManage,
   canDelete,
 }: {
   departments: Department[];
   setDepartments: React.Dispatch<React.SetStateAction<Department[]>>;
+  menus: MenuOption[];
+  setMenus: React.Dispatch<React.SetStateAction<MenuOption[]>>;
   canManage: boolean;
   canDelete: boolean;
 }) {
@@ -186,44 +210,47 @@ function DepartmentsCard({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {departments.map((d) => (
-          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-            {editingId === d.id ? (
-              <>
-                <input value={editName} onChange={(e) => setEditName(e.target.value)} className="vid-input" style={{ ...input, flex: 1, height: 32 }} />
-                <button onClick={() => rename(d.id)} disabled={busy} style={{ ...smallBtn, height: 32 }}>
-                  保存
-                </button>
-                <button onClick={() => setEditingId(null)} style={{ ...smallBtn, height: 32, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-                  キャンセル
-                </button>
-              </>
-            ) : (
-              <>
-                <span style={{ flex: 1, fontSize: 13 }}>{d.name}</span>
-                {canManage && (
-                  <button
-                    onClick={() => {
-                      setEditingId(d.id);
-                      setEditName(d.name);
-                    }}
-                    aria-label="名前を変更"
-                    style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-                  >
-                    <PencilSimple size={13} />
+          <div key={d.id} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {editingId === d.id ? (
+                <>
+                  <input value={editName} onChange={(e) => setEditName(e.target.value)} className="vid-input" style={{ ...input, flex: 1, height: 32 }} />
+                  <button onClick={() => rename(d.id)} disabled={busy} style={{ ...smallBtn, height: 32 }}>
+                    保存
                   </button>
-                )}
-                {canDelete && (
-                  <button
-                    onClick={() => remove(d.id)}
-                    disabled={busy}
-                    aria-label="削除"
-                    style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-                  >
-                    <Trash size={13} />
+                  <button onClick={() => setEditingId(null)} style={{ ...smallBtn, height: 32, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+                    キャンセル
                   </button>
-                )}
-              </>
-            )}
+                </>
+              ) : (
+                <>
+                  <span style={{ flex: 1, fontSize: 13 }}>{d.name}</span>
+                  {canManage && (
+                    <button
+                      onClick={() => {
+                        setEditingId(d.id);
+                        setEditName(d.name);
+                      }}
+                      aria-label="名前を変更"
+                      style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+                    >
+                      <PencilSimple size={13} />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={() => remove(d.id)}
+                      disabled={busy}
+                      aria-label="削除"
+                      style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+                    >
+                      <Trash size={13} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+            {canManage && menus.length > 0 && <DepartmentMenuPicker department={d} menus={menus} setMenus={setMenus} />}
           </div>
         ))}
       </div>
@@ -247,6 +274,69 @@ function DepartmentsCard({
       )}
 
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+    </div>
+  );
+}
+
+// 窓口ごとの「対応メニュー」選択。メニューは1つの窓口にしか属さないので、
+// 別の窓口ですでにONのメニューを押すとこちらに付け替わる。
+function DepartmentMenuPicker({
+  department,
+  menus,
+  setMenus,
+}: {
+  department: Department;
+  menus: MenuOption[];
+  setMenus: React.Dispatch<React.SetStateAction<MenuOption[]>>;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  async function toggle(menu: MenuOption) {
+    if (busyId) return;
+    const nextDepartmentId = menu.departmentId === department.id ? null : department.id;
+    setBusyId(menu.id);
+    setError("");
+    const prev = menu.departmentId;
+    setMenus((rows) => rows.map((m) => (m.id === menu.id ? { ...m, departmentId: nextDepartmentId } : m)));
+    try {
+      await updateMenuDepartment(menu.id, nextDepartmentId);
+    } catch (e) {
+      setMenus((rows) => rows.map((m) => (m.id === menu.id ? { ...m, departmentId: prev } : m)));
+      setError(errorMessage(e, "変更できませんでした"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
+      <span style={label}>対応メニュー</span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {menus.map((m) => {
+          const on = m.departmentId === department.id;
+          return (
+            <button
+              key={m.id}
+              onClick={() => toggle(m)}
+              disabled={busyId === m.id}
+              style={{
+                height: 28,
+                padding: "0 10px",
+                cursor: "pointer",
+                fontSize: 11.5,
+                color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
+                background: on ? "var(--color-accent-900)" : "transparent",
+                border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
+                borderRadius: "var(--radius-md)",
+              }}
+            >
+              {m.label}
+            </button>
+          );
+        })}
+      </div>
+      {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
     </div>
   );
 }

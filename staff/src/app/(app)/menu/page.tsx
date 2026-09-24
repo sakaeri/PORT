@@ -7,7 +7,7 @@ export default async function MenuSettingsPage() {
   if (!ctx) return null;
 
   const supabase = await createClient();
-  const [{ data: org }, { data: menus }, { data: templates }, { data: policy }, { data: userData }, { data: cardPaymentLinks }, { data: departments }] = await Promise.all([
+  const [{ data: org }, { data: menus }, { data: templates }, { data: policy }, { data: userData }, { data: cardPaymentLinks }] = await Promise.all([
     supabase
       .from("organizations")
       .select("name, display_name, rep_name, address, tel, email, slug, card_payment_enabled, bank_transfer_info")
@@ -26,7 +26,6 @@ export default async function MenuSettingsPage() {
     supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId),
     supabase.auth.getUser(),
     supabase.from("card_payment_links").select("id, title, url").eq("org_id", ctx.orgId).order("created_at", { ascending: false }),
-    supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
   ]);
 
   return (
@@ -50,7 +49,6 @@ export default async function MenuSettingsPage() {
       initialCardPaymentEnabled={org?.card_payment_enabled ?? false}
       initialBankInfo={org?.bank_transfer_info ?? {}}
       initialCardPaymentLinks={cardPaymentLinks ?? []}
-      departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
     />
   );
 }

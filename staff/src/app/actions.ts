@@ -1104,6 +1104,44 @@ export async function sendCaseMessage(caseThreadId: string, text: string) {
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", caseThreadId);
 }
 
+// スタッフ⇄本部（オーナー・統括担当）の1対1連絡チャット。スタッフ1人につき
+// 1本の thread（kind='internal'）を、初回アクセス時にその場で作る。
+export async function ensureStaffThread(staffProfileId: string) {
+  const ctx = await requireContext();
+  if (staffProfileId !== ctx.userId && ctx.role !== "owner" && ctx.role !== "supervisor") {
+    throw new Error("権限がありません");
+  }
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("threads")
+    .select("id")
+    .eq("org_id", ctx.orgId)
+    .eq("kind", "internal")
+    .eq("staff_profile_id", staffProfileId)
+    .maybeSingle();
+  if (existing) return existing.id;
+
+  const { data: created, error } = await supabase
+    .from("threads")
+    .insert({ org_id: ctx.orgId, kind: "internal", staff_profile_id: staffProfileId })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return created.id;
+}
+
+export async function sendInternalMessage(threadId: string, text: string) {
+  const ctx = await requireContext();
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("messages")
+    .insert({ thread_id: threadId, sender_id: ctx.userId, sender_role: ctx.role, kind: "text", body: trimmed });
+  if (error) throw error;
+  await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+}
+
 // 項目付きテンプレ（intake_forms）を依頼主トークに intake_request として送る。
 // 依頼主側の回答はその場のメッセージ（intake_answer）としてのみ残り、
 // 依頼主ごとの永続データには繋がらない（見積もりの質問と同じ扱い）。

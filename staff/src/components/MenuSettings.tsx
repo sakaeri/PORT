@@ -27,7 +27,6 @@ import {
   updateIntakeField,
   deleteIntakeField,
   updateRefundPolicy,
-  updateMenuDepartment,
 } from "@/app/actions";
 import type { BankTransferInfo, RefundMode, RefundStage } from "@/lib/supabase/types";
 
@@ -57,11 +56,6 @@ interface Menu {
   active: boolean;
   department_id: string | null;
   menu_questions: Question[];
-}
-
-interface Department {
-  id: string;
-  name: string;
 }
 
 interface IntakeField {
@@ -140,7 +134,6 @@ export default function MenuSettings({
   initialCardPaymentEnabled,
   initialBankInfo,
   initialCardPaymentLinks,
-  departments,
   initialSolo,
 }: {
   orgId: string;
@@ -155,7 +148,6 @@ export default function MenuSettings({
   initialCardPaymentEnabled: boolean;
   initialBankInfo: BankTransferInfo;
   initialCardPaymentLinks: CardPaymentLink[];
-  departments: Department[];
 }) {
   const [tab, setTab] = useState<TabKey>("company");
   const isMobile = useIsMobile();
@@ -231,7 +223,7 @@ export default function MenuSettings({
           <StaffModeCard initialSolo={initialSolo} />
         </>
       )}
-      {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} departments={departments} />}
+      {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
       {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} />}
       {tab === "login" && (
@@ -713,7 +705,7 @@ function Field({ label: l, value, onChange }: { label: string; value: string; on
   );
 }
 
-function MenuListCard({ orgId, initialMenus, departments }: { orgId: string; initialMenus: Menu[]; departments: Department[] }) {
+function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Menu[] }) {
   const [menus, setMenus] = useState(initialMenus);
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -721,11 +713,6 @@ function MenuListCard({ orgId, initialMenus, departments }: { orgId: string; ini
     const id = await createMenu(orgId);
     setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, price: 0, lead_hours: 24, active: true, department_id: null, menu_questions: [] }]);
     setOpenId(id);
-  }
-
-  async function changeDepartment(id: string, departmentId: string) {
-    patchLocal(id, { department_id: departmentId || null });
-    await updateMenuDepartment(id, departmentId || null);
   }
 
   async function handleDelete(id: string) {
@@ -746,7 +733,7 @@ function MenuListCard({ orgId, initialMenus, departments }: { orgId: string; ini
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>受付メニュー</div>
-        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます" />
+        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。どの窓口が対応するかは「スタッフ」画面の窓口・スタッフ管理で設定します" />
         <div style={{ flex: 1 }} />
         <button onClick={handleAdd} style={smallBtn}>
           <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
@@ -803,20 +790,6 @@ function MenuListCard({ orgId, initialMenus, departments }: { orgId: string; ini
                     <span style={label}>詳細内容</span>
                     <input value={m.note ?? ""} onChange={(e) => patchLocal(m.id, { note: e.target.value })} onBlur={() => commit(m)} className="vid-input" style={input} />
                   </div>
-
-                  {departments.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>担当窓口</span>
-                      <select value={m.department_id ?? ""} onChange={(e) => changeDepartment(m.id, e.target.value)} className="vid-input" style={input}>
-                        <option value="">窓口未設定</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
 
                   <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} />
 

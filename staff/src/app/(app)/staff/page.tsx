@@ -1,6 +1,6 @@
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
-import StaffAdmin from "@/components/StaffAdmin";
+import StaffChat from "@/components/StaffChat";
 import type { StaffRole } from "@/lib/supabase/types";
 
 export default async function StaffPage() {
@@ -8,7 +8,7 @@ export default async function StaffPage() {
   if (!ctx) return null;
 
   const supabase = await createClient();
-  const [{ data: departments }, { data: staff }] = await Promise.all([
+  const [{ data: departments }, { data: staff }, { data: menus }] = await Promise.all([
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
     supabase
       .from("profiles")
@@ -16,6 +16,7 @@ export default async function StaffPage() {
       .eq("org_id", ctx.orgId)
       .in("role", ["owner", "supervisor", "dept_manager", "dept_leader"])
       .order("created_at", { ascending: true }),
+    supabase.from("menus").select("id, label, department_id").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
   ]);
 
   // メールアドレスはauth.users側にしかないので、Admin APIでスタッフの
@@ -28,12 +29,19 @@ export default async function StaffPage() {
     }),
   );
 
+  const canManage = ctx.role === "owner" || ctx.role === "supervisor";
+  const staffList = staffWithEmail.filter((s) => s.id !== ctx.userId).map((s) => ({ id: s.id, displayName: s.displayName }));
+
   return (
-    <StaffAdmin
+    <StaffChat
       currentUserId={ctx.userId}
       currentRole={ctx.role}
+      orgId={ctx.orgId}
+      canManage={canManage}
+      staffList={staffList}
       departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
-      staff={staffWithEmail}
+      staffRows={staffWithEmail}
+      menus={(menus ?? []).map((m) => ({ id: m.id, label: m.label, departmentId: m.department_id }))}
     />
   );
 }
