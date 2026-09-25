@@ -24,9 +24,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
     supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId),
-    supabase.from("case_staff").select("profile_id, profiles!case_staff_profile_id_fkey(display_name)").eq("request_id", id),
+    supabase.from("case_staff").select("profile_id, profiles!case_staff_profile_id_fkey(display_name, staff_alias)").eq("request_id", id),
     canAssignStaff
-      ? supabase.from("profiles").select("id, display_name").eq("org_id", ctx.orgId).eq("role", "dept_leader")
+      ? supabase.from("profiles").select("id, display_name, staff_alias").eq("org_id", ctx.orgId).eq("role", "dept_leader")
       : Promise.resolve({ data: [] }),
     supabase.from("threads").select("id, archived_at").eq("kind", "case").eq("request_id", id).maybeSingle(),
   ]);
@@ -34,25 +34,22 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
 
   const assignedStaff = (caseStaffRows ?? []).map((r) => {
     const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
-    return { id: r.profile_id, displayName: profile?.display_name ?? "" };
+    return { id: r.profile_id, displayName: profile?.staff_alias ?? profile?.display_name ?? "" };
   });
-  const availableStaff = (staffPool ?? []).map((p) => ({ id: p.id, displayName: p.display_name }));
+  const availableStaff = (staffPool ?? []).map((p) => ({ id: p.id, displayName: p.staff_alias ?? p.display_name }));
 
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
 
-  let caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null; senderName: string | null }[] = [];
+  let caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null }[] = [];
   if (caseThread) {
     const { data } = await supabase
       .from("messages")
-      .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at, profiles!messages_sender_id_fkey(display_name)")
+      .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at")
       .eq("thread_id", caseThread.id)
       .order("sent_at", { ascending: true });
-    caseMessages = (data ?? []).map((m) => {
-      const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-      return { ...m, senderName: profile?.display_name ?? null };
-    });
+    caseMessages = data ?? [];
   }
 
   return (

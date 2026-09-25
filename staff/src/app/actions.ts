@@ -1349,13 +1349,16 @@ export async function acceptStaffInvite(inviteId: string, fields: { email: strin
   return { email: fields.email.trim() };
 }
 
-export async function updateStaffMember(profileId: string, role: StaffRole, departmentIds: string[], displayName: string) {
+// alias はオーナーがこのスタッフに付ける社内向けの呼び方。本人が自分で
+// 決める本当の表示名（profiles.display_name、updateMyDisplayName経由でしか
+// 変更できない）は書き換えない — LINEのニックネームと同じ発想。
+export async function updateStaffMember(profileId: string, role: StaffRole, departmentIds: string[], alias: string) {
   const ctx = await requireOwner();
-  const trimmedName = displayName.trim();
-  if (!trimmedName) throw new Error("表示名を入力してください");
+  const trimmedAlias = alias.trim();
+  if (!trimmedAlias) throw new Error("表示名を入力してください");
   const resolvedDepartmentIds = normalizeStaffDepartments(role, departmentIds);
   const admin = createServiceRoleClient();
-  const { error } = await admin.from("profiles").update({ role, display_name: trimmedName }).eq("id", profileId).eq("org_id", ctx.orgId);
+  const { error } = await admin.from("profiles").update({ role, staff_alias: trimmedAlias }).eq("id", profileId).eq("org_id", ctx.orgId);
   if (error) throw error;
   await replaceStaffDepartments(admin, profileId, resolvedDepartmentIds);
 }

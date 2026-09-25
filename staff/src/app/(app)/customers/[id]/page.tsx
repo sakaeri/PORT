@@ -67,7 +67,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .order("sort", { ascending: true }),
     supabase
       .from("work_memos")
-      .select("id, author_id, body, created_at, profiles!work_memos_author_id_fkey(display_name)")
+      .select("id, author_id, body, created_at, profiles!work_memos_author_id_fkey(display_name, staff_alias)")
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
     supabase.from("ratings").select("stars, comment, skipped, created_at").eq("customer_id", id).order("created_at", { ascending: false }),
@@ -101,7 +101,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const menus = (menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, payout: m.payout, leadHours: m.lead_hours }));
   const memos = (memoRows ?? []).map((m) => {
     const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-    return { id: m.id, authorId: m.author_id, authorName: profile?.display_name ?? "スタッフ", body: m.body, createdAt: m.created_at };
+    return { id: m.id, authorId: m.author_id, authorName: profile?.staff_alias ?? profile?.display_name ?? "スタッフ", body: m.body, createdAt: m.created_at };
   });
   const rated = (ratingRows ?? []).filter((r) => !r.skipped && r.stars != null);
   const ratings = {

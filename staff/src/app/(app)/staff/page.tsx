@@ -15,7 +15,7 @@ export default async function StaffPage() {
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
     supabase
       .from("profiles")
-      .select("id, role, display_name")
+      .select("id, role, display_name, staff_alias")
       .eq("org_id", ctx.orgId)
       .in("role", ["owner", "dept_manager", "dept_leader"])
       .order("created_at", { ascending: true }),
@@ -44,7 +44,7 @@ export default async function StaffPage() {
         : null;
     return {
       id: p.id,
-      displayName: p.display_name,
+      displayName: p.staff_alias ?? p.display_name,
       role: p.role as StaffRole,
       departmentIds: departmentIdsByProfile.get(p.id) ?? [],
       lastMessagePreview,

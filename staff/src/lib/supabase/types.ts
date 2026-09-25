@@ -147,6 +147,7 @@ export interface Database {
           org_id: string;
           role: AppRole;
           display_name: string;
+          staff_alias: string | null;
           avatar_url: string | null;
           theme: "dark" | "light";
           created_at: string;
