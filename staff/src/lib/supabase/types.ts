@@ -6,7 +6,9 @@
 // this file before trusting the replacement.
 
 export type AppRole = "owner" | "reception" | "creator" | "client" | "supervisor" | "dept_manager" | "dept_leader";
-export type StaffRole = "owner" | "supervisor" | "dept_manager" | "dept_leader";
+// supervisor はDB上の名残の値（enum値は削除できない）。実際には
+// オーナー／マネージャー／スタッフの3段階しか使わない。
+export type StaffRole = "owner" | "dept_manager" | "dept_leader";
 
 export type RequestPhase =
   | "draft"

@@ -8,7 +8,7 @@ export default async function StaffPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
 
-  const canManage = ctx.role === "owner" || ctx.role === "supervisor";
+  const canManage = ctx.role === "owner";
   const supabase = await createClient();
   const [{ data: departments }, { data: profiles }, { data: staffDepartments }, { data: menus }, { data: summaries }] = await Promise.all([
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
@@ -16,7 +16,7 @@ export default async function StaffPage() {
       .from("profiles")
       .select("id, role, display_name")
       .eq("org_id", ctx.orgId)
-      .in("role", ["owner", "supervisor", "dept_manager", "dept_leader"])
+      .in("role", ["owner", "dept_manager", "dept_leader"])
       .order("created_at", { ascending: true }),
     supabase.from("staff_departments").select("profile_id, department_id"),
     supabase.from("menus").select("id, label, department_id").eq("org_id", ctx.orgId).order("sort", { ascending: true }),

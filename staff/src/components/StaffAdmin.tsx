@@ -90,7 +90,7 @@ export function DepartmentAdmin({
 }) {
   const [departments, setDepartments] = useState(initialDepartments);
   const [menus, setMenus] = useState(initialMenus);
-  const canManage = currentRole === "owner" || currentRole === "supervisor";
+  const canManage = currentRole === "owner";
   const canDelete = currentRole === "owner";
 
   return (

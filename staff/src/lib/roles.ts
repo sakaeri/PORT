@@ -4,9 +4,8 @@ import type { StaffRole } from "@/lib/supabase/types";
 // やり取りせず、担当窓口の案件について社内トークで作業する役割）。
 export const ROLE_LABEL: Record<StaffRole, string> = {
   owner: "オーナー",
-  supervisor: "統括担当",
   dept_manager: "マネージャー",
   dept_leader: "スタッフ",
 };
-export const INVITE_ROLES: StaffRole[] = ["supervisor", "dept_manager", "dept_leader"];
+export const INVITE_ROLES: StaffRole[] = ["dept_manager", "dept_leader"];
 export const isDeptScoped = (role: StaffRole) => role === "dept_manager" || role === "dept_leader";

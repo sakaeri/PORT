@@ -28,7 +28,7 @@ export interface StaffContext {
   isLocked: boolean;
 }
 
-const STAFF_ROLES = ["owner", "reception", "supervisor", "dept_manager", "dept_leader"] as const;
+const STAFF_ROLES = ["owner", "reception", "dept_manager", "dept_leader"] as const;
 
 // null means: not logged in, or logged in but not one of STAFF_ROLES (e.g. a
 // creator-role account — that belongs to the separate, not-yet-built

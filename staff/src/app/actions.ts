@@ -6,7 +6,7 @@ import { getStaffContext } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
 import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
 import { notifyCustomerCompletionReport, notifyCustomerPaymentConfirmed, notifyCustomerQuoteCreated } from "@/lib/notify";
-import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage } from "@/lib/supabase/types";
+import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage, StaffRole } from "@/lib/supabase/types";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
 // （キャンセル処理や、支払い設定そのものなど）用。既定はロック中なら弾く。
@@ -25,12 +25,12 @@ async function requireHq() {
   return ctx;
 }
 
-// 統括担当・スタッフ（dept_leader）は削除操作ができない役職。削除系のアクション全部
+// スタッフ（dept_leader）は削除操作ができない役職。削除系のアクション全部
 // でこれを呼ぶ（自分が送ったメッセージの削除も対象— 見積もりチャットの
 // 削除は案件自体の完全削除につながるため）。
 function requireDeletePermission(ctx: { role: string }) {
-  if (ctx.role === "supervisor" || ctx.role === "dept_leader") {
-    throw new Error("削除は統括担当・スタッフには許可されていません。オーナーまたはマネージャーにご依頼ください。");
+  if (ctx.role === "dept_leader") {
+    throw new Error("削除はスタッフには許可されていません。オーナーまたはマネージャーにご依頼ください。");
   }
 }
 
@@ -1106,7 +1106,7 @@ export async function sendCaseMessage(caseThreadId: string, text: string) {
 
 // スタッフ（dept_leader）は窓口所属だけでは案件が見えず、案件ごとに
 // 個別に割り当てられて初めてその案件の社内トークにアクセスできる。
-// 割り当て・解除ができるのはオーナー・統括担当・マネージャー
+// 割り当て・解除ができるのはオーナー・マネージャー
 // （RLS の case_staff_write でも強制される）。
 export async function assignCaseStaff(requestId: string, profileId: string) {
   await requireContext();
@@ -1122,11 +1122,11 @@ export async function unassignCaseStaff(requestId: string, profileId: string) {
   if (error) throw error;
 }
 
-// スタッフ⇄本部（オーナー・統括担当）の1対1連絡チャット。スタッフ1人につき
+// スタッフ⇄本部（オーナー）の1対1連絡チャット。スタッフ1人につき
 // 1本の thread（kind='internal'）を、初回アクセス時にその場で作る。
 export async function ensureStaffThread(staffProfileId: string) {
   const ctx = await requireContext();
-  if (staffProfileId !== ctx.userId && ctx.role !== "owner" && ctx.role !== "supervisor") {
+  if (staffProfileId !== ctx.userId && ctx.role !== "owner") {
     throw new Error("権限がありません");
   }
   const supabase = await createClient();
@@ -1214,20 +1214,20 @@ export async function deleteWorkMemo(id: string) {
 // ============================================================
 // 窓口（部署）とスタッフの役職管理
 // ============================================================
-// 役職は4段階：オーナー（全窓口・依頼主対応可・全権限）／統括担当（全窓口・
-// 依頼主対応可・削除不可）／マネージャー=dept_manager（自分の窓口・依頼主
-// 対応可・削除可）／スタッフ=dept_leader（自分の窓口の案件について社内
-// トークでの作業のみ、依頼主とは直接やり取りしない・削除不可）。
+// 役職は3段階：オーナー（全窓口・依頼主対応可・全権限）／マネージャー=
+// dept_manager（自分の窓口・依頼主対応可・削除可）／スタッフ=dept_leader
+// （自分の窓口の案件について社内トークでの作業のみ、依頼主とは直接
+// やり取りしない・削除不可）。
 // dept_leader という値自体はDB上の名残で、表示・実際の役割は「スタッフ」。
 
-async function requireOwnerOrSupervisor() {
+async function requireOwner() {
   const ctx = await requireContext();
-  if (ctx.role !== "owner" && ctx.role !== "supervisor") throw new Error("この操作はオーナー・統括担当のみ行えます");
+  if (ctx.role !== "owner") throw new Error("この操作はオーナーのみ行えます");
   return ctx;
 }
 
 export async function createDepartment(name: string) {
-  const ctx = await requireOwnerOrSupervisor();
+  const ctx = await requireOwner();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("窓口名を入力してください");
   const admin = createServiceRoleClient();
@@ -1237,7 +1237,7 @@ export async function createDepartment(name: string) {
 }
 
 export async function renameDepartment(id: string, name: string) {
-  const ctx = await requireOwnerOrSupervisor();
+  const ctx = await requireOwner();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("窓口名を入力してください");
   const admin = createServiceRoleClient();
@@ -1256,15 +1256,13 @@ export async function deleteDepartment(id: string) {
 }
 
 export async function updateMenuDepartment(menuId: string, departmentId: string | null) {
-  const ctx = await requireOwnerOrSupervisor();
+  const ctx = await requireOwner();
   const supabase = await createClient();
   const { error } = await supabase.from("menus").update({ department_id: departmentId }).eq("id", menuId).eq("org_id", ctx.orgId);
   if (error) throw error;
 }
 
-type StaffRoleInput = "owner" | "supervisor" | "dept_manager" | "dept_leader";
-
-function normalizeStaffDepartments(role: StaffRoleInput, departmentIds: string[]) {
+function normalizeStaffDepartments(role: StaffRole, departmentIds: string[]) {
   if (role !== "dept_manager" && role !== "dept_leader") return [];
   if (departmentIds.length === 0) throw new Error("マネージャー・スタッフは担当する窓口を1つ以上選んでください");
   return departmentIds;
@@ -1285,7 +1283,7 @@ async function replaceStaffDepartments(admin: ReturnType<typeof createServiceRol
 // あとで変更できるので、招待の時点で決め切る意味がない）。招待は常に
 // 一番権限の小さいスタッフ（dept_leader）として作られる。
 export async function createStaffInvite() {
-  const ctx = await requireOwnerOrSupervisor();
+  const ctx = await requireOwner();
   const admin = createServiceRoleClient();
   const { data, error } = await admin
     .from("staff_invites")
@@ -1307,7 +1305,7 @@ export async function getInvitePreview(inviteId: string) {
     .maybeSingle();
   if (!invite) return null;
   const org = Array.isArray(invite.organizations) ? invite.organizations[0] : invite.organizations;
-  return { role: invite.role as StaffRoleInput, valid: !invite.used_at, orgDisplayName: org?.display_name ?? "" };
+  return { role: invite.role as StaffRole, valid: !invite.used_at, orgDisplayName: org?.display_name ?? "" };
 }
 
 export async function acceptStaffInvite(inviteId: string, fields: { email: string; password: string; displayName: string }) {
@@ -1351,8 +1349,8 @@ export async function acceptStaffInvite(inviteId: string, fields: { email: strin
   return { email: fields.email.trim() };
 }
 
-export async function updateStaffMember(profileId: string, role: StaffRoleInput, departmentIds: string[]) {
-  const ctx = await requireOwnerOrSupervisor();
+export async function updateStaffMember(profileId: string, role: StaffRole, departmentIds: string[]) {
+  const ctx = await requireOwner();
   const resolvedDepartmentIds = normalizeStaffDepartments(role, departmentIds);
   const admin = createServiceRoleClient();
   const { error } = await admin.from("profiles").update({ role }).eq("id", profileId).eq("org_id", ctx.orgId);
