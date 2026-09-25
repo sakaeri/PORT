@@ -5,7 +5,6 @@ import { Plus, Trash, PencilSimple, X, Check, Copy, CaretDown, CaretRight } from
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { createDepartment, renameDepartment, deleteDepartment, updateMenuDepartment, createStaffInvite } from "@/app/actions";
-import RoleTags from "@/components/RoleTags";
 import InfoTooltip from "@/components/InfoTooltip";
 import type { StaffRole } from "@/lib/supabase/types";
 
@@ -290,13 +289,29 @@ function DepartmentRow({
         {open ? <CaretDown size={13} color="var(--color-neutral-500)" /> : <CaretRight size={13} color="var(--color-neutral-500)" />}
       </button>
       {open && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "0 12px 12px", borderTop: "1px solid var(--color-divider)", paddingTop: 10 }}>
-          {canManage && menus.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 12px 12px", borderTop: "1px solid var(--color-divider)", paddingTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {canManage && menus.length > 0 ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 5, flex: 1 }}>
                 <span style={label}>対応メニュー</span>
                 <InfoTooltip text="このメニューで問い合わせが来ると、この窓口のスタッフが直接やり取りできるようになります。タップで選択・解除、他の窓口の担当だったメニューはこちらに移ります。" />
               </div>
+            ) : (
+              <div style={{ flex: 1 }} />
+            )}
+            {canManage && (
+              <button onClick={onEdit} aria-label="編集" style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                <PencilSimple size={13} />
+              </button>
+            )}
+            {canDelete && (
+              <button onClick={onDelete} disabled={busy} aria-label="削除" style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                <Trash size={13} />
+              </button>
+            )}
+          </div>
+          {canManage && menus.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {menus.map((m) => {
                   const on = m.departmentId === department.id;
@@ -328,20 +343,6 @@ function DepartmentRow({
               {menuError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{menuError}</span>}
             </div>
           )}
-          <div style={{ display: "flex", gap: 8 }}>
-            {canManage && (
-              <button onClick={onEdit} style={{ ...smallBtn, height: 30, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-                <PencilSimple size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-                編集
-              </button>
-            )}
-            {canDelete && (
-              <button onClick={onDelete} disabled={busy} style={{ ...smallBtn, height: 30, color: "var(--color-accent-200)", borderColor: "var(--color-accent-800)" }}>
-                <Trash size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-                削除
-              </button>
-            )}
-          </div>
         </div>
       )}
     </div>
@@ -381,7 +382,6 @@ function InviteLinkCard() {
         <span style={{ fontSize: 12.5, color: "var(--color-text)" }}>リンクを発行してURLを本人に送ってください。</span>
         <InfoTooltip text="ログイン情報は本人が自分で設定します。役職・担当窓口はあとから何度でも変更できるので、まずは一番権限の小さい「スタッフ」として参加してもらい、必要になったらチャット画面から権限を上げてください。窓口が未設定の間は何も見えない状態になるので安全です。参加すると、そのままスタッフ一覧に表示されます。" />
       </div>
-      <RoleTags role="dept_leader" />
 
       <button onClick={create} disabled={creating} style={{ ...smallBtn, alignSelf: "flex-start" }}>
         {creating ? "作成中…" : "招待リンクを作成"}
