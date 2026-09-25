@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X } from "@phosphor-icons/react";
+import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X, PencilSimple } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { headingWeight } from "@/lib/style";
 import OrgSwitcher from "@/components/OrgSwitcher";
 import BillingModal from "@/components/BillingModal";
+import Modal from "@/components/Modal";
+import SelfNamePanel from "@/components/SelfNamePanel";
 import { signOutStaff } from "@/lib/signOutStaff";
 import type { StaffContext } from "@/lib/data";
 
@@ -29,6 +31,8 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   const router = useRouter();
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [myName, setMyName] = useState(ctx.displayName);
+  const [showMyName, setShowMyName] = useState(false);
   // 事業者ごとの未読件数。今開いている事業者だけでなく、リンクしている
   // 他の事業者の分もまとめて持っておき、事業者切替の▼に出す（is_staff_of()の
   // RLSにより、ヘッダーを切り替えなくても他の自分の事業者は読める）。
@@ -193,7 +197,24 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       <div style={{ flex: 1 }} />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
-        <div style={{ padding: "4px 4px 8px", fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ctx.displayName}</div>
+        <button
+          onClick={() => setShowMyName(true)}
+          aria-label="表示名を変更"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 4px 8px",
+            cursor: "pointer",
+            fontSize: 11.5,
+            color: "var(--color-neutral-500)",
+            background: "transparent",
+            border: "none",
+          }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myName}</span>
+          <PencilSimple size={11} style={{ flex: "none" }} />
+        </button>
         <button
           onClick={toggleTheme}
           style={{ display: "flex", alignItems: "center", gap: 10, height: 34, padding: "0 10px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", borderRadius: "var(--radius-md)" }}
@@ -270,6 +291,11 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
         </main>
         {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
+        {showMyName && (
+          <Modal onClose={() => setShowMyName(false)} maxWidth={380}>
+            <SelfNamePanel currentName={myName} onSaved={setMyName} onClose={() => setShowMyName(false)} />
+          </Modal>
+        )}
       </div>
     );
   }
@@ -296,6 +322,11 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
         <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
       </main>
       {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
+      {showMyName && (
+        <Modal onClose={() => setShowMyName(false)} maxWidth={380}>
+          <SelfNamePanel currentName={myName} onSaved={setMyName} onClose={() => setShowMyName(false)} />
+        </Modal>
+      )}
     </div>
   );
 }

@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Buildings, UserPlus, PencilSimple } from "@phosphor-icons/react";
+import { Buildings, UserPlus } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
 import StaffThreadPane from "@/components/StaffThreadPane";
 import Modal from "@/components/Modal";
-import SelfNamePanel from "@/components/SelfNamePanel";
 import { DepartmentAdmin, InviteAdmin, type Department, type MenuOption } from "@/components/StaffAdmin";
 import type { StaffRole } from "@/lib/supabase/types";
 
@@ -22,7 +21,6 @@ export interface StaffDirectoryRow {
 
 export default function StaffChat({
   currentUserId,
-  currentDisplayName,
   currentRole,
   orgId,
   canManage,
@@ -31,7 +29,6 @@ export default function StaffChat({
   menus,
 }: {
   currentUserId: string;
-  currentDisplayName: string;
   currentRole: StaffRole | "reception";
   orgId: string;
   canManage: boolean;
@@ -44,8 +41,6 @@ export default function StaffChat({
   const [selectedId, setSelectedId] = useState<string | null>(canManage ? null : currentUserId);
   const [showDepartments, setShowDepartments] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
-  const [myName, setMyName] = useState(currentDisplayName);
-  const [showMyName, setShowMyName] = useState(false);
 
   // 一覧の最終メッセージ・未読はこのコンポーネント自身では再取得せず、
   // ページ全体(staff/page.tsx)を router.refresh() で再取得させる
@@ -92,14 +87,6 @@ export default function StaffChat({
   const header = (
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: "var(--space-6) var(--space-6) 0" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>スタッフ</div>
-      <button
-        onClick={() => setShowMyName(true)}
-        aria-label="自分の表示名を変更"
-        title="自分の表示名を変更"
-        style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}
-      >
-        <PencilSimple size={14} />
-      </button>
       <div style={{ flex: 1 }} />
       {canManage && (
         <>
@@ -122,13 +109,7 @@ export default function StaffChat({
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: showListHeader ? "var(--space-4) var(--space-6) var(--space-6)" : 0 }}>
         {!canManage ? (
-          <StaffThreadPane
-            staffProfileId={currentUserId}
-            title="本部"
-            currentUserId={currentUserId}
-            orgId={orgId}
-            selfName={{ value: myName, onSaved: setMyName }}
-          />
+          <StaffThreadPane staffProfileId={currentUserId} title="本部" currentUserId={currentUserId} orgId={orgId} />
         ) : selected ? (
           <StaffThreadPane
             staffProfileId={selected.id}
@@ -192,11 +173,6 @@ export default function StaffChat({
       {showInvite && (
         <Modal onClose={() => setShowInvite(false)} maxWidth={560}>
           <InviteAdmin onClose={() => setShowInvite(false)} />
-        </Modal>
-      )}
-      {showMyName && (
-        <Modal onClose={() => setShowMyName(false)} maxWidth={380}>
-          <SelfNamePanel currentName={myName} onSaved={setMyName} onClose={() => setShowMyName(false)} />
         </Modal>
       )}
     </div>

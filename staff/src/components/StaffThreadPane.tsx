@@ -10,7 +10,6 @@ import { ROLE_LABEL, INVITE_ROLES, isDeptScoped } from "@/lib/roles";
 import RoleTags from "@/components/RoleTags";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
-import SelfNamePanel from "@/components/SelfNamePanel";
 import type { AppRole, StaffRole } from "@/lib/supabase/types";
 import type { Department } from "@/components/StaffAdmin";
 
@@ -41,7 +40,6 @@ export default function StaffThreadPane({
   orgId,
   onBack,
   editable,
-  selfName,
 }: {
   staffProfileId: string;
   title: string;
@@ -49,9 +47,6 @@ export default function StaffThreadPane({
   orgId: string;
   onBack?: () => void;
   editable?: EditableStaffProps;
-  // 自分自身のトーク画面（本部⇄自分）を見ている時、表示名を自分で
-  // 変えられるようにする。editable（他のスタッフを管理する側）とは排他。
-  selfName?: { value: string; onSaved: (name: string) => void };
 }) {
   const [showEdit, setShowEdit] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -161,7 +156,7 @@ export default function StaffThreadPane({
         </div>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>{title}</div>
         <div style={{ flex: 1 }} />
-        {(editable || selfName) && (
+        {editable && (
           <button
             onClick={() => setShowEdit(true)}
             aria-label="設定"
@@ -179,11 +174,6 @@ export default function StaffThreadPane({
             editable={editable}
             onClose={() => setShowEdit(false)}
           />
-        </Modal>
-      )}
-      {showEdit && !editable && selfName && (
-        <Modal onClose={() => setShowEdit(false)} maxWidth={380}>
-          <SelfNamePanel currentName={selfName.value} onSaved={selfName.onSaved} onClose={() => setShowEdit(false)} />
         </Modal>
       )}
 
