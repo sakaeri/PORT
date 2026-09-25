@@ -1371,12 +1371,22 @@ export async function removeStaffMember(profileId: string) {
 }
 
 // 自分自身の表示名。役職に関係なく誰でも変更できる（削除やロール変更は
-// オーナーのみだが、名前は本人が直接直すのが自然）。
+// オーナーのみだが、名前は本人が直接直すのが自然）。複数事業者を運営する
+// オーナー（staff_org_links）は事業者ごとに別の表示名を持てるので、今
+// どの事業者を見ているか（ctx.orgId）に応じて、profiles（本来の所属先）
+// と staff_org_links（掛け持ち先）のどちらを直すべきか振り分ける。
 export async function updateMyDisplayName(displayName: string) {
   const ctx = await requireContext();
   const trimmed = displayName.trim();
   if (!trimmed) throw new Error("表示名を入力してください");
   const supabase = await createClient();
-  const { error } = await supabase.from("profiles").update({ display_name: trimmed }).eq("id", ctx.userId);
+  const { data, error } = await supabase.from("profiles").update({ display_name: trimmed }).eq("id", ctx.userId).eq("org_id", ctx.orgId).select("id");
   if (error) throw error;
+  if (data && data.length > 0) return;
+
+  // staff_org_links への書き込みはユーザーの書き込みポリシーを置いておらず
+  // service_role専用（20260914000002_staff_multi_org.sqlのコメント参照）。
+  const admin = createServiceRoleClient();
+  const { error: linkError } = await admin.from("staff_org_links").update({ display_name: trimmed }).eq("user_id", ctx.userId).eq("org_id", ctx.orgId);
+  if (linkError) throw linkError;
 }
