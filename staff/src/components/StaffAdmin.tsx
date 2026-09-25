@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash, PencilSimple, X, Check, Copy } from "@phosphor-icons/react";
+import { Plus, Trash, PencilSimple, X, Check, Copy, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { createDepartment, renameDepartment, deleteDepartment, updateMenuDepartment, createStaffInvite } from "@/app/actions";
@@ -270,6 +270,8 @@ function DepartmentMenuPicker({
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [open, setOpen] = useState(false);
+  const selectedCount = menus.filter((m) => m.departmentId === department.id).length;
 
   async function toggle(menu: MenuOption) {
     if (busyId) return;
@@ -291,38 +293,49 @@ function DepartmentMenuPicker({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={label}>対応メニュー</span>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", background: "transparent", border: "none", padding: 0 }}
+        >
+          {open ? <CaretDown size={11} color="var(--color-neutral-500)" /> : <CaretRight size={11} color="var(--color-neutral-500)" />}
+          <span style={label}>対応メニュー{selectedCount > 0 && `（${selectedCount}）`}</span>
+        </button>
         <InfoTooltip text="このメニューで問い合わせが来ると、この窓口のスタッフが直接やり取りできるようになります。タップで選択・解除、他の窓口の担当だったメニューはこちらに移ります。" />
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {menus.map((m) => {
-          const on = m.departmentId === department.id;
-          return (
-            <button
-              key={m.id}
-              onClick={() => toggle(m)}
-              disabled={busyId === m.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                height: 28,
-                padding: "0 10px",
-                cursor: "pointer",
-                fontSize: 11.5,
-                color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
-                background: on ? "var(--color-accent-900)" : "transparent",
-                border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
-                borderRadius: "var(--radius-md)",
-              }}
-            >
-              {on && <Check size={11} weight="bold" />}
-              {m.label}
-            </button>
-          );
-        })}
-      </div>
-      {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
+      {open && (
+        <>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {menus.map((m) => {
+              const on = m.departmentId === department.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => toggle(m)}
+                  disabled={busyId === m.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    height: 28,
+                    padding: "0 10px",
+                    cursor: "pointer",
+                    fontSize: 11.5,
+                    color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
+                    background: on ? "var(--color-accent-900)" : "transparent",
+                    border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
+                    borderRadius: "var(--radius-md)",
+                  }}
+                >
+                  {on && <Check size={11} weight="bold" />}
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+          {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
+        </>
+      )}
     </div>
   );
 }
@@ -331,6 +344,7 @@ function InviteLinkCard() {
   const [creating, setCreating] = useState(false);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   async function create() {
     if (creating) return;
@@ -339,6 +353,7 @@ function InviteLinkCard() {
     try {
       const id = await createStaffInvite();
       setCreatedUrl(`${window.location.origin}/join/${id}`);
+      setCopied(false);
     } catch (e) {
       setError(errorMessage(e, "作成できませんでした"));
     } finally {
@@ -346,10 +361,17 @@ function InviteLinkCard() {
     }
   }
 
+  async function copy(url: string) {
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   return (
     <div style={card}>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        リンクを発行してURLを本人に送ってください。ログイン情報は本人が自分で設定します。役職・担当窓口はあとから何度でも変更できるので、まずは一番権限の小さい「スタッフ」として参加してもらい、必要になったらチャット画面から権限を上げてください。窓口が未設定の間は何も見えない状態になるので安全です。参加すると、そのままスタッフ一覧に表示されます。
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <span style={{ fontSize: 12.5, color: "var(--color-text)" }}>リンクを発行してURLを本人に送ってください。</span>
+        <InfoTooltip text="ログイン情報は本人が自分で設定します。役職・担当窓口はあとから何度でも変更できるので、まずは一番権限の小さい「スタッフ」として参加してもらい、必要になったらチャット画面から権限を上げてください。窓口が未設定の間は何も見えない状態になるので安全です。参加すると、そのままスタッフ一覧に表示されます。" />
       </div>
       <RoleTags role="dept_leader" />
 
@@ -363,11 +385,33 @@ function InviteLinkCard() {
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
           <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{createdUrl}</span>
           <button
-            onClick={() => navigator.clipboard.writeText(createdUrl)}
+            onClick={() => copy(createdUrl)}
             aria-label="コピー"
-            style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+            style={{
+              flex: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              height: 30,
+              padding: copied ? "0 10px" : 0,
+              width: copied ? undefined : 30,
+              justifyContent: "center",
+              cursor: "pointer",
+              fontSize: 11.5,
+              color: copied ? "var(--color-accent-100)" : "var(--color-accent)",
+              background: copied ? "var(--color-accent-900)" : "transparent",
+              border: `1px solid var(--color-accent)`,
+              borderRadius: "var(--radius-md)",
+            }}
           >
-            <Copy size={13} />
+            {copied ? (
+              <>
+                <Check size={13} weight="bold" />
+                コピーしました
+              </>
+            ) : (
+              <Copy size={13} />
+            )}
           </button>
         </div>
       )}
