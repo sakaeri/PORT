@@ -123,6 +123,13 @@ body {
 button {
   font-family: inherit;
 }
+/* 処理中はボタンが見た目でも「押せない」とわかるようにする。ここが
+   無いと、押してから反応が返るまでの間は何も変わって見えず、反応して
+   いないと思われて連打されてしまう。 */
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 
 :focus {
   outline: none;
