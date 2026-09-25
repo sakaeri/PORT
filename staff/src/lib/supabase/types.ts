@@ -349,6 +349,19 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["request_items"]["Row"]>;
         Relationships: [{ foreignKeyName: "request_items_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "requests"; referencedColumns: ["id"] }];
       };
+      case_staff: {
+        Row: {
+          request_id: string;
+          profile_id: string;
+          assigned_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["case_staff"]["Row"]> & { request_id: string; profile_id: string };
+        Update: Partial<Database["public"]["Tables"]["case_staff"]["Row"]>;
+        Relationships: [
+          { foreignKeyName: "case_staff_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "requests"; referencedColumns: ["id"] },
+          { foreignKeyName: "case_staff_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
+        ];
+      };
       threads: {
         Row: {
           id: string;

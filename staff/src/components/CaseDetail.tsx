@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Archive, ArrowCounterClockwise, Star } from "@phosphor-icons/react";
+import { ArrowLeft, Archive, ArrowCounterClockwise, Star, Plus, X } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
@@ -18,6 +18,8 @@ import {
   setFinalPaymentLink,
   archiveCaseThread,
   unarchiveCaseThread,
+  assignCaseStaff,
+  unassignCaseStaff,
 } from "@/app/actions";
 import type { BankTransferInfo, Database, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
@@ -66,6 +68,9 @@ export default function CaseDetail({
   caseMessages,
   orgId,
   currentUserId,
+  assignedStaff,
+  availableStaff,
+  canAssignStaff,
 }: {
   request: {
     id: string;
@@ -94,6 +99,9 @@ export default function CaseDetail({
   caseMessages: CaseMessage[];
   orgId: string;
   currentUserId: string;
+  assignedStaff: { id: string; displayName: string }[];
+  availableStaff: { id: string; displayName: string }[];
+  canAssignStaff: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -172,6 +180,10 @@ export default function CaseDetail({
           </button>
         )}
       </div>
+
+      {(assignedStaff.length > 0 || canAssignStaff) && (
+        <CaseStaffControl requestId={request.id} assignedStaff={assignedStaff} availableStaff={availableStaff} canAssign={canAssignStaff} />
+      )}
 
       <div style={card}>
         {customer && (
@@ -459,6 +471,140 @@ function FinalPaymentLinkForm({ requestId, currentLink }: { requestId: string; c
           キャンセル
         </button>
       </div>
+    </div>
+  );
+}
+
+// 窓口所属だけでは案件が見えないスタッフ（dept_leader）を、この案件に
+// 個別に割り当てる。割り当てられると、この案件の社内トークにアクセス
+// できるようになる。
+function CaseStaffControl({
+  requestId,
+  assignedStaff,
+  availableStaff,
+  canAssign,
+}: {
+  requestId: string;
+  assignedStaff: { id: string; displayName: string }[];
+  availableStaff: { id: string; displayName: string }[];
+  canAssign: boolean;
+}) {
+  const router = useRouter();
+  const [staff, setStaff] = useState(assignedStaff);
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const pickable = availableStaff.filter((s) => !staff.some((a) => a.id === s.id));
+
+  async function add(profileId: string) {
+    const person = availableStaff.find((s) => s.id === profileId);
+    if (!person || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await assignCaseStaff(requestId, profileId);
+      setStaff((rows) => [...rows, person]);
+      setAdding(false);
+      router.refresh();
+    } catch (e) {
+      setError(errorMessage(e, "追加できませんでした"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(profileId: string) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await unassignCaseStaff(requestId, profileId);
+      setStaff((rows) => rows.filter((r) => r.id !== profileId));
+      router.refresh();
+    } catch (e) {
+      setError(errorMessage(e, "解除できませんでした"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+      <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>担当スタッフ：</span>
+      {staff.length === 0 && !canAssign && <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>未割り当て</span>}
+      {staff.map((s) => (
+        <span
+          key={s.id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            height: 26,
+            padding: "0 8px",
+            fontSize: 11.5,
+            color: "var(--color-accent-100)",
+            background: "var(--color-accent-900)",
+            border: "1px solid var(--color-accent)",
+            borderRadius: "var(--radius-md)",
+          }}
+        >
+          {s.displayName}
+          {canAssign && (
+            <button
+              onClick={() => remove(s.id)}
+              disabled={busy}
+              aria-label={`${s.displayName}を解除`}
+              style={{ display: "flex", cursor: "pointer", color: "var(--color-accent-100)", background: "transparent", border: "none", padding: 0 }}
+            >
+              <X size={11} />
+            </button>
+          )}
+        </span>
+      ))}
+      {canAssign &&
+        (adding ? (
+          <select
+            autoFocus
+            defaultValue=""
+            disabled={busy}
+            onChange={(e) => e.target.value && add(e.target.value)}
+            onBlur={() => setAdding(false)}
+            className="vid-input"
+            style={{ height: 28, padding: "0 6px", fontSize: 11.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+          >
+            <option value="" disabled>
+              選択…
+            </option>
+            {pickable.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.displayName}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            disabled={pickable.length === 0}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              height: 26,
+              padding: "0 8px",
+              cursor: pickable.length === 0 ? "default" : "pointer",
+              fontSize: 11.5,
+              color: pickable.length === 0 ? "var(--color-neutral-500)" : "var(--color-accent)",
+              background: "transparent",
+              border: `1px solid ${pickable.length === 0 ? "var(--color-divider)" : "var(--color-accent)"}`,
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            <Plus size={11} />
+            スタッフ追加
+          </button>
+        ))}
+      {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
     </div>
   );
 }

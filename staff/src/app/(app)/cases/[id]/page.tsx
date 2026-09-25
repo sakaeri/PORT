@@ -22,6 +22,19 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
 
   const { data: refundPolicies } = await supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId);
 
+  const canAssignStaff = ctx.role !== "dept_leader";
+  const [{ data: caseStaffRows }, { data: staffPool }] = await Promise.all([
+    supabase.from("case_staff").select("profile_id, profiles!case_staff_profile_id_fkey(display_name)").eq("request_id", id),
+    canAssignStaff
+      ? supabase.from("profiles").select("id, display_name").eq("org_id", ctx.orgId).eq("role", "dept_leader")
+      : Promise.resolve({ data: [] }),
+  ]);
+  const assignedStaff = (caseStaffRows ?? []).map((r) => {
+    const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+    return { id: r.profile_id, displayName: profile?.display_name ?? "" };
+  });
+  const availableStaff = (staffPool ?? []).map((p) => ({ id: p.id, displayName: p.display_name }));
+
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
@@ -69,6 +82,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       caseMessages={caseMessages}
       orgId={ctx.orgId}
       currentUserId={ctx.userId}
+      assignedStaff={assignedStaff}
+      availableStaff={availableStaff}
+      canAssignStaff={canAssignStaff}
     />
   );
 }

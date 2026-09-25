@@ -1104,6 +1104,24 @@ export async function sendCaseMessage(caseThreadId: string, text: string) {
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", caseThreadId);
 }
 
+// スタッフ（dept_leader）は窓口所属だけでは案件が見えず、案件ごとに
+// 個別に割り当てられて初めてその案件の社内トークにアクセスできる。
+// 割り当て・解除ができるのはオーナー・統括担当・マネージャー
+// （RLS の case_staff_write でも強制される）。
+export async function assignCaseStaff(requestId: string, profileId: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("case_staff").insert({ request_id: requestId, profile_id: profileId });
+  if (error) throw error;
+}
+
+export async function unassignCaseStaff(requestId: string, profileId: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("case_staff").delete().eq("request_id", requestId).eq("profile_id", profileId);
+  if (error) throw error;
+}
+
 // スタッフ⇄本部（オーナー・統括担当）の1対1連絡チャット。スタッフ1人につき
 // 1本の thread（kind='internal'）を、初回アクセス時にその場で作る。
 export async function ensureStaffThread(staffProfileId: string) {
