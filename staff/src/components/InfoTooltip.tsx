@@ -8,11 +8,20 @@ export default function InfoTooltip({ text }: { text: string }) {
   const isMobile = useIsMobile();
   const btnRef = useRef<HTMLButtonElement>(null);
   const [mobileTop, setMobileTop] = useState(0);
+  const [desktopPos, setDesktopPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
-    if (open && isMobile && btnRef.current) {
-      // position:fixed なので、開いた時点のボタン位置（ビューポート基準）を測っておく。
-      setMobileTop(btnRef.current.getBoundingClientRect().bottom + 6);
+    // モーダル（overflow:auto）の中で使われることがあるため、position:absolute だと
+    // モーダルのスクロール領域に収まらず切れたり余計なスクロールバーが出てしまう。
+    // position:fixed にして、開いた時点のボタン位置（ビューポート基準）から計算する。
+    if (!open || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    if (isMobile) {
+      setMobileTop(rect.bottom + 6);
+    } else {
+      const maxWidth = 320;
+      const left = Math.min(rect.left, window.innerWidth - maxWidth - 16);
+      setDesktopPos({ top: rect.bottom + 6, left: Math.max(16, left) });
     }
   }, [open, isMobile]);
 
@@ -63,12 +72,12 @@ export default function InfoTooltip({ text }: { text: string }) {
                   boxShadow: "var(--shadow-md)",
                 }
               : {
-                  position: "absolute",
-                  top: "calc(100% + 6px)",
-                  left: 0,
-                  zIndex: 20,
+                  position: "fixed",
+                  top: desktopPos.top,
+                  left: desktopPos.left,
+                  zIndex: 30,
                   width: "max-content",
-                  maxWidth: 520,
+                  maxWidth: 320,
                   padding: "10px 12px",
                   fontSize: 11.5,
                   lineHeight: 1.6,

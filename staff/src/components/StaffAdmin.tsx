@@ -171,66 +171,48 @@ function DepartmentsCard({
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>窓口（部署）</div>
-        <div style={{ flex: 1 }} />
+        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6, flex: 1 }}>
+          経理・イベント対応など、業務ごとの窓口を作って受付メニューとスタッフを割り当てられます。
+        </div>
         {canManage && !adding && (
-          <button onClick={() => setAdding(true)} style={smallBtn}>
+          <button onClick={() => setAdding(true)} style={{ ...smallBtn, flex: "none" }}>
             <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
             窓口を追加
           </button>
         )}
       </div>
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        経理・イベント対応など、業務ごとの窓口を作って受付メニューとスタッフを割り当てられます。
-      </div>
 
       {departments.length === 0 && !adding && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ窓口がありません。</div>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {departments.map((d) => (
-          <div key={d.id} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {editingId === d.id ? (
-                <>
-                  <input value={editName} onChange={(e) => setEditName(e.target.value)} className="vid-input" style={{ ...input, flex: 1, height: 32 }} />
-                  <button onClick={() => rename(d.id)} disabled={busy} style={{ ...smallBtn, height: 32 }}>
-                    保存
-                  </button>
-                  <button onClick={() => setEditingId(null)} style={{ ...smallBtn, height: 32, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-                    キャンセル
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span style={{ flex: 1, fontSize: 13 }}>{d.name}</span>
-                  {canManage && (
-                    <button
-                      onClick={() => {
-                        setEditingId(d.id);
-                        setEditName(d.name);
-                      }}
-                      aria-label="名前を変更"
-                      style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-                    >
-                      <PencilSimple size={13} />
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button
-                      onClick={() => remove(d.id)}
-                      disabled={busy}
-                      aria-label="削除"
-                      style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-                    >
-                      <Trash size={13} />
-                    </button>
-                  )}
-                </>
-              )}
+        {departments.map((d) =>
+          editingId === d.id ? (
+            <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+              <input value={editName} onChange={(e) => setEditName(e.target.value)} className="vid-input" style={{ ...input, flex: 1, height: 32 }} autoFocus />
+              <button onClick={() => rename(d.id)} disabled={busy} style={{ ...smallBtn, height: 32 }}>
+                保存
+              </button>
+              <button onClick={() => setEditingId(null)} style={{ ...smallBtn, height: 32, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+                キャンセル
+              </button>
             </div>
-            {canManage && menus.length > 0 && <DepartmentMenuPicker department={d} menus={menus} setMenus={setMenus} />}
-          </div>
-        ))}
+          ) : (
+            <DepartmentRow
+              key={d.id}
+              department={d}
+              menus={menus}
+              setMenus={setMenus}
+              canManage={canManage}
+              canDelete={canDelete}
+              busy={busy}
+              onEdit={() => {
+                setEditingId(d.id);
+                setEditName(d.name);
+              }}
+              onDelete={() => remove(d.id)}
+            />
+          ),
+        )}
       </div>
 
       {adding && (
@@ -256,85 +238,111 @@ function DepartmentsCard({
   );
 }
 
-// 窓口ごとの「対応メニュー」選択。メニューは1つの窓口にしか属さないので、
-// 別の窓口ですでにONのメニューを押すとこちらに付け替わる。タップ後の状態が
-// ひと目でわかるよう、選択中はチェックマーク付きで塗りつぶす。
-function DepartmentMenuPicker({
+// 窓口ひとつぶんの行。タップで開閉し、中に対応メニューの選択と編集・削除をまとめる。
+function DepartmentRow({
   department,
   menus,
   setMenus,
+  canManage,
+  canDelete,
+  busy,
+  onEdit,
+  onDelete,
 }: {
   department: Department;
   menus: MenuOption[];
   setMenus: React.Dispatch<React.SetStateAction<MenuOption[]>>;
+  canManage: boolean;
+  canDelete: boolean;
+  busy: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
-  const selectedCount = menus.filter((m) => m.departmentId === department.id).length;
+  const [busyMenuId, setBusyMenuId] = useState<string | null>(null);
+  const [menuError, setMenuError] = useState("");
 
-  async function toggle(menu: MenuOption) {
-    if (busyId) return;
+  async function toggleMenu(menu: MenuOption) {
+    if (busyMenuId) return;
     const nextDepartmentId = menu.departmentId === department.id ? null : department.id;
-    setBusyId(menu.id);
-    setError("");
+    setBusyMenuId(menu.id);
+    setMenuError("");
     const prev = menu.departmentId;
     setMenus((rows) => rows.map((m) => (m.id === menu.id ? { ...m, departmentId: nextDepartmentId } : m)));
     try {
       await updateMenuDepartment(menu.id, nextDepartmentId);
     } catch (e) {
       setMenus((rows) => rows.map((m) => (m.id === menu.id ? { ...m, departmentId: prev } : m)));
-      setError(errorMessage(e, "変更できませんでした"));
+      setMenuError(errorMessage(e, "変更できませんでした"));
     } finally {
-      setBusyId(null);
+      setBusyMenuId(null);
     }
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", background: "transparent", border: "none", padding: 0 }}
-        >
-          {open ? <CaretDown size={11} color="var(--color-neutral-500)" /> : <CaretRight size={11} color="var(--color-neutral-500)" />}
-          <span style={label}>対応メニュー{selectedCount > 0 && `（${selectedCount}）`}</span>
-        </button>
-        <InfoTooltip text="このメニューで問い合わせが来ると、この窓口のスタッフが直接やり取りできるようになります。タップで選択・解除、他の窓口の担当だったメニューはこちらに移ります。" />
-      </div>
+    <div style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{ display: "flex", alignItems: "center", width: "100%", gap: 8, height: 40, padding: "0 12px", cursor: "pointer", fontSize: 13, color: "var(--color-text)", background: "transparent", border: "none", textAlign: "left" }}
+      >
+        <span style={{ flex: 1 }}>{department.name}</span>
+        {open ? <CaretDown size={13} color="var(--color-neutral-500)" /> : <CaretRight size={13} color="var(--color-neutral-500)" />}
+      </button>
       {open && (
-        <>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {menus.map((m) => {
-              const on = m.departmentId === department.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => toggle(m)}
-                  disabled={busyId === m.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    height: 28,
-                    padding: "0 10px",
-                    cursor: "pointer",
-                    fontSize: 11.5,
-                    color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
-                    background: on ? "var(--color-accent-900)" : "transparent",
-                    border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
-                    borderRadius: "var(--radius-md)",
-                  }}
-                >
-                  {on && <Check size={11} weight="bold" />}
-                  {m.label}
-                </button>
-              );
-            })}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "0 12px 12px", borderTop: "1px solid var(--color-divider)", paddingTop: 10 }}>
+          {canManage && menus.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={label}>対応メニュー</span>
+                <InfoTooltip text="このメニューで問い合わせが来ると、この窓口のスタッフが直接やり取りできるようになります。タップで選択・解除、他の窓口の担当だったメニューはこちらに移ります。" />
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {menus.map((m) => {
+                  const on = m.departmentId === department.id;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => toggleMenu(m)}
+                      disabled={busyMenuId === m.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        height: 28,
+                        padding: "0 10px",
+                        cursor: "pointer",
+                        fontSize: 11.5,
+                        color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
+                        background: on ? "var(--color-accent-900)" : "transparent",
+                        border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
+                        borderRadius: "var(--radius-md)",
+                      }}
+                    >
+                      {on && <Check size={11} weight="bold" />}
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {menuError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{menuError}</span>}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            {canManage && (
+              <button onClick={onEdit} style={{ ...smallBtn, height: 30, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+                <PencilSimple size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
+                編集
+              </button>
+            )}
+            {canDelete && (
+              <button onClick={onDelete} disabled={busy} style={{ ...smallBtn, height: 30, color: "var(--color-accent-200)", borderColor: "var(--color-accent-800)" }}>
+                <Trash size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
+                削除
+              </button>
+            )}
           </div>
-          {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
-        </>
+        </div>
       )}
     </div>
   );
