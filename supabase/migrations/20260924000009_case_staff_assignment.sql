@@ -11,24 +11,10 @@ create table if not exists case_staff (
 );
 alter table case_staff enable row level security;
 
-create policy case_staff_read on case_staff for select using (
-  exists (select 1 from requests r where r.id = case_staff.request_id and r.org_id = auth_org() and is_office())
-);
--- 割り当て・解除ができるのはオーナー・統括担当・マネージャー（自分の
--- 担当窓口の案件のみ）。スタッフ自身は割り当てを変更できない。
-create policy case_staff_write on case_staff for all using (
-  exists (select 1 from requests r where r.id = case_staff.request_id and r.org_id = auth_org() and (
-    auth_role() in ('owner','supervisor')
-    or (auth_role() = 'dept_manager' and case_visible(r.customer_id, r.id))
-  ))
-);
-
 -- case_visible() に request_id を追加。マネージャーは今まで通り窓口
 -- ベース、スタッフ（dept_leader）はcase_staffに個別に割り当てられた
--- 案件だけが対象になる。古い1引数版は、それを使っているポリシーを
--- 全部差し替えたあと、ファイルの最後で明示的に削除する（create or
--- replaceは引数が違うと別関数として残ってしまう上、まだ使われている
--- 関数は依存エラーで削除できないため）。
+-- 案件だけが対象になる。この後に出てくるポリシー（case_staff自身の
+-- ポリシーも含む）が使うので、先に定義する。
 create or replace function case_visible(p_customer_id uuid, p_request_id uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select
@@ -41,6 +27,18 @@ language sql stable security definer set search_path = public as $$
       select 1 from case_staff cs where cs.request_id = p_request_id and cs.profile_id = auth.uid()
     ))
 $$;
+
+create policy case_staff_read on case_staff for select using (
+  exists (select 1 from requests r where r.id = case_staff.request_id and r.org_id = auth_org() and is_office())
+);
+-- 割り当て・解除ができるのはオーナー・統括担当・マネージャー（自分の
+-- 担当窓口の案件のみ）。スタッフ自身は割り当てを変更できない。
+create policy case_staff_write on case_staff for all using (
+  exists (select 1 from requests r where r.id = case_staff.request_id and r.org_id = auth_org() and (
+    auth_role() in ('owner','supervisor')
+    or (auth_role() = 'dept_manager' and case_visible(r.customer_id, r.id))
+  ))
+);
 
 drop policy if exists requests_read on requests;
 create policy requests_read on requests for select using (
