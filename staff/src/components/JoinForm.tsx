@@ -6,7 +6,6 @@ import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { acceptStaffInvite } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
-import { ROLE_LABEL } from "@/lib/roles";
 import type { StaffRole } from "@/lib/supabase/types";
 
 const card: React.CSSProperties = {
@@ -87,7 +86,7 @@ export default function JoinForm({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>{invite.orgDisplayName}に参加</div>
-        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)", marginTop: 4 }}>役職：{ROLE_LABEL[invite.role]}として招待されています。ログイン情報を設定してください。</div>
+        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)", marginTop: 4 }}>ログイン情報を設定してください。</div>
       </div>
 
       <form onSubmit={submit} style={card}>
