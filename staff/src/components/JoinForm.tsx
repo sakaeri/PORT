@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
@@ -59,7 +60,10 @@ export default function JoinForm({
     return (
       <div style={card}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>この招待リンクは無効です</div>
-        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>すでに使われているか、URLが正しくありません。招待した本部の方にご確認ください。</div>
+        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>すでに使われているか、URLが正しくありません。すでに登録済みの方はログインしてください。心当たりがない場合は招待した本部の方にご確認ください。</div>
+        <Link href="/login" style={{ ...primaryBtn, display: "grid", placeItems: "center", textDecoration: "none", alignSelf: "flex-start" }}>
+          ログイン
+        </Link>
       </div>
     );
   }
