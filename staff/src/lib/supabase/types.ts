@@ -546,6 +546,7 @@ export interface Database {
           last_message_body: string | null;
           last_message_payload: unknown;
           last_message_deleted_at: string | null;
+          last_message_sender_role: AppRole | null;
         }[];
       };
       staff_thread_summaries: {

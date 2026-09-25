@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PaperPlaneTilt, Trash } from "@phosphor-icons/react";
+import { Trash } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { sendCaseMessage, deleteMessage, markThreadRead } from "@/app/actions";
-import type { AppRole } from "@/lib/supabase/types";
+import { ROLE_LABEL } from "@/lib/roles";
+import TextComposer from "@/components/TextComposer";
+import type { AppRole, StaffRole } from "@/lib/supabase/types";
 
 export interface CaseMessage {
   id: string;
@@ -14,7 +16,14 @@ export interface CaseMessage {
   body: string | null;
   sent_at: string;
   deleted_at: string | null;
-  senderName: string | null;
+}
+
+// profilesとのjoinに頼らず、メッセージ自体が持つsender_roleだけで
+// 「誰が送ったか」を表す（RLSやjoinの失敗に影響されない、確実な方法）。
+function senderLabel(role: AppRole | null): string {
+  if (role && role in ROLE_LABEL) return ROLE_LABEL[role as StaffRole];
+  if (role === "reception") return "受付";
+  return "スタッフ";
 }
 
 export default function CaseThreadChat({
@@ -46,17 +55,10 @@ export default function CaseThreadChat({
     const supabase = createClient(orgId);
     const { data } = await supabase
       .from("messages")
-      .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at, profiles!messages_sender_id_fkey(display_name)")
+      .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at")
       .eq("thread_id", threadId)
       .order("sent_at", { ascending: true });
-    if (data) {
-      setMessages(
-        data.map((m) => {
-          const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-          return { ...m, senderName: profile?.display_name ?? null };
-        }),
-      );
-    }
+    if (data) setMessages(data);
   }, [threadId, orgId]);
 
   useEffect(() => {
@@ -80,7 +82,7 @@ export default function CaseThreadChat({
       await sendCaseMessage(threadId, body);
       setMessages((m) => [
         ...m,
-        { id: `temp-${Date.now()}`, sender_id: currentUserId, sender_role: null, kind: "text", body, sent_at: new Date().toISOString(), deleted_at: null, senderName: null },
+        { id: `temp-${Date.now()}`, sender_id: currentUserId, sender_role: null, kind: "text", body, sent_at: new Date().toISOString(), deleted_at: null },
       ]);
       setDraft("");
     } finally {
@@ -138,7 +140,7 @@ export default function CaseThreadChat({
               {!m.deleted_at && (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>
-                    {m.senderName ?? "スタッフ"}・
+                    {senderLabel(m.sender_role)}・
                     {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
                   {isOwn && (
@@ -152,41 +154,7 @@ export default function CaseThreadChat({
           );
         })}
       </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              send();
-            }
-          }}
-          placeholder="メモを入力…"
-          className="vid-input"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            height: 36,
-            padding: "0 10px",
-            font: "inherit",
-            fontSize: 13,
-            color: "var(--color-text)",
-            background: "var(--color-bg)",
-            border: "1px solid var(--color-divider)",
-            borderRadius: "var(--radius-md)",
-            outline: "none",
-          }}
-        />
-        <button
-          onClick={send}
-          disabled={sending || !draft.trim()}
-          aria-label="送信"
-          style={{ flex: "none", width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
-        >
-          <PaperPlaneTilt size={14} />
-        </button>
-      </div>
+      <TextComposer value={draft} onChange={setDraft} onSend={send} sending={sending} placeholder="メモを入力…" />
     </div>
   );
 }

@@ -2,28 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Buildings, UserPlus } from "@phosphor-icons/react";
+import { Buildings, UserPlus, PencilSimple } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
 import StaffThreadPane from "@/components/StaffThreadPane";
+import Modal from "@/components/Modal";
+import SelfNamePanel from "@/components/SelfNamePanel";
 import { DepartmentAdmin, InviteAdmin, type Department, type MenuOption } from "@/components/StaffAdmin";
 import type { StaffRole } from "@/lib/supabase/types";
-
-function Modal({ children, onClose, maxWidth }: { children: React.ReactNode; onClose: () => void; maxWidth: number }) {
-  return (
-    <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ width: `min(${maxWidth}px, 100%)`, maxHeight: "88vh", overflowY: "auto", borderRadius: "var(--radius-lg)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
 
 export interface StaffDirectoryRow {
   id: string;
@@ -36,6 +22,7 @@ export interface StaffDirectoryRow {
 
 export default function StaffChat({
   currentUserId,
+  currentDisplayName,
   currentRole,
   orgId,
   canManage,
@@ -44,6 +31,7 @@ export default function StaffChat({
   menus,
 }: {
   currentUserId: string;
+  currentDisplayName: string;
   currentRole: StaffRole | "reception";
   orgId: string;
   canManage: boolean;
@@ -56,6 +44,8 @@ export default function StaffChat({
   const [selectedId, setSelectedId] = useState<string | null>(canManage ? null : currentUserId);
   const [showDepartments, setShowDepartments] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [myName, setMyName] = useState(currentDisplayName);
+  const [showMyName, setShowMyName] = useState(false);
 
   // 一覧の最終メッセージ・未読はこのコンポーネント自身では再取得せず、
   // ページ全体(staff/page.tsx)を router.refresh() で再取得させる
@@ -97,9 +87,19 @@ export default function StaffChat({
     borderRadius: "var(--radius-md)",
   };
 
+  const showListHeader = canManage && !selected;
+
   const header = (
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: "var(--space-6) var(--space-6) 0" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>スタッフ</div>
+      <button
+        onClick={() => setShowMyName(true)}
+        aria-label="自分の表示名を変更"
+        title="自分の表示名を変更"
+        style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}
+      >
+        <PencilSimple size={14} />
+      </button>
       <div style={{ flex: 1 }} />
       {canManage && (
         <>
@@ -118,12 +118,18 @@ export default function StaffChat({
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0, maxWidth: 900, width: "100%", margin: "0 auto" }}>
-      {header}
+      {showListHeader && header}
 
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "var(--space-4) var(--space-6) var(--space-6)" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: showListHeader ? "var(--space-4) var(--space-6) var(--space-6)" : "var(--space-6)" }}>
         {!canManage ? (
           <div style={{ flex: 1, minHeight: 0, border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-surface)" }}>
-            <StaffThreadPane staffProfileId={currentUserId} title="本部" currentUserId={currentUserId} orgId={orgId} />
+            <StaffThreadPane
+              staffProfileId={currentUserId}
+              title="本部"
+              currentUserId={currentUserId}
+              orgId={orgId}
+              selfName={{ value: myName, onSaved: setMyName }}
+            />
           </div>
         ) : selected ? (
           <div style={{ flex: 1, minHeight: 0, border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-surface)" }}>
@@ -134,6 +140,7 @@ export default function StaffChat({
               orgId={orgId}
               onBack={() => setSelectedId(null)}
               editable={{
+                displayName: selected.displayName,
                 role: selected.role,
                 departmentIds: selected.departmentIds,
                 departments,
@@ -189,6 +196,11 @@ export default function StaffChat({
       {showInvite && (
         <Modal onClose={() => setShowInvite(false)} maxWidth={560}>
           <InviteAdmin onClose={() => setShowInvite(false)} />
+        </Modal>
+      )}
+      {showMyName && (
+        <Modal onClose={() => setShowMyName(false)} maxWidth={380}>
+          <SelfNamePanel currentName={myName} onSaved={setMyName} onClose={() => setShowMyName(false)} />
         </Modal>
       )}
     </div>

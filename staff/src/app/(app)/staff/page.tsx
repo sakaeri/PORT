@@ -51,6 +51,7 @@ export default async function StaffPage() {
   return (
     <StaffChat
       currentUserId={ctx.userId}
+      currentDisplayName={ctx.displayName}
       currentRole={ctx.role}
       orgId={ctx.orgId}
       canManage={canManage}

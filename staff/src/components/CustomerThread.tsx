@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage, reassignThreadDepartment } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
+import TextComposer from "@/components/TextComposer";
 import { PHASE_LABEL } from "@/lib/stage";
 import type { AppRole, BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase, StaffRole } from "@/lib/supabase/types";
 
@@ -536,47 +537,24 @@ export default function CustomerThread({
         </div>
       )}
       {thread && (
-        <div style={{ flex: "none", display: "flex", gap: 8, padding: "14px 20px", borderTop: "1px solid var(--color-divider)" }}>
-          {templates.length > 0 && (
-            <button
-              onClick={() => setShowTemplates((v) => !v)}
-              aria-label="テンプレを選ぶ"
-              style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-            >
-              <ChatCircleText size={16} />
-            </button>
-          )}
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            rows={1}
-            placeholder="返信を入力…"
-            className="vid-input"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              resize: "none",
-              maxHeight: 120,
-              padding: "9px 12px",
-              font: "inherit",
-              fontSize: 13.5,
-              color: "var(--color-text)",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-divider)",
-              borderRadius: "var(--radius-md)",
-              outline: "none",
-            }}
-          />
-          <button onClick={send} disabled={sending || !draft.trim()} aria-label="送信" style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-            <PaperPlaneTilt size={16} />
-          </button>
-        </div>
+        <TextComposer
+          value={draft}
+          onChange={setDraft}
+          onSend={send}
+          sending={sending}
+          placeholder="返信を入力…"
+          leftButton={
+            templates.length > 0 ? (
+              <button
+                onClick={() => setShowTemplates((v) => !v)}
+                aria-label="テンプレを選ぶ"
+                style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+              >
+                <ChatCircleText size={16} />
+              </button>
+            ) : undefined
+          }
+        />
       )}
       {thread && (
         <div style={{ flex: "none", padding: "0 20px 12px", fontSize: 10.5, color: "var(--color-neutral-600)", display: "flex", alignItems: "center", gap: 5 }}>

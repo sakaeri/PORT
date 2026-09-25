@@ -1263,8 +1263,8 @@ export async function updateMenuDepartment(menuId: string, departmentId: string 
 }
 
 function normalizeStaffDepartments(role: StaffRole, departmentIds: string[]) {
-  if (role !== "dept_manager" && role !== "dept_leader") return [];
-  if (departmentIds.length === 0) throw new Error("マネージャー・スタッフは担当する窓口を1つ以上選んでください");
+  if (role !== "dept_manager") return [];
+  if (departmentIds.length === 0) throw new Error("マネージャーは担当する窓口を1つ以上選んでください");
   return departmentIds;
 }
 
@@ -1349,11 +1349,13 @@ export async function acceptStaffInvite(inviteId: string, fields: { email: strin
   return { email: fields.email.trim() };
 }
 
-export async function updateStaffMember(profileId: string, role: StaffRole, departmentIds: string[]) {
+export async function updateStaffMember(profileId: string, role: StaffRole, departmentIds: string[], displayName: string) {
   const ctx = await requireOwner();
+  const trimmedName = displayName.trim();
+  if (!trimmedName) throw new Error("表示名を入力してください");
   const resolvedDepartmentIds = normalizeStaffDepartments(role, departmentIds);
   const admin = createServiceRoleClient();
-  const { error } = await admin.from("profiles").update({ role }).eq("id", profileId).eq("org_id", ctx.orgId);
+  const { error } = await admin.from("profiles").update({ role, display_name: trimmedName }).eq("id", profileId).eq("org_id", ctx.orgId);
   if (error) throw error;
   await replaceStaffDepartments(admin, profileId, resolvedDepartmentIds);
 }
@@ -1366,4 +1368,15 @@ export async function removeStaffMember(profileId: string) {
   const { error } = await admin.from("profiles").delete().eq("id", profileId).eq("org_id", ctx.orgId);
   if (error) throw error;
   await admin.auth.admin.deleteUser(profileId);
+}
+
+// 自分自身の表示名。役職に関係なく誰でも変更できる（削除やロール変更は
+// オーナーのみだが、名前は本人が直接直すのが自然）。
+export async function updateMyDisplayName(displayName: string) {
+  const ctx = await requireContext();
+  const trimmed = displayName.trim();
+  if (!trimmed) throw new Error("表示名を入力してください");
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ display_name: trimmed }).eq("id", ctx.userId);
+  if (error) throw error;
 }

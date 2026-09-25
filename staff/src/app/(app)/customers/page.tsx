@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { headingWeight } from "@/lib/style";
-import { previewMessage } from "@/lib/message-preview";
+import { previewMessage, senderPrefix } from "@/lib/message-preview";
 import CustomersList from "@/components/CustomersList";
 
 export default async function CustomersPage() {
@@ -36,7 +36,10 @@ export default async function CustomersPage() {
       // （LEFT JOIN LATERAL のため）。last_message_kind が無ければ「やり取りなし」。
       const lastMessagePreview =
         summary && summary.last_message_kind != null
-          ? previewMessage({ kind: summary.last_message_kind, body: summary.last_message_body, payload: summary.last_message_payload, deleted_at: summary.last_message_deleted_at })
+          ? previewMessage(
+              { kind: summary.last_message_kind, body: summary.last_message_body, payload: summary.last_message_payload, deleted_at: summary.last_message_deleted_at },
+              senderPrefix(summary.last_message_sender_role),
+            )
           : null;
       return {
         id: c.id,

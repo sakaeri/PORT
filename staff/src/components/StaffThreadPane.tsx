@@ -1,22 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, PaperPlaneTilt, Trash, GearSix, Check, ChatCircleDots } from "@phosphor-icons/react";
+import { ArrowLeft, Trash, GearSix, Check, ChatCircleDots } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { ensureStaffThread, sendInternalMessage, deleteMessage, markThreadRead, updateStaffMember, removeStaffMember } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 import { ROLE_LABEL, INVITE_ROLES, isDeptScoped } from "@/lib/roles";
 import RoleTags from "@/components/RoleTags";
+import TextComposer from "@/components/TextComposer";
+import Modal from "@/components/Modal";
+import SelfNamePanel from "@/components/SelfNamePanel";
 import type { AppRole, StaffRole } from "@/lib/supabase/types";
 import type { Department } from "@/components/StaffAdmin";
 
 interface EditableStaffProps {
+  displayName: string;
   role: StaffRole;
   departmentIds: string[];
   departments: Department[];
   canDelete: boolean;
-  onSaved: (patch: { role: StaffRole; departmentIds: string[] }) => void;
+  onSaved: (patch: { displayName: string; role: StaffRole; departmentIds: string[] }) => void;
   onRemoved: () => void;
 }
 
@@ -28,7 +32,6 @@ interface InternalMessage {
   body: string | null;
   sent_at: string;
   deleted_at: string | null;
-  senderName: string | null;
 }
 
 export default function StaffThreadPane({
@@ -38,6 +41,7 @@ export default function StaffThreadPane({
   orgId,
   onBack,
   editable,
+  selfName,
 }: {
   staffProfileId: string;
   title: string;
@@ -45,6 +49,9 @@ export default function StaffThreadPane({
   orgId: string;
   onBack?: () => void;
   editable?: EditableStaffProps;
+  // 自分自身のトーク画面（本部⇄自分）を見ている時、表示名を自分で
+  // 変えられるようにする。editable（他のスタッフを管理する側）とは排他。
+  selfName?: { value: string; onSaved: (name: string) => void };
 }) {
   const [showEdit, setShowEdit] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -60,17 +67,10 @@ export default function StaffThreadPane({
       const supabase = createClient(orgId);
       const { data } = await supabase
         .from("messages")
-        .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at, profiles!messages_sender_id_fkey(display_name)")
+        .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at")
         .eq("thread_id", id)
         .order("sent_at", { ascending: true });
-      if (data) {
-        setMessages(
-          data.map((m) => {
-            const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-            return { ...m, senderName: profile?.display_name ?? null };
-          }),
-        );
-      }
+      if (data) setMessages(data);
     },
     [orgId],
   );
@@ -124,7 +124,7 @@ export default function StaffThreadPane({
       await sendInternalMessage(threadId, body);
       setMessages((m) => [
         ...m,
-        { id: `temp-${Date.now()}`, sender_id: currentUserId, sender_role: null, kind: "text", body, sent_at: new Date().toISOString(), deleted_at: null, senderName: null },
+        { id: `temp-${Date.now()}`, sender_id: currentUserId, sender_role: null, kind: "text", body, sent_at: new Date().toISOString(), deleted_at: null },
       ]);
       setDraft("");
     } catch (e) {
@@ -161,23 +161,30 @@ export default function StaffThreadPane({
         </div>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>{title}</div>
         <div style={{ flex: 1 }} />
-        {editable && (
+        {(editable || selfName) && (
           <button
-            onClick={() => setShowEdit((v) => !v)}
-            aria-label="役職・窓口の設定"
-            style={{ display: "flex", cursor: "pointer", color: showEdit ? "var(--color-accent)" : "var(--color-neutral-400)", background: "transparent", border: "none" }}
+            onClick={() => setShowEdit(true)}
+            aria-label="設定"
+            style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}
           >
             <GearSix size={18} />
           </button>
         )}
       </div>
 
-      {editable && showEdit && (
-        <StaffEditPanel
-          staffProfileId={staffProfileId}
-          editable={editable}
-          onClose={() => setShowEdit(false)}
-        />
+      {showEdit && editable && (
+        <Modal onClose={() => setShowEdit(false)} maxWidth={480}>
+          <StaffEditPanel
+            staffProfileId={staffProfileId}
+            editable={editable}
+            onClose={() => setShowEdit(false)}
+          />
+        </Modal>
+      )}
+      {showEdit && !editable && selfName && (
+        <Modal onClose={() => setShowEdit(false)} maxWidth={380}>
+          <SelfNamePanel currentName={selfName.value} onSaved={selfName.onSaved} onClose={() => setShowEdit(false)} />
+        </Modal>
       )}
 
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "var(--space-4)" }}>
@@ -214,7 +221,7 @@ export default function StaffThreadPane({
               {!m.deleted_at && (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>
-                    {m.senderName ?? "スタッフ"}・
+                    {isOwn ? "自分" : title}・
                     {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
                   {isOwn && (
@@ -229,41 +236,7 @@ export default function StaffThreadPane({
         })}
       </div>
 
-      <div style={{ flex: "none", display: "flex", gap: 8, padding: "12px 18px", borderTop: "1px solid var(--color-divider)" }}>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              send();
-            }
-          }}
-          placeholder="メッセージを入力…"
-          className="vid-input"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            height: 40,
-            padding: "0 12px",
-            font: "inherit",
-            fontSize: 13.5,
-            color: "var(--color-text)",
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-divider)",
-            borderRadius: "var(--radius-md)",
-            outline: "none",
-          }}
-        />
-        <button
-          onClick={send}
-          disabled={sending || !draft.trim() || !threadId}
-          aria-label="送信"
-          style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
-        >
-          <PaperPlaneTilt size={16} />
-        </button>
-      </div>
+      <TextComposer value={draft} onChange={setDraft} onSend={send} sending={sending} disabled={!threadId} placeholder="メッセージを入力…" />
     </div>
   );
 }
@@ -290,6 +263,7 @@ function StaffEditPanel({
   editable: EditableStaffProps;
   onClose: () => void;
 }) {
+  const [displayName, setDisplayName] = useState(editable.displayName);
   const [role, setRole] = useState(editable.role);
   const [departmentIds, setDepartmentIds] = useState(editable.departmentIds);
   const [saving, setSaving] = useState(false);
@@ -302,6 +276,10 @@ function StaffEditPanel({
 
   async function save() {
     if (saving) return;
+    if (!displayName.trim()) {
+      setError("表示名を入力してください");
+      return;
+    }
     if (isDeptScoped(role) && departmentIds.length === 0) {
       setError("担当する窓口を1つ以上選んでください");
       return;
@@ -310,8 +288,9 @@ function StaffEditPanel({
     setError("");
     try {
       const resolved = isDeptScoped(role) ? departmentIds : [];
-      await updateStaffMember(staffProfileId, role, resolved);
-      editable.onSaved({ role, departmentIds: resolved });
+      const trimmedName = displayName.trim();
+      await updateStaffMember(staffProfileId, role, resolved, trimmedName);
+      editable.onSaved({ displayName: trimmedName, role, departmentIds: resolved });
       onClose();
     } catch (e) {
       setError(errorMessage(e, "変更できませんでした"));
@@ -334,7 +313,12 @@ function StaffEditPanel({
   }
 
   return (
-    <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 10, padding: "var(--space-4)", borderBottom: "1px solid var(--color-divider)", background: "var(--color-bg)" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "var(--space-6)" }}>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>スタッフ設定</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span style={editLabel}>表示名</span>
+        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="vid-input" style={{ ...editInput, maxWidth: 260 }} />
+      </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={editLabel}>役職</span>
