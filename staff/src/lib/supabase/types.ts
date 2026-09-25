@@ -546,6 +546,18 @@ export interface Database {
           last_message_deleted_at: string | null;
         }[];
       };
+      staff_thread_summaries: {
+        Args: { p_org_id: string };
+        Returns: {
+          staff_profile_id: string;
+          thread_id: string;
+          unread: boolean;
+          last_message_kind: MessageKind | null;
+          last_message_body: string | null;
+          last_message_payload: unknown;
+          last_message_deleted_at: string | null;
+        }[];
+      };
     };
     Enums: {
       app_role: AppRole;

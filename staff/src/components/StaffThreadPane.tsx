@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, PaperPlaneTilt, Trash, GearSix, Check } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Trash, GearSix, Check, ChatCircleDots } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { ensureStaffThread, sendInternalMessage, deleteMessage, markThreadRead, updateStaffMember, removeStaffMember } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
@@ -150,12 +150,15 @@ export default function StaffThreadPane({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "var(--space-4)", borderBottom: "1px solid var(--color-divider)" }}>
+      <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid var(--color-divider)" }}>
         {onBack && (
           <button onClick={onBack} aria-label="一覧に戻る" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
             <ArrowLeft size={17} />
           </button>
         )}
+        <div style={{ flex: "none", width: 32, height: 32, display: "grid", placeItems: "center", fontSize: 13, fontWeight: 700, color: "var(--color-accent-100)", background: "var(--color-accent-900)", borderRadius: "50%" }}>
+          {title.slice(0, 1)}
+        </div>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>{title}</div>
         <div style={{ flex: 1 }} />
         {editable && (
@@ -179,7 +182,12 @@ export default function StaffThreadPane({
 
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "var(--space-4)" }}>
         {error && <div style={{ fontSize: 12.5, color: "var(--color-accent-200)" }}>{error}</div>}
-        {threadId && messages.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだやり取りがありません。</div>}
+        {threadId && messages.length === 0 && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "var(--color-neutral-500)" }}>
+            <ChatCircleDots size={28} />
+            <span style={{ fontSize: 12.5 }}>まだやり取りがありません</span>
+          </div>
+        )}
         {messages.map((m) => {
           const isOwn = m.sender_id === currentUserId;
           return (
@@ -221,7 +229,7 @@ export default function StaffThreadPane({
         })}
       </div>
 
-      <div style={{ flex: "none", display: "flex", gap: 8, padding: "var(--space-4)", borderTop: "1px solid var(--color-divider)" }}>
+      <div style={{ flex: "none", display: "flex", gap: 8, padding: "12px 18px", borderTop: "1px solid var(--color-divider)" }}>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -236,12 +244,12 @@ export default function StaffThreadPane({
           style={{
             flex: 1,
             minWidth: 0,
-            height: 38,
+            height: 40,
             padding: "0 12px",
             font: "inherit",
             fontSize: 13.5,
             color: "var(--color-text)",
-            background: "var(--color-bg)",
+            background: "var(--color-surface)",
             border: "1px solid var(--color-divider)",
             borderRadius: "var(--radius-md)",
             outline: "none",
@@ -251,9 +259,9 @@ export default function StaffThreadPane({
           onClick={send}
           disabled={sending || !draft.trim() || !threadId}
           aria-label="送信"
-          style={{ flex: "none", width: 38, height: 38, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+          style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
         >
-          <PaperPlaneTilt size={15} />
+          <PaperPlaneTilt size={16} />
         </button>
       </div>
     </div>

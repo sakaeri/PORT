@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Buildings, UserPlus } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { createClient } from "@/lib/supabase/client";
 import StaffThreadPane from "@/components/StaffThreadPane";
 import { DepartmentAdmin, InviteAdmin, type Department, type MenuOption } from "@/components/StaffAdmin";
 import type { StaffRole } from "@/lib/supabase/types";
@@ -28,6 +30,8 @@ export interface StaffDirectoryRow {
   displayName: string;
   role: StaffRole;
   departmentIds: string[];
+  lastMessagePreview: string | null;
+  unread: boolean;
 }
 
 export default function StaffChat({
@@ -47,10 +51,34 @@ export default function StaffChat({
   departments: Department[];
   menus: MenuOption[];
 }) {
+  const router = useRouter();
   const [staff, setStaff] = useState(initialStaff);
   const [selectedId, setSelectedId] = useState<string | null>(canManage ? null : currentUserId);
   const [showDepartments, setShowDepartments] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+
+  // 一覧の最終メッセージ・未読はこのコンポーネント自身では再取得せず、
+  // ページ全体(staff/page.tsx)を router.refresh() で再取得させる
+  // （依頼主一覧のCustomersListと同じパターン）。
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a server-refetched prop (router.refresh()), not state derived from other client state
+    setStaff(initialStaff);
+  }, [initialStaff]);
+
+  useEffect(() => {
+    if (!canManage) return;
+    const supabase = createClient(orgId);
+    const channel = supabase
+      .channel(`staff-list-${orgId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "threads" }, () => router.refresh())
+      .subscribe();
+    const interval = setInterval(() => router.refresh(), 4000);
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [orgId, canManage, router]);
 
   const otherStaff = staff.filter((s) => s.id !== currentUserId);
   const selected = selectedId ? staff.find((s) => s.id === selectedId) : null;
@@ -127,18 +155,26 @@ export default function StaffChat({
                 onClick={() => setSelectedId(s.id)}
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  flexDirection: "column",
+                  gap: 2,
                   textAlign: "left",
                   padding: "12px 14px",
                   cursor: "pointer",
-                  fontSize: 13.5,
                   color: "var(--color-text)",
                   background: "var(--color-surface)",
                   border: "1px solid var(--color-divider)",
                   borderRadius: "var(--radius-md)",
                 }}
               >
-                {s.displayName}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ fontSize: 14, fontWeight: s.unread ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.displayName}</div>
+                  {s.unread && (
+                    <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: "var(--radius-sm)", padding: "1.5px 6px" }}>
+                      未読
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.lastMessagePreview ?? "まだやり取りがありません"}</div>
               </button>
             ))}
           </div>
