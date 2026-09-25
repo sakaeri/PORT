@@ -77,6 +77,7 @@ language sql stable as $$
   ) m on true
   where t.org_id = p_org_id and t.kind = 'internal' and t.staff_profile_id is not null
 $$;
+grant execute on function staff_thread_summaries(uuid) to authenticated;
 
 drop policy if exists departments_insert on departments;
 create policy departments_insert on departments for insert with check (
