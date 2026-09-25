@@ -10,25 +10,28 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   if (!ctx) return null;
 
   const supabase = await createClient();
-  const { data: request } = await supabase
-    .from("requests")
-    .select(
-      "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, customers(id, name), completion_reports(*), ratings(*)",
-    )
-    .eq("id", id)
-    .eq("org_id", ctx.orgId)
-    .maybeSingle();
-  if (!request) notFound();
-
-  const { data: refundPolicies } = await supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId);
-
   const canAssignStaff = ctx.role !== "dept_leader";
-  const [{ data: caseStaffRows }, { data: staffPool }] = await Promise.all([
+
+  // 互いに依存しないクエリは並列で投げる（案件トークのメッセージだけは
+  // threads.id が要るので、案件トークの行を取ったあとに投げる）。
+  const [{ data: request }, { data: refundPolicies }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }] = await Promise.all([
+    supabase
+      .from("requests")
+      .select(
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, customers(id, name), completion_reports(*), ratings(*)",
+      )
+      .eq("id", id)
+      .eq("org_id", ctx.orgId)
+      .maybeSingle(),
+    supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId),
     supabase.from("case_staff").select("profile_id, profiles!case_staff_profile_id_fkey(display_name)").eq("request_id", id),
     canAssignStaff
       ? supabase.from("profiles").select("id, display_name").eq("org_id", ctx.orgId).eq("role", "dept_leader")
       : Promise.resolve({ data: [] }),
+    supabase.from("threads").select("id, archived_at").eq("kind", "case").eq("request_id", id).maybeSingle(),
   ]);
+  if (!request) notFound();
+
   const assignedStaff = (caseStaffRows ?? []).map((r) => {
     const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
     return { id: r.profile_id, displayName: profile?.display_name ?? "" };
@@ -39,7 +42,6 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
 
-  const { data: caseThread } = await supabase.from("threads").select("id, archived_at").eq("kind", "case").eq("request_id", id).maybeSingle();
   let caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null; senderName: string | null }[] = [];
   if (caseThread) {
     const { data } = await supabase
