@@ -353,7 +353,7 @@ export async function deleteIntakeField(id: string) {
 // キャンセル・返金ポリシー（段階は固定。返金の扱いと割合だけを設定する）
 // ============================================================
 export async function updateRefundPolicy(orgId: string, stage: RefundStage, mode: RefundMode, pct: number) {
-  await requireContext();
+  await requireOwner();
   const supabase = await createClient();
   const { error } = await supabase
     .from("refund_policies")
@@ -1122,11 +1122,11 @@ export async function unassignCaseStaff(requestId: string, profileId: string) {
   if (error) throw error;
 }
 
-// スタッフ⇄本部（オーナー）の1対1連絡チャット。スタッフ1人につき
-// 1本の thread（kind='internal'）を、初回アクセス時にその場で作る。
+// スタッフ⇄本部（オーナー・マネージャー）の1対1連絡チャット。スタッフ1人
+// につき1本の thread（kind='internal'）を、初回アクセス時にその場で作る。
 export async function ensureStaffThread(staffProfileId: string) {
   const ctx = await requireContext();
-  if (staffProfileId !== ctx.userId && ctx.role !== "owner") {
+  if (staffProfileId !== ctx.userId && ctx.role !== "owner" && ctx.role !== "dept_manager") {
     throw new Error("権限がありません");
   }
   const supabase = await createClient();

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ensureStaffThread, sendInternalMessage, deleteMessage, markThreadRead, updateStaffMember, removeStaffMember } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
-import { ROLE_LABEL, INVITE_ROLES, isDeptScoped } from "@/lib/roles";
+import { ROLE_LABEL, INVITE_ROLES, isDeptScoped, staffSenderLabel } from "@/lib/roles";
 import RoleTags from "@/components/RoleTags";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
@@ -211,7 +211,7 @@ export default function StaffThreadPane({
               {!m.deleted_at && (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>
-                    {isOwn ? "自分" : title}・
+                    {isOwn ? "自分" : staffSenderLabel(m.sender_role)}・
                     {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
                   {isOwn && (

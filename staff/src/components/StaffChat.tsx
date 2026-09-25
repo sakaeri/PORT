@@ -19,26 +19,44 @@ export interface StaffDirectoryRow {
   unread: boolean;
 }
 
+interface RosterEntry {
+  id: string;
+  displayName: string;
+  lastMessagePreview: string | null;
+  unread: boolean;
+  isSelf: boolean;
+}
+
 export default function StaffChat({
   currentUserId,
   currentRole,
   orgId,
-  canManage,
+  canAdmin,
+  canBrowseStaff,
   staff: initialStaff,
+  selfEntry,
   departments,
   menus,
 }: {
   currentUserId: string;
   currentRole: StaffRole | "reception";
   orgId: string;
-  canManage: boolean;
+  // オーナー：招待・役職変更・削除・窓口管理ができる。
+  canAdmin: boolean;
+  // オーナー・マネージャー：スタッフ一覧を見てチャットできる（マネージャーは
+  // 一覧・チャットだけで管理操作はできない）。falseなら自分の「本部」との
+  // やり取り画面だけが表示される（スタッフ=dept_leader向け）。
+  canBrowseStaff: boolean;
   staff: StaffDirectoryRow[];
+  // マネージャーの一覧の先頭に出す「本部」＝自分自身の窓口担当スレッド。
+  // オーナーには不要（オーナー自身がHQなので、自分宛のスレッドという概念がない）。
+  selfEntry?: { lastMessagePreview: string | null; unread: boolean };
   departments: Department[];
   menus: MenuOption[];
 }) {
   const router = useRouter();
   const [staff, setStaff] = useState(initialStaff);
-  const [selectedId, setSelectedId] = useState<string | null>(canManage ? null : currentUserId);
+  const [selectedId, setSelectedId] = useState<string | null>(canBrowseStaff ? null : currentUserId);
   const [showDepartments, setShowDepartments] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
 
@@ -51,7 +69,7 @@ export default function StaffChat({
   }, [initialStaff]);
 
   useEffect(() => {
-    if (!canManage) return;
+    if (!canBrowseStaff) return;
     const supabase = createClient(orgId);
     const channel = supabase
       .channel(`staff-list-${orgId}`)
@@ -63,10 +81,18 @@ export default function StaffChat({
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [orgId, canManage, router]);
+  }, [orgId, canBrowseStaff, router]);
 
   const otherStaff = staff.filter((s) => s.id !== currentUserId);
-  const selected = selectedId ? staff.find((s) => s.id === selectedId) : null;
+  const entries: RosterEntry[] = canAdmin
+    ? otherStaff.map((s) => ({ id: s.id, displayName: s.displayName, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false }))
+    : [
+        { id: currentUserId, displayName: "本部", lastMessagePreview: selfEntry?.lastMessagePreview ?? null, unread: selfEntry?.unread ?? false, isSelf: true },
+        ...otherStaff.map((s) => ({ id: s.id, displayName: s.displayName, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false })),
+      ];
+
+  const selectedEntry = selectedId ? entries.find((e) => e.id === selectedId) : null;
+  const selectedStaff = selectedEntry && !selectedEntry.isSelf ? otherStaff.find((s) => s.id === selectedEntry.id) : null;
 
   const headerBtn: React.CSSProperties = {
     display: "flex",
@@ -82,13 +108,13 @@ export default function StaffChat({
     borderRadius: "var(--radius-md)",
   };
 
-  const showListHeader = canManage && !selected;
+  const showListHeader = canBrowseStaff && !selectedEntry;
 
   const header = (
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: "var(--space-6) var(--space-6) 0" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>スタッフ</div>
       <div style={{ flex: 1 }} />
-      {canManage && (
+      {canAdmin && (
         <>
           <button onClick={() => setShowDepartments(true)} style={headerBtn}>
             <Buildings size={14} />
@@ -108,35 +134,39 @@ export default function StaffChat({
       {showListHeader && header}
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: showListHeader ? "var(--space-4) var(--space-6) var(--space-6)" : 0 }}>
-        {!canManage ? (
+        {!canBrowseStaff ? (
           <StaffThreadPane staffProfileId={currentUserId} title="本部" currentUserId={currentUserId} orgId={orgId} />
-        ) : selected ? (
+        ) : selectedEntry ? (
           <StaffThreadPane
-            staffProfileId={selected.id}
-            title={selected.displayName}
+            staffProfileId={selectedEntry.id}
+            title={selectedEntry.displayName}
             currentUserId={currentUserId}
             orgId={orgId}
             onBack={() => setSelectedId(null)}
-            editable={{
-              displayName: selected.displayName,
-              role: selected.role,
-              departmentIds: selected.departmentIds,
-              departments,
-              canDelete: currentRole === "owner" && selected.role !== "owner",
-              onSaved: (patch) => setStaff((rows) => rows.map((r) => (r.id === selected.id ? { ...r, ...patch } : r))),
-              onRemoved: () => {
-                setStaff((rows) => rows.filter((r) => r.id !== selected.id));
-                setSelectedId(null);
-              },
-            }}
+            editable={
+              canAdmin && selectedStaff
+                ? {
+                    displayName: selectedStaff.displayName,
+                    role: selectedStaff.role,
+                    departmentIds: selectedStaff.departmentIds,
+                    departments,
+                    canDelete: currentRole === "owner" && selectedStaff.role !== "owner",
+                    onSaved: (patch) => setStaff((rows) => rows.map((r) => (r.id === selectedStaff.id ? { ...r, ...patch } : r))),
+                    onRemoved: () => {
+                      setStaff((rows) => rows.filter((r) => r.id !== selectedStaff.id));
+                      setSelectedId(null);
+                    },
+                  }
+                : undefined
+            }
           />
         ) : (
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-            {otherStaff.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだスタッフがいません。右上の「スタッフを招待」から追加してください。</div>}
-            {otherStaff.map((s) => (
+            {entries.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだスタッフがいません。右上の「スタッフを招待」から追加してください。</div>}
+            {entries.map((e) => (
               <button
-                key={s.id}
-                onClick={() => setSelectedId(s.id)}
+                key={e.id}
+                onClick={() => setSelectedId(e.id)}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -151,14 +181,14 @@ export default function StaffChat({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ fontSize: 14, fontWeight: s.unread ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.displayName}</div>
-                  {s.unread && (
+                  <div style={{ fontSize: 14, fontWeight: e.unread ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.displayName}</div>
+                  {e.unread && (
                     <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: "var(--radius-sm)", padding: "1.5px 6px" }}>
                       未読
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.lastMessagePreview ?? "まだやり取りがありません"}</div>
+                <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.lastMessagePreview ?? "まだやり取りがありません"}</div>
               </button>
             ))}
           </div>

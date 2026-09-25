@@ -52,6 +52,7 @@ export default async function MenuSettingsPage() {
       initialCardPaymentEnabled={org?.card_payment_enabled ?? false}
       initialBankInfo={org?.bank_transfer_info ?? {}}
       initialCardPaymentLinks={cardPaymentLinks ?? []}
+      canEdit={ctx.role === "owner"}
     />
   );
 }

@@ -136,6 +136,7 @@ export default function MenuSettings({
   initialBankInfo,
   initialCardPaymentLinks,
   initialSolo,
+  canEdit,
 }: {
   orgId: string;
   referrerUserId: string;
@@ -149,6 +150,10 @@ export default function MenuSettings({
   initialCardPaymentEnabled: boolean;
   initialBankInfo: BankTransferInfo;
   initialCardPaymentLinks: CardPaymentLink[];
+  // 受付メニュー・返信テンプレはマネージャーも使うので常に編集可。それ以外
+  // （会社情報・決済設定・返金ポリシー・スタッフ連携）はオーナー専用で、
+  // マネージャーには閲覧のみで見せる。
+  canEdit: boolean;
 }) {
   const [tab, setTab] = useState<TabKey>("company");
   const isMobile = useIsMobile();
@@ -218,15 +223,15 @@ export default function MenuSettings({
 
       {tab === "company" && (
         <>
-          <CompanyInfoCard initial={initialCompany} slug={slug} />
-          <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} />
+          <CompanyInfoCard initial={initialCompany} slug={slug} canEdit={canEdit} />
+          <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} canEdit={canEdit} />
           <CardPaymentLinksCard initialLinks={initialCardPaymentLinks} />
-          <StaffModeCard initialSolo={initialSolo} />
+          <StaffModeCard initialSolo={initialSolo} canEdit={canEdit} />
         </>
       )}
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
-      {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} />}
+      {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} canEdit={canEdit} />}
       {tab === "login" && (
         <>
           <LoginInfoCard initialEmail={initialLoginEmail} />
@@ -247,13 +252,13 @@ const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
   { key: "login", label: "ログイン情報", mobileLabel: "ログイン設定" },
 ];
 
-function CardHeader({ title, info, editing, onEdit }: { title: string; info?: string; editing: boolean; onEdit: () => void }) {
+function CardHeader({ title, info, editing, onEdit, canEdit = true }: { title: string; info?: string; editing: boolean; onEdit: () => void; canEdit?: boolean }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>{title}</div>
       {info && <InfoTooltip text={info} />}
       <div style={{ flex: 1 }} />
-      {!editing && (
+      {!editing && canEdit && (
         <button onClick={onEdit} style={{ ...smallBtn, height: 28 }}>
           変更
         </button>
@@ -271,7 +276,7 @@ function InfoRow({ label: l, value, labelWidth = 90 }: { label: string; value: s
   );
 }
 
-function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | null }) {
+function CompanyInfoCard({ initial, slug, canEdit }: { initial: Company; slug: string | null; canEdit: boolean }) {
   const [saved, setSaved] = useState(initial);
   const [form, setForm] = useState(initial);
   const [editing, setEditing] = useState(false);
@@ -305,7 +310,7 @@ function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | n
 
   return (
     <div style={card}>
-      <CardHeader title="会社情報" info="契約書の「甲」・依頼主への表示名・見積書と請求書に使います" editing={editing} onEdit={startEdit} />
+      <CardHeader title="会社情報" info="契約書の「甲」・依頼主への表示名・見積書と請求書に使います" editing={editing} onEdit={startEdit} canEdit={canEdit} />
       {slug && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
           <span>お問い合わせURL：</span>
@@ -352,9 +357,11 @@ function CompanyInfoCard({ initial, slug }: { initial: Company; slug: string | n
 function PaymentSettingsCard({
   initialCardPaymentEnabled,
   initialBankInfo,
+  canEdit,
 }: {
   initialCardPaymentEnabled: boolean;
   initialBankInfo: BankTransferInfo;
+  canEdit: boolean;
 }) {
   const savedInitial = { cardEnabled: initialCardPaymentEnabled, bankInfo: initialBankInfo };
   const [saved, setSaved] = useState(savedInitial);
@@ -397,6 +404,7 @@ function PaymentSettingsCard({
         info="見積もり作成時に選べる支払い方法と、銀行振込のデフォルトの振込先です（見積もりごとにその場で変更もできます）。カード決済のリンクは見積もり作成のたびに入力します。"
         editing={editing}
         onEdit={startEdit}
+        canEdit={canEdit}
       />
       {!editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -557,14 +565,14 @@ function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[
   );
 }
 
-function StaffModeCard({ initialSolo }: { initialSolo: boolean }) {
+function StaffModeCard({ initialSolo, canEdit }: { initialSolo: boolean; canEdit: boolean }) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(!initialSolo);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   async function toggle() {
-    if (saving) return;
+    if (saving || !canEdit) return;
     const next = !enabled;
     setSaving(true);
     setError("");
@@ -588,7 +596,7 @@ function StaffModeCard({ initialSolo }: { initialSolo: boolean }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <button
           onClick={toggle}
-          disabled={saving}
+          disabled={saving || !canEdit}
           role="switch"
           aria-checked={enabled}
           style={{
@@ -596,7 +604,8 @@ function StaffModeCard({ initialSolo }: { initialSolo: boolean }) {
             height: 24,
             padding: 2,
             flex: "none",
-            cursor: "pointer",
+            cursor: canEdit ? "pointer" : "default",
+            opacity: canEdit ? 1 : 0.5,
             display: "flex",
             justifyContent: enabled ? "flex-end" : "flex-start",
             background: enabled ? "var(--color-accent)" : "var(--color-neutral-800)",
@@ -1101,7 +1110,7 @@ function refundModeLabel(mode: RefundMode, pct: number): string {
   return mode === "partial" ? `${base}（${pct}%）` : base;
 }
 
-function RefundPolicyCard({ orgId, initialPolicy }: { orgId: string; initialPolicy: RefundPolicyRow[] }) {
+function RefundPolicyCard({ orgId, initialPolicy, canEdit }: { orgId: string; initialPolicy: RefundPolicyRow[]; canEdit: boolean }) {
   const makeRows = () =>
     REFUND_STAGES.map((s) => {
       const found = initialPolicy.find((p) => p.stage === s.key);
@@ -1127,6 +1136,7 @@ function RefundPolicyCard({ orgId, initialPolicy }: { orgId: string; initialPoli
         info="段階は依頼の進み方で決まるため固定です。受付が決めるのは、それぞれの段階の返金の扱いと割合だけです。"
         editing={editing}
         onEdit={() => { setRows(saved); setEditing(true); }}
+        canEdit={canEdit}
       />
 
       {!editing ? (
