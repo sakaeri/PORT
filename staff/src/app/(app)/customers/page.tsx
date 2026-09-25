@@ -14,13 +14,14 @@ export default async function CustomersPage() {
   const supabase = await createClient();
   // 依存のないクエリは並列で投げる。依頼主一覧に必要な「各依頼主の最新メッセージ・未読」は、
   // 案件トークまで巻き込む二重ネストの embed ではなく、確実に正しい専用RPCでまとめて取る。
-  const [{ data: customers, error }, { data: summaries, error: summariesError }] = await Promise.all([
+  const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }] = await Promise.all([
     supabase
       .from("customers")
       .select("id, name, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
     supabase.rpc("customer_thread_summaries", { p_org_id: ctx.orgId }),
+    supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
   ]);
   if (error) console.error("customers select failed:", error);
   if (summariesError) console.error("customer_thread_summaries failed:", summariesError);
@@ -44,6 +45,7 @@ export default async function CustomersPage() {
         active: c.active,
         convertedOrg: convertedOrg ? { displayName: convertedOrg.display_name, slug: convertedOrg.slug } : null,
         thread: summary ? { id: summary.thread_id, archived: summary.archived } : null,
+        departmentId: summary?.department_id ?? null,
         lastMessagePreview,
         unread: summary?.unread ?? false,
       };
@@ -63,7 +65,7 @@ export default async function CustomersPage() {
         </div>
       )}
 
-      <CustomersList rows={rows} isHq={ctx.isHq} orgId={ctx.orgId} />
+      <CustomersList rows={rows} isHq={ctx.isHq} orgId={ctx.orgId} departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))} />
     </div>
   );
 }

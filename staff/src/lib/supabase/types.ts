@@ -539,6 +539,7 @@ export interface Database {
           thread_id: string;
           archived: boolean;
           unread: boolean;
+          department_id: string | null;
           last_message_kind: MessageKind | null;
           last_message_body: string | null;
           last_message_payload: unknown;

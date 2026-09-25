@@ -14,6 +14,7 @@ interface CustomerRow {
   active: boolean;
   convertedOrg: { displayName: string; slug: string | null } | null;
   thread: { id: string; archived: boolean } | null;
+  departmentId: string | null;
   lastMessagePreview: string | null;
   unread: boolean;
 }
@@ -30,12 +31,25 @@ const smallBtn: React.CSSProperties = {
   borderRadius: "var(--radius-md)",
 };
 
-export default function CustomersList({ rows: initialRows, isHq, orgId }: { rows: CustomerRow[]; isHq: boolean; orgId: string }) {
+export default function CustomersList({
+  rows: initialRows,
+  isHq,
+  orgId,
+  departments,
+}: {
+  rows: CustomerRow[];
+  isHq: boolean;
+  orgId: string;
+  departments: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const visible = rows.filter((c) => c.active || showArchived);
+  const visible = rows
+    .filter((c) => c.active || showArchived)
+    .filter((c) => departmentFilter === "all" || (departmentFilter === "none" ? c.departmentId === null : c.departmentId === departmentFilter));
   const archivedCount = rows.filter((c) => !c.active).length;
 
   // サーバーから渡された最新の行を反映する（下のポーリング/リアルタイムが
@@ -89,6 +103,31 @@ export default function CustomersList({ rows: initialRows, isHq, orgId }: { rows
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {departments.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {[{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "窓口未設定" }].map((d) => {
+            const on = departmentFilter === d.id;
+            return (
+              <button
+                key={d.id}
+                onClick={() => setDepartmentFilter(d.id)}
+                style={{
+                  height: 28,
+                  padding: "0 12px",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
+                  background: on ? "var(--color-accent-900)" : "transparent",
+                  border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
+                  borderRadius: "var(--radius-md)",
+                }}
+              >
+                {d.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {archivedCount > 0 && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
