@@ -25,7 +25,10 @@ create policy case_staff_write on case_staff for all using (
 
 -- case_visible() に request_id を追加。マネージャーは今まで通り窓口
 -- ベース、スタッフ（dept_leader）はcase_staffに個別に割り当てられた
--- 案件だけが対象になる。
+-- 案件だけが対象になる。古い1引数版は、それを使っているポリシーを
+-- 全部差し替えたあと、ファイルの最後で明示的に削除する（create or
+-- replaceは引数が違うと別関数として残ってしまう上、まだ使われている
+-- 関数は依存エラーで削除できないため）。
 create or replace function case_visible(p_customer_id uuid, p_request_id uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select
@@ -138,3 +141,7 @@ create policy messages_send on messages for insert with check (
       )
   )
 );
+
+-- ここまでで古い1引数版 case_visible(uuid) を使うポリシーは全部
+-- 差し替え終えたので、名残の関数を削除する。
+drop function if exists case_visible(uuid);
