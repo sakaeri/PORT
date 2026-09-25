@@ -40,6 +40,16 @@ const smallBtn: React.CSSProperties = {
   border: "1px solid var(--color-accent)",
   borderRadius: "var(--radius-md)",
 };
+const primaryBtn: React.CSSProperties = {
+  height: 40,
+  padding: "0 18px",
+  cursor: "pointer",
+  fontSize: 13.5,
+  color: "var(--color-accent-100)",
+  background: "var(--color-accent-900)",
+  border: "1px solid var(--color-accent)",
+  borderRadius: "var(--radius-md)",
+};
 const input: React.CSSProperties = {
   width: "100%",
   height: 36,
@@ -377,15 +387,16 @@ function InviteLinkCard() {
   }
 
   return (
-    <div style={card}>
-      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ fontSize: 12.5, color: "var(--color-text)" }}>リンクを発行してURLを本人に送ってください。</span>
-        <InfoTooltip text="ログイン情報は本人が自分で設定します。役職・担当窓口はあとから何度でも変更できるので、まずは一番権限の小さい「スタッフ」として参加してもらい、必要になったらチャット画面から権限を上げてください。窓口が未設定の間は何も見えない状態になるので安全です。参加すると、そのままスタッフ一覧に表示されます。" />
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, flex: 1 }}>
+          <span style={{ fontSize: 12.5, color: "var(--color-text)" }}>リンクを発行してURLを本人に送ってください。</span>
+          <InfoTooltip text="ログイン情報は本人が自分で設定します。役職・担当窓口はあとから何度でも変更できるので、まずは一番権限の小さい「スタッフ」として参加してもらい、必要になったらチャット画面から権限を上げてください。窓口が未設定の間は何も見えない状態になるので安全です。参加すると、そのままスタッフ一覧に表示されます。" />
+        </div>
+        <button onClick={create} disabled={creating} style={{ ...primaryBtn, flex: "none" }}>
+          {creating ? "作成中…" : "招待リンクを作成"}
+        </button>
       </div>
-
-      <button onClick={create} disabled={creating} style={{ ...smallBtn, alignSelf: "flex-start" }}>
-        {creating ? "作成中…" : "招待リンクを作成"}
-      </button>
 
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
 
