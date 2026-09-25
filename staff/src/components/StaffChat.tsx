@@ -120,39 +120,35 @@ export default function StaffChat({
     <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       {showListHeader && header}
 
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: showListHeader ? "var(--space-4) var(--space-6) var(--space-6)" : "var(--space-6)" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: showListHeader ? "var(--space-4) var(--space-6) var(--space-6)" : 0 }}>
         {!canManage ? (
-          <div style={{ flex: 1, minHeight: 0, border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-surface)" }}>
-            <StaffThreadPane
-              staffProfileId={currentUserId}
-              title="本部"
-              currentUserId={currentUserId}
-              orgId={orgId}
-              selfName={{ value: myName, onSaved: setMyName }}
-            />
-          </div>
+          <StaffThreadPane
+            staffProfileId={currentUserId}
+            title="本部"
+            currentUserId={currentUserId}
+            orgId={orgId}
+            selfName={{ value: myName, onSaved: setMyName }}
+          />
         ) : selected ? (
-          <div style={{ flex: 1, minHeight: 0, border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-surface)" }}>
-            <StaffThreadPane
-              staffProfileId={selected.id}
-              title={selected.displayName}
-              currentUserId={currentUserId}
-              orgId={orgId}
-              onBack={() => setSelectedId(null)}
-              editable={{
-                displayName: selected.displayName,
-                role: selected.role,
-                departmentIds: selected.departmentIds,
-                departments,
-                canDelete: currentRole === "owner" && selected.role !== "owner",
-                onSaved: (patch) => setStaff((rows) => rows.map((r) => (r.id === selected.id ? { ...r, ...patch } : r))),
-                onRemoved: () => {
-                  setStaff((rows) => rows.filter((r) => r.id !== selected.id));
-                  setSelectedId(null);
-                },
-              }}
-            />
-          </div>
+          <StaffThreadPane
+            staffProfileId={selected.id}
+            title={selected.displayName}
+            currentUserId={currentUserId}
+            orgId={orgId}
+            onBack={() => setSelectedId(null)}
+            editable={{
+              displayName: selected.displayName,
+              role: selected.role,
+              departmentIds: selected.departmentIds,
+              departments,
+              canDelete: currentRole === "owner" && selected.role !== "owner",
+              onSaved: (patch) => setStaff((rows) => rows.map((r) => (r.id === selected.id ? { ...r, ...patch } : r))),
+              onRemoved: () => {
+                setStaff((rows) => rows.filter((r) => r.id !== selected.id));
+                setSelectedId(null);
+              },
+            }}
+          />
         ) : (
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
             {otherStaff.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだスタッフがいません。右上の「スタッフを招待」から追加してください。</div>}

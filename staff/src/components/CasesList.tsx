@@ -15,6 +15,7 @@ export interface CaseRow {
   customerName: string;
   threadId: string | null;
   archived: boolean;
+  lastMessagePreview: string | null;
 }
 
 const smallBtn: React.CSSProperties = {
@@ -64,6 +65,7 @@ export default function CasesList({ rows: initialRows }: { rows: CaseRow[] }) {
             <Link href={`/cases/${r.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
               <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</div>
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{r.customerName}</div>
+              <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lastMessagePreview ?? "まだ記録がありません"}</div>
             </Link>
             <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>¥{r.amount.toLocaleString("ja-JP")}</div>
             <div style={{ flex: "none", fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)", whiteSpace: "nowrap" }}>

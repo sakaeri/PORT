@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { previewMessage } from "@/lib/message-preview";
+import { staffSenderLabel } from "@/lib/roles";
 import StaffChat from "@/components/StaffChat";
 import type { StaffRole } from "@/lib/supabase/types";
 
@@ -36,7 +37,10 @@ export default async function StaffPage() {
     const summary = summaryByProfileId.get(p.id) ?? null;
     const lastMessagePreview =
       summary && summary.last_message_kind != null
-        ? previewMessage({ kind: summary.last_message_kind, body: summary.last_message_body, payload: summary.last_message_payload, deleted_at: summary.last_message_deleted_at })
+        ? previewMessage(
+            { kind: summary.last_message_kind, body: summary.last_message_body, payload: summary.last_message_payload, deleted_at: summary.last_message_deleted_at },
+            staffSenderLabel(summary.last_message_sender_role),
+          )
         : null;
     return {
       id: p.id,

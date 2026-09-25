@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { headingWeight } from "@/lib/style";
+import { previewMessage } from "@/lib/message-preview";
+import { staffSenderLabel } from "@/lib/roles";
 import CasesList, { type CaseRow } from "@/components/CasesList";
 
 export default async function CasesPage() {
@@ -8,21 +10,32 @@ export default async function CasesPage() {
   if (!ctx) return null;
 
   const supabase = await createClient();
-  const [{ data: requests, error }, { data: caseThreads, error: threadsError }] = await Promise.all([
+  const [{ data: requests, error }, { data: caseThreads, error: threadsError }, { data: summaries, error: summariesError }] = await Promise.all([
     supabase
       .from("requests")
       .select("id, title, amount, phase, created_at, customers(name)")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
     supabase.from("threads").select("id, request_id, archived_at").eq("org_id", ctx.orgId).eq("kind", "case"),
+    supabase.rpc("case_thread_summaries", { p_org_id: ctx.orgId }),
   ]);
   if (error) console.error("requests select failed:", error);
   if (threadsError) console.error("case threads select failed:", threadsError);
+  if (summariesError) console.error("case_thread_summaries failed:", summariesError);
 
   const threadByRequestId = new Map((caseThreads ?? []).map((t) => [t.request_id, t]));
+  const summaryByRequestId = new Map((summaries ?? []).map((s) => [s.request_id, s]));
   const rows: CaseRow[] = (requests ?? []).map((r) => {
     const customer = Array.isArray(r.customers) ? r.customers[0] : r.customers;
     const thread = threadByRequestId.get(r.id) ?? null;
+    const summary = summaryByRequestId.get(r.id) ?? null;
+    const lastMessagePreview =
+      summary && summary.last_message_kind != null
+        ? previewMessage(
+            { kind: summary.last_message_kind, body: summary.last_message_body, payload: summary.last_message_payload, deleted_at: summary.last_message_deleted_at },
+            staffSenderLabel(summary.last_message_sender_role),
+          )
+        : null;
     return {
       id: r.id,
       title: r.title,
@@ -31,6 +44,7 @@ export default async function CasesPage() {
       customerName: customer?.name ?? "—",
       threadId: thread?.id ?? null,
       archived: !!thread?.archived_at,
+      lastMessagePreview,
     };
   });
 

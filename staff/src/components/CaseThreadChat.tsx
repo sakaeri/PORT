@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Trash } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { sendCaseMessage, deleteMessage, markThreadRead } from "@/app/actions";
-import { ROLE_LABEL } from "@/lib/roles";
+import { staffSenderLabel } from "@/lib/roles";
 import TextComposer from "@/components/TextComposer";
-import type { AppRole, StaffRole } from "@/lib/supabase/types";
+import type { AppRole } from "@/lib/supabase/types";
 
 export interface CaseMessage {
   id: string;
@@ -16,14 +16,6 @@ export interface CaseMessage {
   body: string | null;
   sent_at: string;
   deleted_at: string | null;
-}
-
-// profilesとのjoinに頼らず、メッセージ自体が持つsender_roleだけで
-// 「誰が送ったか」を表す（RLSやjoinの失敗に影響されない、確実な方法）。
-function senderLabel(role: AppRole | null): string {
-  if (role && role in ROLE_LABEL) return ROLE_LABEL[role as StaffRole];
-  if (role === "reception") return "受付";
-  return "スタッフ";
 }
 
 export default function CaseThreadChat({
@@ -140,7 +132,7 @@ export default function CaseThreadChat({
               {!m.deleted_at && (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>
-                    {senderLabel(m.sender_role)}・
+                    {staffSenderLabel(m.sender_role)}・
                     {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
                   {isOwn && (

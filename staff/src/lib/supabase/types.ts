@@ -559,6 +559,19 @@ export interface Database {
           last_message_body: string | null;
           last_message_payload: unknown;
           last_message_deleted_at: string | null;
+          last_message_sender_role: AppRole | null;
+        }[];
+      };
+      case_thread_summaries: {
+        Args: { p_org_id: string };
+        Returns: {
+          request_id: string;
+          thread_id: string;
+          last_message_kind: MessageKind | null;
+          last_message_body: string | null;
+          last_message_payload: unknown;
+          last_message_deleted_at: string | null;
+          last_message_sender_role: AppRole | null;
         }[];
       };
     };
