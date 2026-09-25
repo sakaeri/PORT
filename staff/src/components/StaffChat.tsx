@@ -120,7 +120,7 @@ export default function StaffChat({
           </div>
         ) : (
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-            {otherStaff.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ほかにスタッフがいません。</div>}
+            {otherStaff.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだスタッフがいません。右上の「スタッフを招待」から追加してください。</div>}
             {otherStaff.map((s) => (
               <button
                 key={s.id}

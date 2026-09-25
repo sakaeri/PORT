@@ -6,6 +6,7 @@ import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { createDepartment, renameDepartment, deleteDepartment, updateMenuDepartment, createStaffInvite } from "@/app/actions";
 import RoleTags from "@/components/RoleTags";
+import InfoTooltip from "@/components/InfoTooltip";
 import type { StaffRole } from "@/lib/supabase/types";
 
 export interface Department {
@@ -289,7 +290,10 @@ function DepartmentMenuPicker({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
-      <span style={label}>対応メニュー（このメニューで問い合わせが来ると、この窓口のスタッフが直接やり取りできるようになります。タップで選択・解除、他の窓口の担当だったメニューはこちらに移ります）</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <span style={label}>対応メニュー</span>
+        <InfoTooltip text="このメニューで問い合わせが来ると、この窓口のスタッフが直接やり取りできるようになります。タップで選択・解除、他の窓口の担当だったメニューはこちらに移ります。" />
+      </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {menus.map((m) => {
           const on = m.departmentId === department.id;
