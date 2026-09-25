@@ -35,7 +35,8 @@ language sql stable as $$
 $$;
 grant execute on function case_thread_summaries(uuid) to authenticated;
 
-create or replace function staff_thread_summaries(p_org_id uuid)
+drop function if exists staff_thread_summaries(uuid);
+create function staff_thread_summaries(p_org_id uuid)
 returns table (
   staff_profile_id uuid,
   thread_id uuid,
