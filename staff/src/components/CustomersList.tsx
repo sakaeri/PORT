@@ -24,6 +24,11 @@ interface CustomerRow {
 
 const yen = new Intl.NumberFormat("ja-JP");
 
+function formatStaffNames(names: string[]): string {
+  if (names.length <= 2) return names.join("・");
+  return `${names.slice(0, 2).join("・")} 他${names.length - 2}名`;
+}
+
 const smallBtn: React.CSSProperties = {
   height: 28,
   width: 28,
@@ -48,6 +53,7 @@ export default function CustomersList({
   departments: { id: string; name: string }[];
 }) {
   const router = useRouter();
+  const departmentById = new Map(departments.map((d) => [d.id, d.name]));
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
@@ -144,7 +150,12 @@ export default function CustomersList({
           <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", opacity: c.active ? 1 : 0.55 }}>
             <Link href={`/customers/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div style={{ fontSize: 14, fontWeight: c.unread ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: c.unread ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                {c.departmentId && departmentById.get(c.departmentId) && (
+                  <span style={{ flex: "none", fontSize: 10, color: "var(--color-neutral-500)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-sm)", padding: "1px 6px" }}>
+                    {departmentById.get(c.departmentId)}
+                  </span>
+                )}
                 {c.unread && (
                   <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: "var(--radius-sm)", padding: "1.5px 6px" }}>
                     未読
@@ -154,7 +165,7 @@ export default function CustomersList({
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.lastMessagePreview ?? "まだやり取りがありません"}</div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 3 }}>
                 <div style={{ fontSize: 11, color: c.activeCase ? "var(--color-neutral-400)" : "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.activeCase && c.activeCase.staffNames.length > 0 ? `対応 ${c.activeCase.staffNames.join("・")}` : "進行中の案件なし"}
+                  {c.activeCase && c.activeCase.staffNames.length > 0 ? `対応 ${formatStaffNames(c.activeCase.staffNames)}` : "進行中の案件なし"}
                 </div>
                 {c.requestCount > 0 && (
                   <div style={{ flex: "none", fontSize: 11, color: "var(--color-neutral-500)" }}>
