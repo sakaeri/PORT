@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -12,6 +12,7 @@ import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, 
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import TextComposer from "@/components/TextComposer";
+import Modal from "@/components/Modal";
 import { PHASE_LABEL } from "@/lib/stage";
 import type { AppRole, BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase, StaffRole } from "@/lib/supabase/types";
 
@@ -70,29 +71,116 @@ const card: React.CSSProperties = {
   gap: 12,
 };
 
-function TemplateRow({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+interface TemplateInfo {
+  id: string;
+  label: string;
+  note: string | null;
+  fieldCount: number;
+  fields: { label: string; required: boolean }[];
+}
+
+function TemplatesModal({
+  templates,
+  busy,
+  onClose,
+  onSendForm,
+  onUseText,
+}: {
+  templates: TemplateInfo[];
+  busy: boolean;
+  onClose: () => void;
+  onSendForm: (id: string) => void;
+  onUseText: (text: string) => void;
+}) {
+  const forms = templates.filter((t) => t.fieldCount > 0);
+  const plain = templates.filter((t) => t.fieldCount === 0);
   return (
-    <button
-      disabled={disabled}
-      onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 8,
-        padding: "7px 9px",
-        cursor: "pointer",
-        textAlign: "left",
-        fontSize: 12.5,
-        color: "var(--color-text)",
-        background: "transparent",
-        border: "none",
-        borderRadius: "var(--radius-sm)",
-      }}
-    >
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-      <PaperPlaneTilt size={12} color="var(--color-neutral-500)" style={{ flex: "none" }} />
-    </button>
+    <Modal onClose={onClose} maxWidth={440}>
+      <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>返信テンプレから送る</div>
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+            <X size={18} />
+          </button>
+        </div>
+        {forms.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--color-neutral-500)" }}>入力してもらう</span>
+            {forms.map((t) => (
+              <TemplateFormRow key={t.id} template={t} busy={busy} onSend={() => onSendForm(t.id)} />
+            ))}
+          </div>
+        )}
+        {plain.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--color-neutral-500)" }}>送るだけ</span>
+            {plain.map((t) => (
+              <TemplateTextRow key={t.id} template={t} onUse={() => onUseText(t.note ?? t.label)} />
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+const templateRowHeader: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, padding: "10px 12px" };
+const templateCaretBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, cursor: "pointer", background: "transparent", border: "none", textAlign: "left", color: "var(--color-text)" };
+const templateCountBadge: React.CSSProperties = { flex: "none", fontSize: 10.5, color: "var(--color-neutral-500)" };
+const templateSendBtn: React.CSSProperties = { flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
+
+function TemplateFormRow({ template, busy, onSend }: { template: TemplateInfo; busy: boolean; onSend: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
+      <div style={templateRowHeader}>
+        <button onClick={() => setOpen((v) => !v)} style={templateCaretBtn}>
+          {open ? <CaretDown size={13} color="var(--color-neutral-500)" /> : <CaretRight size={13} color="var(--color-neutral-500)" />}
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{template.label}</span>
+        </button>
+        <span style={templateCountBadge}>{template.fieldCount}項目</span>
+        <button onClick={onSend} disabled={busy} aria-label="この内容で送信" style={templateSendBtn}>
+          <PaperPlaneTilt size={13} />
+        </button>
+      </div>
+      {open && (
+        <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+          {template.note && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", paddingBottom: 4 }}>{template.note}</div>}
+          {template.fields.map((f, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+              <span style={{ flex: "none", width: 16, color: "var(--color-neutral-500)" }}>{i + 1}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                {f.label}
+                {f.required && <span style={{ marginLeft: 5, fontSize: 10, color: "var(--color-accent-200)" }}>必須</span>}
+              </span>
+              <span style={{ flex: "none", fontSize: 10.5, padding: "2px 8px", borderRadius: 999, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)" }}>記入</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TemplateTextRow({ template, onUse }: { template: TemplateInfo; onUse: () => void }) {
+  const [open, setOpen] = useState(false);
+  const text = template.note ?? template.label;
+  const lineCount = text.split("\n").length;
+  return (
+    <div style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
+      <div style={templateRowHeader}>
+        <button onClick={() => setOpen((v) => !v)} style={templateCaretBtn}>
+          {open ? <CaretDown size={13} color="var(--color-neutral-500)" /> : <CaretRight size={13} color="var(--color-neutral-500)" />}
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{template.label}</span>
+        </button>
+        <span style={templateCountBadge}>{lineCount}行</span>
+        <button onClick={onUse} aria-label="この内容を入力欄にセット" style={templateSendBtn}>
+          <PaperPlaneTilt size={13} />
+        </button>
+      </div>
+      {open && <div style={{ padding: "0 12px 12px", fontSize: 12.5, color: "var(--color-neutral-500)", whiteSpace: "pre-wrap" }}>{text}</div>}
+    </div>
   );
 }
 
@@ -255,7 +343,6 @@ export default function CustomerThread({
   const [showTemplates, setShowTemplates] = useState(false);
   const isMobile = useIsMobile();
   const [showInfoPanel, setShowInfoPanel] = useState(false);
-  const [previewTemplate, setPreviewTemplate] = useState<{ id: string; label: string; note: string | null; fields: { label: string; required: boolean }[] } | null>(null);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -393,6 +480,17 @@ export default function CustomerThread({
     }
   }
 
+  async function sendTemplateForm(templateId: string) {
+    if (!thread || busy) return;
+    setBusy(true);
+    try {
+      await sendTemplateMessage(thread.id, templateId);
+      setShowTemplates(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div style={{ display: "flex", height: "100%" }}>
     <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%" }}>
@@ -496,45 +594,17 @@ export default function CustomerThread({
         })}
       </div>
 
-      {thread && templates.length > 0 && showTemplates && (
-        <div style={{ flex: "none", margin: "0 20px", padding: 8, display: "flex", flexDirection: "column", gap: 10, maxHeight: 240, overflowY: "auto", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
-          {templates.some((t) => t.fieldCount > 0) && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.05em", color: "var(--color-neutral-500)", padding: "0 9px" }}>入力してもらう</div>
-              {templates
-                .filter((t) => t.fieldCount > 0)
-                .map((t) => (
-                  <TemplateRow
-                    key={t.id}
-                    label={`${t.label}（${t.fieldCount}項目）`}
-                    disabled={busy}
-                    onClick={() => {
-                      setPreviewTemplate({ id: t.id, label: t.label, note: t.note, fields: t.fields });
-                      setShowTemplates(false);
-                    }}
-                  />
-                ))}
-            </div>
-          )}
-          {templates.some((t) => t.fieldCount === 0) && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.05em", color: "var(--color-neutral-500)", padding: "0 9px" }}>送るだけ</div>
-              {templates
-                .filter((t) => t.fieldCount === 0)
-                .map((t) => (
-                  <TemplateRow
-                    key={t.id}
-                    label={t.label}
-                    disabled={busy}
-                    onClick={() => {
-                      setDraft(t.note ?? t.label);
-                      setShowTemplates(false);
-                    }}
-                  />
-                ))}
-            </div>
-          )}
-        </div>
+      {thread && showTemplates && (
+        <TemplatesModal
+          templates={templates}
+          busy={busy}
+          onClose={() => setShowTemplates(false)}
+          onSendForm={sendTemplateForm}
+          onUseText={(text) => {
+            setDraft(text);
+            setShowTemplates(false);
+          }}
+        />
       )}
       {thread && (
         <TextComposer
@@ -561,22 +631,6 @@ export default function CustomerThread({
           <Paperclip size={11} />
           ファイルの添付は次のフェーズで対応します。
         </div>
-      )}
-      {thread && previewTemplate && (
-        <TemplatePreviewDialog
-          template={previewTemplate}
-          busy={busy}
-          onClose={() => setPreviewTemplate(null)}
-          onSend={async () => {
-            setBusy(true);
-            try {
-              await sendTemplateMessage(thread.id, previewTemplate.id);
-              setPreviewTemplate(null);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        />
       )}
     </div>
 
@@ -896,51 +950,6 @@ function pillStyle(active: boolean): React.CSSProperties {
   };
 }
 
-function TemplatePreviewDialog({
-  template,
-  busy,
-  onClose,
-  onSend,
-}: {
-  template: { label: string; note: string | null; fields: { label: string; required: boolean }[] };
-  busy: boolean;
-  onClose: () => void;
-  onSend: () => void;
-}) {
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ width: "min(400px, 100%)", maxHeight: "85vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, padding: 20, borderRadius: "var(--radius-lg)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}
-      >
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>このテンプレを送信</div>
-        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>依頼主にはこの内容のカードが送られ、下の項目を入力してもらいます。</div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-          <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: headingWeight }}>{template.label}</div>
-          {template.note && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>{template.note}</div>}
-          <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
-            {template.fields.map((f, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
-                <span>{f.label}</span>
-                {f.required && <span style={{ fontSize: 10, color: "var(--color-accent-200)" }}>必須</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button onClick={onClose} disabled={busy} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-            キャンセル
-          </button>
-          <button onClick={onSend} disabled={busy} style={{ ...smallBtn, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
-            {busy ? "送信中…" : "この内容で送信する"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function QuoteDialog({
   threadId,
