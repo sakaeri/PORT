@@ -17,7 +17,12 @@ interface CustomerRow {
   departmentId: string | null;
   lastMessagePreview: string | null;
   unread: boolean;
+  requestCount: number;
+  lifetimeTotal: number;
+  activeCase: { title: string; phaseLabel: string; staffNames: string[] } | null;
 }
+
+const yen = new Intl.NumberFormat("ja-JP");
 
 const smallBtn: React.CSSProperties = {
   height: 28,
@@ -147,6 +152,40 @@ export default function CustomersList({
                 )}
               </div>
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.lastMessagePreview ?? "まだやり取りがありません"}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: c.activeCase ? "var(--color-neutral-400)" : "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {c.activeCase && c.activeCase.staffNames.length > 0 ? `対応 ${c.activeCase.staffNames.join("・")}` : "進行中の案件なし"}
+                </div>
+                {c.requestCount > 0 && (
+                  <div style={{ flex: "none", fontSize: 11, color: "var(--color-neutral-500)" }}>
+                    依頼{c.requestCount}件・累計¥{yen.format(c.lifetimeTotal)}
+                  </div>
+                )}
+              </div>
+              {c.activeCase && (
+                <div style={{ marginTop: 5 }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      maxWidth: "100%",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      color: "var(--color-accent-100)",
+                      background: "var(--color-accent-900)",
+                      border: "1px solid var(--color-accent)",
+                    }}
+                  >
+                    {c.activeCase.phaseLabel}：{c.activeCase.title}
+                  </span>
+                </div>
+              )}
             </Link>
             {isHq && c.convertedOrg && (
               <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: "var(--color-accent-200)" }}>

@@ -2,7 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { headingWeight } from "@/lib/style";
 import { previewMessage, senderPrefix } from "@/lib/message-preview";
+import { PHASE_LABEL } from "@/lib/stage";
 import CustomersList from "@/components/CustomersList";
+import type { RequestPhase } from "@/lib/supabase/types";
+
+const ACTIVE_PHASES: RequestPhase[] = ["draft", "quoted", "preparing", "started"];
+const VOID_PHASES: RequestPhase[] = ["cancelled", "declined"];
 
 export default async function CustomersPage() {
   const ctx = await getStaffContext();
@@ -14,7 +19,7 @@ export default async function CustomersPage() {
   const supabase = await createClient();
   // 依存のないクエリは並列で投げる。依頼主一覧に必要な「各依頼主の最新メッセージ・未読」は、
   // 案件トークまで巻き込む二重ネストの embed ではなく、確実に正しい専用RPCでまとめて取る。
-  const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }] = await Promise.all([
+  const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }, { data: requests }] = await Promise.all([
     supabase
       .from("customers")
       .select("id, name, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
@@ -22,11 +27,45 @@ export default async function CustomersPage() {
       .order("created_at", { ascending: false }),
     supabase.rpc("customer_thread_summaries", { p_org_id: ctx.orgId }),
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
+    supabase
+      .from("requests")
+      .select("id, customer_id, title, amount, phase, created_at")
+      .eq("org_id", ctx.orgId)
+      .order("created_at", { ascending: false }),
   ]);
   if (error) console.error("customers select failed:", error);
   if (summariesError) console.error("customer_thread_summaries failed:", summariesError);
 
   const summaryByCustomerId = new Map((summaries ?? []).map((s) => [s.customer_id, s]));
+
+  // 依頼主ごとの件数・累計額・進行中案件（一番新しいもの）をまとめる。
+  // requests は created_at 降順で取っているので、最初に出てきたものが最新。
+  const requestsByCustomerId = new Map<string, NonNullable<typeof requests>>();
+  for (const r of requests ?? []) {
+    const list = requestsByCustomerId.get(r.customer_id) ?? [];
+    list.push(r);
+    requestsByCustomerId.set(r.customer_id, list);
+  }
+  const activeRequestIds = (requests ?? [])
+    .filter((r) => ACTIVE_PHASES.includes(r.phase))
+    .map((r) => r.id);
+
+  const { data: caseStaff, error: caseStaffError } = activeRequestIds.length
+    ? await supabase
+        .from("case_staff")
+        .select("request_id, profiles!case_staff_profile_id_fkey(display_name, staff_alias)")
+        .in("request_id", activeRequestIds)
+    : { data: [], error: null };
+  if (caseStaffError) console.error("case_staff select failed:", caseStaffError);
+
+  const staffNamesByRequestId = new Map<string, string[]>();
+  for (const cs of caseStaff ?? []) {
+    const profile = Array.isArray(cs.profiles) ? cs.profiles[0] : cs.profiles;
+    if (!profile) continue;
+    const list = staffNamesByRequestId.get(cs.request_id) ?? [];
+    list.push(profile.staff_alias ?? profile.display_name);
+    staffNamesByRequestId.set(cs.request_id, list);
+  }
 
   const rows = (customers ?? [])
     .map((c) => {
@@ -41,6 +80,20 @@ export default async function CustomersPage() {
               senderPrefix(summary.last_message_sender_role),
             )
           : null;
+
+      const customerRequests = requestsByCustomerId.get(c.id) ?? [];
+      const billable = customerRequests.filter((r) => !VOID_PHASES.includes(r.phase));
+      const requestCount = billable.length;
+      const lifetimeTotal = billable.reduce((sum, r) => sum + r.amount, 0);
+      const activeRequest = customerRequests.find((r) => ACTIVE_PHASES.includes(r.phase)) ?? null;
+      const activeCase = activeRequest
+        ? {
+            title: activeRequest.title,
+            phaseLabel: PHASE_LABEL[activeRequest.phase],
+            staffNames: staffNamesByRequestId.get(activeRequest.id) ?? [],
+          }
+        : null;
+
       return {
         id: c.id,
         name: c.name,
@@ -51,6 +104,9 @@ export default async function CustomersPage() {
         departmentId: summary?.department_id ?? null,
         lastMessagePreview,
         unread: summary?.unread ?? false,
+        requestCount,
+        lifetimeTotal,
+        activeCase,
       };
     })
     // やり取りが一度もない依頼主（ページを開いただけ）は一覧に一切出さない
