@@ -2,7 +2,48 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash, Plus, CaretDown, CaretRight, Gift } from "@phosphor-icons/react";
+import {
+  Trash,
+  Plus,
+  CaretDown,
+  CaretRight,
+  Gift,
+  Wrench,
+  Toolbox,
+  Hammer,
+  HardHat,
+  Truck,
+  Package,
+  Car,
+  Broom,
+  PaintBrush,
+  Calculator,
+  CurrencyCircleDollar,
+  ClipboardText,
+  FileText,
+  Calendar,
+  ChatCircleText,
+  Phone,
+  EnvelopeSimple,
+  Megaphone,
+  Camera,
+  Scissors,
+  ForkKnife,
+  GraduationCap,
+  FirstAidKit,
+  Heartbeat,
+  ShieldCheck,
+  Star,
+  Tag,
+  House,
+  MapPin,
+  ShoppingCart,
+  Users,
+  Handshake,
+  ArrowsClockwise,
+  Scales,
+  type Icon,
+} from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -52,11 +93,104 @@ interface Menu {
   org_id: string;
   label: string;
   note: string | null;
+  icon: string | null;
   price: number;
   lead_hours: number;
   active: boolean;
   department_id: string | null;
   menu_questions: Question[];
+}
+
+// 依頼主側の「メニューから問い合わせる」で ph.ph-xxx のアイコンフォントとして
+// そのまま表示される（src/components/chat/Dialogs.tsx の MenuSheet）。
+// 画像アップロードではなくこの固定セットから選ぶ形にすることで、追加の
+// 保存先や表示コストなしにアイコンを付けられるようにする。
+const MENU_ICON_OPTIONS: { name: string; label: string }[] = [
+  { name: "wrench", label: "修理" },
+  { name: "toolbox", label: "道具" },
+  { name: "hammer", label: "施工" },
+  { name: "hard-hat", label: "工事" },
+  { name: "truck", label: "配送" },
+  { name: "package", label: "荷物" },
+  { name: "car", label: "車" },
+  { name: "broom", label: "清掃" },
+  { name: "paint-brush", label: "塗装" },
+  { name: "calculator", label: "経理" },
+  { name: "currency-circle-dollar", label: "料金" },
+  { name: "clipboard-text", label: "手続き" },
+  { name: "file-text", label: "書類" },
+  { name: "calendar", label: "予約" },
+  { name: "chat-circle-text", label: "相談" },
+  { name: "phone", label: "電話" },
+  { name: "envelope-simple", label: "連絡" },
+  { name: "megaphone", label: "案内" },
+  { name: "camera", label: "撮影" },
+  { name: "scissors", label: "美容" },
+  { name: "fork-knife", label: "飲食" },
+  { name: "graduation-cap", label: "講習" },
+  { name: "first-aid-kit", label: "応急" },
+  { name: "heartbeat", label: "健康" },
+  { name: "shield-check", label: "安全" },
+  { name: "gift", label: "特典" },
+  { name: "star", label: "おすすめ" },
+  { name: "tag", label: "割引" },
+  { name: "house", label: "住宅" },
+  { name: "map-pin", label: "現地" },
+  { name: "shopping-cart", label: "購入" },
+  { name: "users", label: "人員" },
+  { name: "handshake", label: "契約" },
+  { name: "arrows-clockwise", label: "修正" },
+  { name: "scales", label: "法務" },
+];
+
+const MENU_ICON_COMPONENTS: Record<string, Icon> = {
+  wrench: Wrench,
+  toolbox: Toolbox,
+  hammer: Hammer,
+  "hard-hat": HardHat,
+  truck: Truck,
+  package: Package,
+  car: Car,
+  broom: Broom,
+  "paint-brush": PaintBrush,
+  calculator: Calculator,
+  "currency-circle-dollar": CurrencyCircleDollar,
+  "clipboard-text": ClipboardText,
+  "file-text": FileText,
+  calendar: Calendar,
+  "chat-circle-text": ChatCircleText,
+  phone: Phone,
+  "envelope-simple": EnvelopeSimple,
+  megaphone: Megaphone,
+  camera: Camera,
+  scissors: Scissors,
+  "fork-knife": ForkKnife,
+  "graduation-cap": GraduationCap,
+  "first-aid-kit": FirstAidKit,
+  heartbeat: Heartbeat,
+  "shield-check": ShieldCheck,
+  gift: Gift,
+  star: Star,
+  tag: Tag,
+  house: House,
+  "map-pin": MapPin,
+  "shopping-cart": ShoppingCart,
+  users: Users,
+  handshake: Handshake,
+  "arrows-clockwise": ArrowsClockwise,
+  scales: Scales,
+};
+
+// menus.icon はスタッフ側では上の名前(例:"wrench")だけを持ち、依頼主側の
+// アイコンフォント（@phosphor-icons/web）のクラス名 "ph ph-wrench" に変換して保存する。
+function menuIconName(iconClass: string | null): string | null {
+  if (!iconClass) return null;
+  const parts = iconClass.trim().split(/\s+/);
+  const withPrefix = parts.find((p) => p.startsWith("ph-"));
+  return withPrefix ? withPrefix.slice(3) : null;
+}
+function menuIconClass(name: string | null): string | null {
+  return name ? `ph ph-${name}` : null;
 }
 
 interface IntakeField {
@@ -637,7 +771,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
 
   async function handleAdd() {
     const id = await createMenu(orgId);
-    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, price: 0, lead_hours: 24, active: true, department_id: null, menu_questions: [] }]);
+    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: 0, lead_hours: 24, active: true, department_id: null, menu_questions: [] }]);
     setOpenId(id);
   }
 
@@ -652,7 +786,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
   }
 
   async function commit(m: Menu) {
-    await updateMenu(m.id, { label: m.label, note: m.note ?? "", price: m.price, lead_hours: m.lead_hours, active: m.active });
+    await updateMenu(m.id, { label: m.label, note: m.note ?? "", price: m.price, lead_hours: m.lead_hours, active: m.active, icon: m.icon });
   }
 
   return (
@@ -672,6 +806,8 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {menus.map((m) => {
           const open = openId === m.id;
+          const selectedIconName = menuIconName(m.icon);
+          const SelectedIcon = selectedIconName ? MENU_ICON_COMPONENTS[selectedIconName] : null;
           return (
             <div key={m.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
               <button
@@ -679,6 +815,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
               >
                 {open ? <CaretDown size={13} /> : <CaretRight size={13} />}
+                {SelectedIcon && <SelectedIcon size={15} color="var(--color-accent)" style={{ flex: "none" }} />}
                 <span style={{ flex: 1, fontSize: 13.5, opacity: m.active ? 1 : 0.5 }}>{m.label || "（無題）"}</span>
                 <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>¥{m.price.toLocaleString("ja-JP")}</span>
               </button>
@@ -715,6 +852,63 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={label}>詳細内容</span>
                     <input value={m.note ?? ""} onChange={(e) => patchLocal(m.id, { note: e.target.value })} onBlur={() => commit(m)} className="vid-input" style={input} />
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <span style={label}>アイコン（依頼主のメニュー一覧に表示されます）</span>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          patchLocal(m.id, { icon: null });
+                          commit({ ...m, icon: null });
+                        }}
+                        title="アイコンなし"
+                        style={{
+                          width: 32,
+                          height: 32,
+                          display: "grid",
+                          placeItems: "center",
+                          cursor: "pointer",
+                          fontSize: 10,
+                          color: selectedIconName === null ? "var(--color-accent)" : "var(--color-neutral-500)",
+                          background: selectedIconName === null ? "var(--color-accent-900)" : "transparent",
+                          border: `1px solid ${selectedIconName === null ? "var(--color-accent)" : "var(--color-divider)"}`,
+                          borderRadius: "var(--radius-md)",
+                        }}
+                      >
+                        なし
+                      </button>
+                      {MENU_ICON_OPTIONS.map((opt) => {
+                        const OptIcon = MENU_ICON_COMPONENTS[opt.name];
+                        const on = selectedIconName === opt.name;
+                        return (
+                          <button
+                            key={opt.name}
+                            type="button"
+                            onClick={() => {
+                              const iconClass = menuIconClass(opt.name);
+                              patchLocal(m.id, { icon: iconClass });
+                              commit({ ...m, icon: iconClass });
+                            }}
+                            title={opt.label}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              display: "grid",
+                              placeItems: "center",
+                              cursor: "pointer",
+                              color: on ? "var(--color-accent-100)" : "var(--color-neutral-500)",
+                              background: on ? "var(--color-accent-900)" : "transparent",
+                              border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
+                              borderRadius: "var(--radius-md)",
+                            }}
+                          >
+                            <OptIcon size={16} />
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} />

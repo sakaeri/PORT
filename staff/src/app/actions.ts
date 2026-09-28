@@ -218,7 +218,7 @@ export async function createMenu(orgId: string) {
 
 export async function updateMenu(
   id: string,
-  fields: { label: string; note: string; price: number; lead_hours: number; active: boolean },
+  fields: { label: string; note: string; price: number; lead_hours: number; active: boolean; icon: string | null },
 ) {
   await requireContext();
   const supabase = await createClient();
@@ -230,6 +230,7 @@ export async function updateMenu(
       price: fields.price,
       lead_hours: fields.lead_hours,
       active: fields.active,
+      icon: fields.icon,
     })
     .eq("id", id);
   if (error) throw error;
