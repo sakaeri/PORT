@@ -301,12 +301,12 @@ function StaffEditPanel({
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>スタッフ設定</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <span style={editLabel}>表示名</span>
-        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="vid-input" style={{ ...editInput, maxWidth: 260 }} />
+        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="vid-input" style={editInput} />
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 180px" }}>
           <span style={editLabel}>役職</span>
-          <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={{ ...editInput, maxWidth: 260 }}>
+          <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={editInput}>
             {INVITE_ROLES.map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r]}
