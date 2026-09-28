@@ -1074,7 +1074,7 @@ interface MenuOption {
   id: string;
   label: string;
   note: string | null;
-  price: number;
+  price: number | null;
   payout: number;
   leadHours: number;
 }
@@ -1186,7 +1186,9 @@ function QuoteDialog({
     setCustomItems((rows) => rows.map((r, i) => (i === index ? { ...r, qty: Math.max(1, r.qty + delta) } : r)));
   }
 
-  const menuItems = menus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id], leadHours: m.leadHours as number | null }));
+  // 金額が未設定（相談項目としてだけ使う）受付メニューは見積もりの候補には出さない。
+  const priceableMenus = menus.filter((m): m is MenuOption & { price: number } => m.price != null);
+  const menuItems = priceableMenus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id], leadHours: m.leadHours as number | null }));
   const allItems = [
     ...menuItems,
     ...customItems.map((c) => ({ menuId: null as string | null, label: c.label, price: c.price, payout: 0, qty: c.qty, leadHours: c.leadHours })),
@@ -1245,7 +1247,8 @@ function QuoteDialog({
               ＋項目を追加
             </button>
           </div>
-          {menus.map((m) => (
+          {priceableMenus.length === 0 && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>金額の設定されたメニューがありません。</div>}
+          {priceableMenus.map((m) => (
             <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</div>

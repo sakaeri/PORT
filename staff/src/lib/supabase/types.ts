@@ -209,7 +209,7 @@ export interface Database {
           label: string;
           note: string | null;
           icon: string | null;
-          price: number;
+          price: number | null;
           payout: number;
           lead_hours: number;
           sort: number;

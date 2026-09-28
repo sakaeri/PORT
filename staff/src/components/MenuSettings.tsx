@@ -94,7 +94,7 @@ interface Menu {
   label: string;
   note: string | null;
   icon: string | null;
-  price: number;
+  price: number | null;
   lead_hours: number;
   active: boolean;
   department_id: string | null;
@@ -771,7 +771,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
 
   async function handleAdd() {
     const id = await createMenu(orgId);
-    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: 0, lead_hours: 24, active: true, department_id: null, menu_questions: [] }]);
+    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: null, lead_hours: 24, active: true, department_id: null, menu_questions: [] }]);
     setOpenId(id);
   }
 
@@ -793,7 +793,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>受付メニュー</div>
-        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。どの窓口が対応するかは「スタッフ」画面の窓口・スタッフ管理で設定します" />
+        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの窓口が対応するかは「スタッフ」画面の窓口・スタッフ管理で設定します" />
         <div style={{ flex: 1 }} />
         <button onClick={handleAdd} style={smallBtn}>
           <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
@@ -817,7 +817,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
                 {open ? <CaretDown size={13} /> : <CaretRight size={13} />}
                 {SelectedIcon && <SelectedIcon size={15} color="var(--color-accent)" style={{ flex: "none" }} />}
                 <span style={{ flex: 1, fontSize: 13.5, opacity: m.active ? 1 : 0.5 }}>{m.label || "（無題）"}</span>
-                <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>¥{m.price.toLocaleString("ja-JP")}</span>
+                <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{m.price != null ? `¥${m.price.toLocaleString("ja-JP")}` : "相談のみ"}</span>
               </button>
               {open && (
                 <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -827,11 +827,12 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
                       <input value={m.label} onChange={(e) => patchLocal(m.id, { label: e.target.value })} onBlur={() => commit(m)} className="vid-input" style={input} />
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>請求金額（円）</span>
+                      <span style={label}>請求金額（円・空欄なら相談項目として扱う）</span>
                       <input
                         type="number"
-                        value={m.price}
-                        onChange={(e) => patchLocal(m.id, { price: Number(e.target.value) })}
+                        value={m.price ?? ""}
+                        placeholder="未設定"
+                        onChange={(e) => patchLocal(m.id, { price: e.target.value === "" ? null : Number(e.target.value) })}
                         onBlur={() => commit(m)}
                         className="vid-input"
                         style={input}

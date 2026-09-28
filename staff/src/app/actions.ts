@@ -209,7 +209,7 @@ export async function createMenu(orgId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("menus")
-    .insert({ org_id: orgId, label: "新しいメニュー", price: 0, payout: 0, lead_hours: 24, sort: 999 })
+    .insert({ org_id: orgId, label: "新しいメニュー", price: null, payout: 0, lead_hours: 24, sort: 999 })
     .select("id")
     .single();
   if (error || !data) throw error ?? new Error("作成できませんでした");
@@ -218,7 +218,7 @@ export async function createMenu(orgId: string) {
 
 export async function updateMenu(
   id: string,
-  fields: { label: string; note: string; price: number; lead_hours: number; active: boolean; icon: string | null },
+  fields: { label: string; note: string; price: number | null; lead_hours: number; active: boolean; icon: string | null },
 ) {
   await requireContext();
   const supabase = await createClient();
