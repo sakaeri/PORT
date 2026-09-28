@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCustomerContext, getMenus, getMyCompanies, getReferralSignupUrl, getRefundPolicies, getThreadMessages, getVaultItems, hasAuthSession } from "@/lib/data";
+import { getCustomerContext, getMyCompanies, getRefundPolicies, getThreadMessages, getVaultItems, hasAuthSession } from "@/lib/data";
 import ChatScreen from "@/components/chat/ChatScreen";
 import VerifyGate from "@/components/chat/VerifyGate";
 
@@ -45,13 +45,11 @@ export default async function Home() {
     );
   }
 
-  const [{ messages, hasMoreOlder }, menus, refundPolicies, vault, companies, referralSignupUrl] = await Promise.all([
+  const [{ messages, hasMoreOlder }, refundPolicies, vault, companies] = await Promise.all([
     getThreadMessages(ctx.threadId),
-    getMenus(ctx.orgId),
     getRefundPolicies(ctx.orgId),
     getVaultItems(ctx.customerId),
     ctx.isAnonymous ? Promise.resolve([]) : getMyCompanies(),
-    getReferralSignupUrl(ctx.orgId),
   ]);
 
   return (
@@ -59,11 +57,9 @@ export default async function Home() {
       ctx={ctx}
       initialMessages={messages}
       initialHasMoreOlder={hasMoreOlder}
-      menus={menus}
       refundPolicies={refundPolicies}
       initialVault={vault}
       companies={companies}
-      referralSignupUrl={referralSignupUrl}
     />
   );
 }

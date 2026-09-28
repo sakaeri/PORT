@@ -42,12 +42,10 @@ export async function proxy(request: NextRequest) {
 
   const { data } = await supabase.auth.getUser();
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
-  // /signup: LPからの公開セルフサインアップ（未ログインでも入れる必要がある）。
   // /join: スタッフの招待リンク（招待された本人はまだログインしていない）。
   // /api/stripe-webhook: Stripeサーバーからの通知（ログインセッションを持たない）。
   const isPublicRoute =
     isLoginRoute ||
-    request.nextUrl.pathname.startsWith("/signup") ||
     request.nextUrl.pathname.startsWith("/join") ||
     request.nextUrl.pathname.startsWith("/api/stripe-webhook");
 

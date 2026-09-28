@@ -103,40 +103,6 @@ export async function sendMessage(text: string, attachments: { path: string; nam
   await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
 }
 
-export async function submitMenuInquiry(
-  menuId: string,
-  menuLabel: string,
-  menuIcon: string | null,
-  rows: { label: string; value: string }[],
-  note: string,
-) {
-  const ctx = await requireActiveContext();
-  const supabase = await createClient();
-  const filled = rows.filter((r) => r.value.trim());
-  const { error } = await supabase.from("messages").insert({
-    thread_id: ctx.threadId,
-    sender_id: ctx.userId,
-    sender_role: "client",
-    kind: "menu_pick",
-    payload: { menuId, menuLabel, menuIcon, rows: filled, note: note.trim() },
-  });
-  if (error) throw error;
-  await touchThread(ctx.threadId);
-  await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
-  await assignThreadDepartmentFromMenu(ctx.threadId, menuId);
-}
-
-// 依頼主が最初にメニューを選んだ時点で、そのトーク全体を該当の窓口に
-// 紐付ける（一度紐付いたら、以後は受付が手動で切り替えるまで変わらない）。
-// これは受付側の窓口権限を絞るためのRLSにも使うため、依頼主自身の書き込み
-// 権限では更新できないようservice roleで行う。
-async function assignThreadDepartmentFromMenu(threadId: string, menuId: string) {
-  const admin = createServiceRoleClient();
-  const { data: menu } = await admin.from("menus").select("department_id").eq("id", menuId).maybeSingle();
-  if (!menu?.department_id) return;
-  await admin.from("threads").update({ department_id: menu.department_id }).eq("id", threadId).is("department_id", null);
-}
-
 // id が null（または DB にまだ存在しない一時ID）なら新規作成として扱い、
 // 実際の行IDを返す。呼び出し側はローカルの仮IDをこれで置き換える。
 export async function saveVaultItem(id: string | null, label: string, value: string): Promise<string> {
@@ -336,17 +302,3 @@ export async function cancelRequest(requestId: string) {
   }
 }
 
-// マイページの「この窓口のしくみを、自社でも」→「90日間無料で始める」用。
-// 実際のセルフサインアップへのリンクはページ読み込み時に用意済み
-// （getReferralSignupUrl）なので、ここでは営業フォロー用の記録だけ行う。
-export async function startReferral() {
-  const ctx = await requireContext();
-  const admin = createServiceRoleClient();
-  const { error } = await admin.from("referral_leads").insert({
-    org_id: ctx.orgId,
-    customer_id: ctx.customerId,
-    customer_name: ctx.customerName,
-    customer_email: ctx.email,
-  });
-  if (error) throw error;
-}

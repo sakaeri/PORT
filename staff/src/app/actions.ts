@@ -491,51 +491,6 @@ export async function createOrgAccount(fields: OrgAccountFields) {
   return createOrgCore(fields);
 }
 
-// LPからの公開セルフサインアップ。HQ権限は不要（本部を介さず誰でも申し込める）。
-// Turnstile（CAPTCHA）で機械的な大量作成を防ぎ、紹介コード（=紹介元オーナーの
-// profile id）が実在するオーナーのものであれば90日トライアルとして扱う。
-export async function signUpSelfServe(fields: OrgAccountFields, refUserId: string | null, turnstileToken: string) {
-  await verifyTurnstile(turnstileToken);
-
-  const admin = createServiceRoleClient();
-  let referrer: { userId: string; orgId: string } | null = null;
-  if (refUserId) {
-    const { data: refProfile } = await admin.from("profiles").select("id, org_id").eq("id", refUserId).eq("role", "owner").maybeSingle();
-    if (refProfile) referrer = { userId: refProfile.id, orgId: refProfile.org_id };
-  }
-
-  const result = await createOrgCore(fields, referrer?.userId ?? null);
-
-  // 紹介した事業者が後で1枚使えるチケットの元。初回課金が通ったら
-  // Stripe Webhook側で confirmed に更新する（今は pending で記録するだけ）。
-  if (referrer) {
-    const { error } = await admin
-      .from("referral_credits")
-      .insert({ referrer_user_id: referrer.userId, referrer_org_id: referrer.orgId, referred_org_id: result.orgId });
-    if (error) console.error("signUpSelfServe: failed to record referral_credits", error);
-  }
-
-  return result;
-}
-
-// TURNSTILE_SECRET_KEY が未設定の間は検証をスキップする（本番公開前に必ず設定すること。
-// 未設定のまま公開すると誰でも無制限にアカウントを作成できてしまう）。
-async function verifyTurnstile(token: string) {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) {
-    console.warn("verifyTurnstile: TURNSTILE_SECRET_KEY is not set — skipping CAPTCHA verification");
-    return;
-  }
-  if (!token) throw new Error("認証に失敗しました。ページを再読み込みしてもう一度お試しください。");
-  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ secret, response: token }),
-  });
-  const data = (await res.json()) as { success: boolean };
-  if (!data.success) throw new Error("認証に失敗しました。ページを再読み込みしてもう一度お試しください。");
-}
-
 // 依頼主一覧の問い合わせ行から、そのままその依頼主を新しい事業者として
 // 登録する。作成ロジックは createOrgAccount と共通（createOrgCore）で、
 // 追加で customers.converted_org_id を紐付けて「どの問い合わせがどの事業者
@@ -1374,8 +1329,7 @@ async function replaceStaffDepartments(admin: ReturnType<typeof createServiceRol
 }
 
 // メールアドレス・パスワードをこちらで発行する代わりに、招待リンクを発行する。
-// 招待された本人が /join/<id> を開いて自分でログイン情報を設定する
-// （公開セルフサインアップの signUpSelfServe と同じ考え方）。役職・担当窓口は
+// 招待された本人が /join/<id> を開いて自分でログイン情報を設定する。役職・担当窓口は
 // ここでは決めず、参加後にチャット画面の歯車パネルから設定する（役職も
 // あとで変更できるので、招待の時点で決め切る意味がない）。招待は常に
 // 一番権限の小さいスタッフ（dept_leader）として作られる。

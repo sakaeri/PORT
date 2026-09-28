@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ListDashes, Paperclip, ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/react";
+import { Paperclip, ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/image-resize";
 
@@ -16,7 +16,6 @@ interface Props {
   threadId: string;
   orgId: string;
   onSend: (text: string, attachments: PendingAttachment[]) => Promise<void>;
-  onOpenMenuSheet: () => void;
 }
 
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20MB。Supabase側の上限に確実に収まるよう、送信前にここで弾く
@@ -40,7 +39,7 @@ function sizeMbLabel(bytes: number): string {
   return (bytes / 1048576).toFixed(1);
 }
 
-export default function Composer({ threadId, orgId, onSend, onOpenMenuSheet }: Props) {
+export default function Composer({ threadId, orgId, onSend }: Props) {
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
@@ -243,9 +242,6 @@ export default function Composer({ threadId, orgId, onSend, onOpenMenuSheet }: P
       )}
 
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-        <button onClick={onOpenMenuSheet} aria-label="メニューから問い合わせる" title="メニューから問い合わせる" style={{ flex: "none", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-          <ListDashes size={17} />
-        </button>
         <input ref={fileInputRef} type="file" multiple accept="image/*,application/pdf" onChange={handlePickFiles} style={{ display: "none" }} />
         <button
           onClick={() => fileInputRef.current?.click()}

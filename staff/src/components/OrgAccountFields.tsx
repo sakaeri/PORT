@@ -69,16 +69,7 @@ const smallBtn: React.CSSProperties = {
 
 // 「新規事業者を追加」（ゼロから入力）と「依頼主を事業者に変換」（名前だけ
 // 引き継いで残りを入力）の両方で使う、事業者情報＋オーナーのログイン情報の
-// 入力欄一式。selfServe=true のとき（公開のセルフサインアップ /signup 用）は、
-// 「窓口を1つ作るだけ」の最小限の項目に絞る：
-// - 正式名称・代表者名・電話番号・連絡用メールアドレスは出さない
-//   （正式名称は表示名をそのまま使う。連絡用メールはログインメールアドレスを
-//   代わりに使う。どれも後から会社情報タブで入力・修正できる）
-// - 項目数が少ないので2列グリッドではなく縦一列に並べ、URL欄の説明文で
-//   高さが変わっても隣の項目とズレて見えないようにする
-// - URLの説明を分かりやすくし、実際のURLをその場でプレビューする
-// - パスワードは本人が決める前提でマスク表示にし、「自動生成」ボタンは出さない
-//   （自動生成は「本部が代わりに作って本人に伝える」内部ツール専用の機能のため）
+// 入力欄一式。
 export function OrgAccountFields({
   form,
   set,
@@ -90,17 +81,15 @@ export function OrgAccountFields({
   // false のとき: 「今ログイン中の自分にそのまま追加する」フロー用。新しい
   // ログイン情報を作らないので、オーナーのログイン欄自体を出さない。
   showOwnerLogin?: boolean;
+  // true のとき:「窓口を追加」の簡易フォーム用。正式名称・代表者名・電話番号・
+  // 連絡用メールアドレスの入力欄自体を出さず、表示名とURLだけの最小限にする
+  // （正式名称は表示名をそのまま使う。他は後から会社情報タブで入力できる）。
   selfServe?: boolean;
 }) {
   const urlField = (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <span style={label}>{selfServe ? "お問い合わせページのURL（半角英数字とハイフン）" : "URLの合言葉（半角英数字とハイフン）"}</span>
+      <span style={label}>URLの合言葉（半角英数字とハイフン）</span>
       <input required value={form.slug} onChange={(e) => set("slug", sanitizeSlugInput(e.target.value))} className="vid-input" style={input} />
-      {selfServe && (
-        <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>
-          {form.slug ? `→ port.s-stylegolf.com/${form.slug}` : "依頼主がお問い合わせに使うURLになります"}
-        </span>
-      )}
     </div>
   );
 
@@ -125,28 +114,21 @@ export function OrgAccountFields({
       {showOwnerLogin && (
         <>
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
-            {selfServe ? "受付画面に入るためのログイン情報" : "この事業者のオーナーが受付画面に入るためのログイン情報"}
+            この事業者のオーナーが受付画面に入るためのログイン情報
           </div>
-          {selfServe ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <Field label="ログインメールアドレス" value={form.owner_email} onChange={(v) => set("owner_email", v)} type="email" required />
-              <Field label="パスワード（8文字以上）" value={form.owner_password} onChange={(v) => set("owner_password", v)} type="password" required />
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-              <Field label="オーナーの表示名" value={form.owner_display_name} onChange={(v) => set("owner_display_name", v)} />
-              <Field label="ログインメールアドレス" value={form.owner_email} onChange={(v) => set("owner_email", v)} type="email" required />
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <span style={label}>初期パスワード</span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input required value={form.owner_password} onChange={(e) => set("owner_password", e.target.value)} className="vid-input" style={input} />
-                  <button type="button" onClick={() => set("owner_password", randomPassword())} style={{ ...smallBtn, flex: "none" }}>
-                    自動生成
-                  </button>
-                </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+            <Field label="オーナーの表示名" value={form.owner_display_name} onChange={(v) => set("owner_display_name", v)} />
+            <Field label="ログインメールアドレス" value={form.owner_email} onChange={(v) => set("owner_email", v)} type="email" required />
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <span style={label}>初期パスワード</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input required value={form.owner_password} onChange={(e) => set("owner_password", e.target.value)} className="vid-input" style={input} />
+                <button type="button" onClick={() => set("owner_password", randomPassword())} style={{ ...smallBtn, flex: "none" }}>
+                  自動生成
+                </button>
               </div>
             </div>
-          )}
+          </div>
         </>
       )}
     </>

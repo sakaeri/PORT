@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle } from "@/lib/chat-types";
 
 export type { CustomerContext, MessageWithExtras, RequestBundle };
@@ -128,19 +128,6 @@ export async function getThreadMessages(threadId: string): Promise<{ messages: M
   return { messages: rows.map(mapMessageRow), hasMoreOlder: data.length === MESSAGE_PAGE_SIZE };
 }
 
-// 依頼主には価格を一切見せない（見積りで初めて金額が決まる）。price/payout/
-// department_id は受付側の内部情報なので、依頼主のブラウザには送らない。
-export async function getMenus(orgId: string) {
-  const supabase = await createClient();
-  const { data: menus } = await supabase
-    .from("menus")
-    .select("id, label, icon, note, menu_questions(id, label)")
-    .eq("org_id", orgId)
-    .eq("active", true)
-    .order("sort", { ascending: true });
-  return menus ?? [];
-}
-
 export async function getRefundPolicies(orgId: string) {
   const supabase = await createClient();
   const { data } = await supabase.from("refund_policies").select("*").eq("org_id", orgId);
@@ -151,19 +138,6 @@ export async function getMyCompanies() {
   const supabase = await createClient();
   const { data } = await supabase.rpc("my_companies");
   return data ?? [];
-}
-
-// マイページの「この窓口のしくみを、自社でも」ボタン用。押した瞬間に受付
-// アプリの /signup へ直接飛べるよう、事業所のオーナーの profile id を
-// あらかじめページ読み込み時に解決しておく（クリック時に非同期処理を
-// 挟まない）。依頼主のセッションには profiles を読む権限が無いため
-// service role を使う。.limit(1) は、万一同じ org に owner ロールの
-// profiles 行が複数あっても maybeSingle() がエラーにならないようにするため。
-export async function getReferralSignupUrl(orgId: string): Promise<string> {
-  const admin = createServiceRoleClient();
-  const { data: owner } = await admin.from("profiles").select("id").eq("org_id", orgId).eq("role", "owner").limit(1).maybeSingle();
-  const staffAppUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
-  return owner ? `${staffAppUrl}/signup?ref=${owner.id}` : `${staffAppUrl}/signup`;
 }
 
 export async function getVaultItems(customerId: string) {

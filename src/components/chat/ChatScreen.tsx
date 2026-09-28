@@ -4,14 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/chat/Header";
 import Composer, { type PendingAttachment } from "@/components/chat/Composer";
 import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, IntakeCard, IntakeAnswerBubble } from "@/components/chat/Bubbles";
-import { ProgressPanel, CancelDialog, ReportsDialog, MenuSheet } from "@/components/chat/Dialogs";
+import { ProgressPanel, CancelDialog, ReportsDialog } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
 import { createClient } from "@/lib/supabase/client";
-import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MenuRow, type MessageWithExtras, type RawMessageRow, type RequestBundle, type VaultRow } from "@/lib/chat-types";
+import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle, type VaultRow } from "@/lib/chat-types";
 import type { Database } from "@/lib/supabase/types";
 import {
   sendMessage as sendMessageAction,
-  submitMenuInquiry,
   cancelRequest,
   submitRating,
   skipRating,
@@ -23,15 +22,10 @@ interface Props {
   ctx: CustomerContext;
   initialMessages: MessageWithExtras[];
   initialHasMoreOlder?: boolean;
-  menus: MenuRow[];
   refundPolicies: RefundPolicyRow[];
   initialVault: VaultRow[];
   companies: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];
-  referralSignupUrl: string;
 }
-
-// 依頼主には価格を一切見せない。getMenus() と同じ絞り込み。
-const MENU_SELECT = "id, label, icon, note, menu_questions(id, label)";
 
 const ACKED_KEY = "VID_acked_reports";
 
@@ -51,19 +45,17 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, menus: initialMenus, refundPolicies, initialVault, companies, referralSignupUrl }: Props) {
+export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, refundPolicies, initialVault, companies }: Props) {
   const [messages, setMessages] = useState(initialMessages);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const skipAutoScrollRef = useRef(false);
-  const [menus, setMenus] = useState(initialMenus);
   const vault = initialVault;
   const [searchQuery, setSearchQuery] = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showReports, setShowReports] = useState(false);
   const [showMyPage, setShowMyPage] = useState(false);
-  const [showMenuSheet, setShowMenuSheet] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Both start matching the server's render (empty set / dark) and sync from
@@ -156,33 +148,6 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
     };
   }, [ctx.threadId, ctx.customerId, ctx.orgId, refresh]);
 
-  // 受付側でメニューや「はじめの質問」を追加・編集しても、この画面をすでに開いている
-  // 依頼主に反映されるようにする（開いたまま放置されがちな画面のため）。
-  const refreshMenus = useCallback(async () => {
-    const supabase = createClient(ctx.orgId);
-    const { data } = await supabase
-      .from("menus")
-      .select(MENU_SELECT)
-      .eq("org_id", ctx.orgId)
-      .eq("active", true)
-      .order("sort", { ascending: true });
-    if (data) setMenus(data as MenuRow[]);
-  }, [ctx.orgId]);
-
-  useEffect(() => {
-    const supabase = createClient(ctx.orgId);
-    const channel = supabase
-      .channel(`menus-${ctx.orgId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "menus", filter: `org_id=eq.${ctx.orgId}` }, refreshMenus)
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_questions" }, refreshMenus)
-      .subscribe();
-    const interval = setInterval(refreshMenus, 4000);
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(interval);
-    };
-  }, [ctx.orgId, refreshMenus]);
-
   function toggleTheme() {
     const next = isDark ? "light" : "dark";
     document.documentElement.setAttribute("data-vid-theme", next);
@@ -217,12 +182,6 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
   async function handleSend(text: string, attachments: PendingAttachment[]) {
     await sendMessageAction(text, attachments);
     await refresh();
-  }
-
-  async function handleMenuSubmit(menu: MenuRow, rows: { label: string; value: string }[], note: string) {
-    await submitMenuInquiry(menu.id, menu.label, menu.icon, rows, note);
-    await refresh();
-    setShowMenuSheet(false);
   }
 
   const cancelTargetBundle = cancelTargetId ? bundles.find((b) => b.request.id === cancelTargetId) ?? null : null;
@@ -317,7 +276,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
         })}
       </div>
 
-      <Composer threadId={ctx.threadId} orgId={ctx.orgId} onSend={handleSend} onOpenMenuSheet={() => setShowMenuSheet(true)} />
+      <Composer threadId={ctx.threadId} orgId={ctx.orgId} onSend={handleSend} />
 
       {showProgress && (
         <ProgressPanel
@@ -328,7 +287,6 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
         />
       )}
       {showReports && <ReportsDialog bundles={bundles} ackedIds={ackedIds} onAck={ackReport} onClose={() => setShowReports(false)} />}
-      {showMenuSheet && <MenuSheet menus={menus} onClose={() => setShowMenuSheet(false)} onSubmit={handleMenuSubmit} />}
       {cancelTargetBundle && (
         <CancelDialog bundle={cancelTargetBundle} refundPolicies={refundPolicies} confirming={busy} onClose={() => setCancelTargetId(null)} onConfirm={handleCancelConfirm} />
       )}
@@ -348,7 +306,6 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
           isDark={isDark}
           onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}
-          referralSignupUrl={referralSignupUrl}
         />
       )}
     </div>

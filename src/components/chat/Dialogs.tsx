@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { X, Timer } from "@phosphor-icons/react";
 import type { RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { stageInfoFor, statusBadgeFor, STAGE_LABELS } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
-import type { MenuRow } from "@/lib/chat-types";
 import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
 
@@ -224,103 +222,3 @@ export function ReportsDialog({ bundles, ackedIds, onAck, onClose }: { bundles: 
   );
 }
 
-// ---------- メニューから問い合わせる ----------
-export function MenuSheet({
-  menus,
-  onClose,
-  onSubmit,
-}: {
-  menus: MenuRow[];
-  onClose: () => void;
-  onSubmit: (menu: MenuRow, rows: { label: string; value: string }[], note: string) => Promise<void>;
-}) {
-  const [selected, setSelected] = useState<MenuRow | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [note, setNote] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function submit() {
-    if (!selected || submitting) return;
-    setSubmitting(true);
-    try {
-      const rows = selected.menu_questions.map((q) => ({ label: q.label, value: fields[q.id] ?? "" }));
-      await onSubmit(selected, rows, note);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Centered onBackdrop={onClose}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {!selected ? (
-          <>
-            <div style={dialogTitle}>メニューから問い合わせる</div>
-            <div style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--color-neutral-400)" }}>何から聞けばいいか迷うときの入口です。選んでもこの内容で確定にはなりません。</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {menus.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => {
-                    setSelected(m);
-                    setFields({});
-                    setNote("");
-                  }}
-                  style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", cursor: "pointer", padding: "11px 13px", borderRadius: "var(--radius-md)", color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}
-                >
-                  {m.icon && <i className={m.icon} style={{ fontSize: 16, color: "var(--color-accent)", flex: "none" }} />}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
-                    <span style={{ fontSize: 13.5, lineHeight: 1.4 }}>{m.label}</span>
-                    <span style={{ fontSize: 11, color: "var(--color-neutral-600)", lineHeight: 1.5 }}>{m.note}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 12, lineHeight: 1.6, color: "var(--color-neutral-500)", paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>メニュー外のご相談は、チャットでお気軽にご相談ください。</div>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button onClick={onClose} style={ghostBtn}>閉じる</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>お問い合わせ内容</span>
-              <div style={dialogTitle}>{selected.label}</div>
-              <span style={{ fontSize: 11.5, color: "var(--color-neutral-600)", lineHeight: 1.5 }}>{selected.note}</span>
-            </div>
-            <div style={{ fontSize: 12, lineHeight: 1.6, color: "var(--color-neutral-400)" }}>わかる項目だけで大丈夫です。空欄のままでも送れます。</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              {selected.menu_questions.map((q) => (
-                <div key={q.id} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <label style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{q.label}</label>
-                  <input
-                    value={fields[q.id] ?? ""}
-                    onChange={(e) => setFields((f) => ({ ...f, [q.id]: e.target.value }))}
-                    className="vid-input"
-                    style={{ width: "100%", height: 36, padding: "6px 10px", font: "inherit", fontSize: 13.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
-                  />
-                </div>
-              ))}
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>そのほか伝えたいこと</label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={2}
-                  className="vid-textarea"
-                  style={{ width: "100%", resize: "vertical", padding: "8px 10px", font: "inherit", fontSize: 13.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
-                />
-              </div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              <button onClick={() => setSelected(null)} style={ghostBtn}>戻る</button>
-              <button onClick={submit} disabled={submitting} style={{ ...accentBtn, padding: "0 16px", opacity: submitting ? 0.6 : 1 }}>
-                この内容で送る
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </Centered>
-  );
-}

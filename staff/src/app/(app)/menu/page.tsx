@@ -34,7 +34,6 @@ export default async function MenuSettingsPage() {
   return (
     <MenuSettings
       orgId={ctx.orgId}
-      referrerUserId={ctx.userId}
       initialCompany={{
         name: org?.name ?? "",
         display_name: org?.display_name ?? "",

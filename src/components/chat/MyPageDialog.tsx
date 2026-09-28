@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
-import { X, CheckCircle, Gift, CaretDown, CaretRight, ChatsCircle, Receipt, UsersThree, Sun, MoonStars } from "@phosphor-icons/react";
+import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
 import type { VaultRow } from "@/lib/chat-types";
-import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, startReferral } from "@/app/actions";
+import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 import LoginPanel from "@/components/chat/LoginPanel";
 import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
@@ -59,7 +59,6 @@ export default function MyPageDialog({
   isDark,
   onToggleTheme,
   onClose,
-  referralSignupUrl,
 }: {
   userId: string;
   memberNo: string | null;
@@ -75,7 +74,6 @@ export default function MyPageDialog({
   isDark: boolean;
   onToggleTheme: () => void;
   onClose: () => void;
-  referralSignupUrl: string;
 }) {
   const [name, setName] = useState(customerName);
   const nameIsPlaceholder = name === NAME_PLACEHOLDER;
@@ -96,18 +94,6 @@ export default function MyPageDialog({
   const [emSaving, setEmSaving] = useState(false);
 
   const [vaultRows, setVaultRows] = useState(vault.map((v) => ({ ...v })));
-
-  const [refOpen, setRefOpen] = useState(false);
-
-  // リンクは referralSignupUrl としてページ読み込み時に用意済みなので、
-  // クリックしたらそのまま /signup に飛ばす（非同期処理を挟まない）。
-  // 営業フォロー用の記録（referral_leads）は結果を待たず裏側で行い、
-  // 失敗してもナビゲーションは止めない。
-  function handleReferralClick() {
-    void startReferral().catch(() => {
-      /* 記録に失敗しても申し込み自体は止めない */
-    });
-  }
 
   const [authView, setAuthView] = useState<"none" | "login" | "create">("none");
 
@@ -401,52 +387,6 @@ export default function MyPageDialog({
             )}
               </>
             )}
-
-            {/* PORT referral block */}
-            <div style={{ paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-                <div style={{ fontFamily: "var(--font-heading)", fontSize: 14, lineHeight: 1.5 }}>この窓口のしくみを、自社でも</div>
-                <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.65 }}>
-                  この画面は PORT という受付システムです。こちらから企業アカウントを作成して自社の依頼受付にもお使いいただけます。月額 ¥4,800
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: "var(--color-accent-200)" }}>
-                  <Gift size={14} />
-                  <span>この画面から始めると、90日間無料でお試しいただけます。</span>
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                  <a
-                    href={referralSignupUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={handleReferralClick}
-                    style={{ height: 36, padding: "0 14px", display: "inline-flex", alignItems: "center", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", textDecoration: "none" }}
-                  >
-                    企業アカウントを作成する
-                  </a>
-                  <button onClick={() => setRefOpen((v) => !v)} style={{ height: 34, padding: "0 12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
-                    {refOpen ? <CaretDown size={13} /> : <CaretRight size={13} />}
-                    できること
-                  </button>
-                </div>
-                {refOpen && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 9, borderTop: "1px solid var(--color-divider)" }}>
-                    {[
-                      { icon: <ChatsCircle size={13} />, text: "依頼はトーク1本。フォームも管理表も作らずに受け付けられます" },
-                      { icon: <Receipt size={13} />, text: "見積・決済・完了報告・領収書までこのシステムの中で完結します" },
-                      { icon: <UsersThree size={13} />, text: "スタッフ連携を使えば、案件ごとに自動でスタッフを割り振って運用することも可能です" },
-                    ].map((p, i) => (
-                      <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 11.5, color: "var(--color-neutral-400)", lineHeight: 1.6 }}>
-                        <span style={{ flex: "none", marginTop: 2, color: "var(--color-accent)" }}>{p.icon}</span>
-                        <span>{p.text}</span>
-                      </div>
-                    ))}
-                    <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6, marginTop: 2 }}>
-                      こちらからお申し込みいただくと、90日間は料金が一切かかりません。
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         </div>
       </div>
