@@ -534,6 +534,19 @@ export interface Database {
           trial_ends_on: string | null;
         }[];
       };
+      staff_context_for_own_org: {
+        Args: Record<string, never>;
+        Returns: {
+          org_id: string;
+          org_display_name: string;
+          solo: boolean;
+          is_hq: boolean;
+          role: AppRole;
+          display_name: string;
+          plan_status: "trial" | "active" | "past_due" | "paused" | "cancelled";
+          trial_ends_on: string | null;
+        }[];
+      };
       unread_customer_count: { Args: { p_org_id: string }; Returns: number };
       customer_thread_summaries: {
         Args: { p_org_id: string };
@@ -555,6 +568,7 @@ export interface Database {
         Returns: {
           staff_profile_id: string;
           thread_id: string;
+          archived: boolean;
           unread: boolean;
           last_message_kind: MessageKind | null;
           last_message_body: string | null;

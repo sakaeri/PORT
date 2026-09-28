@@ -13,7 +13,7 @@ export default async function CasesPage() {
   const [{ data: requests, error }, { data: caseThreads, error: threadsError }, { data: summaries, error: summariesError }] = await Promise.all([
     supabase
       .from("requests")
-      .select("id, title, amount, phase, created_at, customers(name)")
+      .select("id, title, amount, phase, pay_status, created_at, customers(name)")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
     supabase.from("threads").select("id, request_id, archived_at").eq("org_id", ctx.orgId).eq("kind", "case"),
@@ -41,6 +41,7 @@ export default async function CasesPage() {
       title: r.title,
       amount: r.amount,
       phase: r.phase,
+      paid: r.pay_status === "paid",
       customerName: customer?.name ?? "—",
       threadId: thread?.id ?? null,
       archived: !!thread?.archived_at,
@@ -60,7 +61,7 @@ export default async function CasesPage() {
         </div>
       )}
 
-      {!error && rows.length > 0 && <CasesList rows={rows} />}
+      {!error && rows.length > 0 && <CasesList rows={rows} canDelete={ctx.role === "owner" || ctx.role === "dept_manager"} />}
     </div>
   );
 }

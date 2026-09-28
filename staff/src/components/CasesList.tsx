@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Archive, ArrowCounterClockwise } from "@phosphor-icons/react";
 import { PHASE_LABEL } from "@/lib/stage";
-import { archiveCaseThread, unarchiveCaseThread } from "@/app/actions";
+import { archiveCaseThread, unarchiveCaseThread, deleteCaseRequest } from "@/app/actions";
+import RowKebabMenu from "@/components/RowKebabMenu";
 import type { RequestPhase } from "@/lib/supabase/types";
 
 export interface CaseRow {
@@ -12,26 +12,14 @@ export interface CaseRow {
   title: string;
   amount: number;
   phase: RequestPhase;
+  paid: boolean;
   customerName: string;
   threadId: string | null;
   archived: boolean;
   lastMessagePreview: string | null;
 }
 
-const smallBtn: React.CSSProperties = {
-  height: 28,
-  width: 28,
-  flex: "none",
-  display: "grid",
-  placeItems: "center",
-  cursor: "pointer",
-  color: "var(--color-neutral-500)",
-  background: "transparent",
-  border: "1px solid var(--color-divider)",
-  borderRadius: "var(--radius-md)",
-};
-
-export default function CasesList({ rows: initialRows }: { rows: CaseRow[] }) {
+export default function CasesList({ rows: initialRows, canDelete }: { rows: CaseRow[]; canDelete: boolean }) {
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -46,6 +34,21 @@ export default function CasesList({ rows: initialRows }: { rows: CaseRow[] }) {
       if (willArchive) await archiveCaseThread(r.threadId);
       else await unarchiveCaseThread(r.threadId);
       setRows((rs) => rs.map((row) => (row.id === r.id ? { ...row, archived: willArchive } : row)));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDelete(r: CaseRow) {
+    if (busyId) return;
+    const warning = r.paid
+      ? `「${r.title}」を完全に削除します。この案件は入金済みで、その支払い記録も含めてトーク・完了報告・評価が全て元に戻せなくなります。よろしいですか？`
+      : `「${r.title}」を完全に削除します。トーク・完了報告・評価が全て元に戻せなくなります。よろしいですか？`;
+    if (!confirm(warning)) return;
+    setBusyId(r.id);
+    try {
+      await deleteCaseRequest(r.id);
+      setRows((rs) => rs.filter((row) => row.id !== r.id));
     } finally {
       setBusyId(null);
     }
@@ -71,11 +74,12 @@ export default function CasesList({ rows: initialRows }: { rows: CaseRow[] }) {
             <div style={{ flex: "none", fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)", whiteSpace: "nowrap" }}>
               {PHASE_LABEL[r.phase]}
             </div>
-            {r.threadId && (
-              <button onClick={() => toggleArchive(r)} disabled={busyId === r.id} aria-label={r.archived ? "一覧に戻す" : "非表示にする"} style={smallBtn}>
-                {r.archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
-              </button>
-            )}
+            <RowKebabMenu
+              archived={r.archived}
+              onToggleArchive={r.threadId ? () => toggleArchive(r) : undefined}
+              onDelete={canDelete ? () => handleDelete(r) : undefined}
+              busy={busyId === r.id}
+            />
           </div>
         ))}
         {visible.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>該当する案件がありません。</div>}

@@ -58,7 +58,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
     supabase.from("threads").select("id, archived_at, department_id").eq("customer_id", id).eq("kind", "customer").maybeSingle(),
-    supabase.from("intake_forms").select("id, label, note, intake_fields(id, label, required, sort)").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
+    supabase.from("intake_forms").select("id, label, note, intake_fields(id, label, kind, required, sort)").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
     supabase
       .from("menus")
       .select("id, label, note, price, payout, lead_hours")
@@ -92,11 +92,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     id: t.id,
     label: t.label,
     note: t.note,
-    fieldCount: (t.intake_fields ?? []).length,
     fields: (t.intake_fields ?? [])
       .slice()
       .sort((a, b) => a.sort - b.sort)
-      .map((f) => ({ label: f.label, required: f.required })),
+      .map((f) => ({ id: f.id, label: f.label, kind: f.kind, required: f.required })),
   }));
   const menus = (menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, payout: m.payout, leadHours: m.lead_hours }));
   const memos = (memoRows ?? []).map((m) => {

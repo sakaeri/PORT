@@ -4,7 +4,7 @@ export default function Modal({ children, onClose, maxWidth }: { children: React
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}
+      style={{ position: "fixed", inset: 0, zIndex: 80, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}
     >
       <div
         onClick={(e) => e.stopPropagation()}

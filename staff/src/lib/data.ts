@@ -42,10 +42,20 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return null;
 
-  const [{ data: ctx }, { data: orgs }] = await Promise.all([
+  const [{ data: rawCtx }, { data: orgs }] = await Promise.all([
     supabase.rpc("staff_context").maybeSingle(),
     supabase.rpc("my_staff_orgs"),
   ]);
+
+  let ctx = rawCtx;
+  if (!ctx || !(STAFF_ROLES as readonly string[]).includes(ctx.role)) {
+    // staff_org_id Cookie（x-vid-org ヘッダー）が、今のログインが権限を
+    // 持たない事業者を指している可能性がある（複数タブで別の事業者に
+    // 切り替えた直後など）。即座に「権限がありません」にはせず、本人の
+    // 本来の事業者（profiles.org_id）で解決できないか試してから諦める。
+    const { data: fallback } = await supabase.rpc("staff_context_for_own_org").maybeSingle();
+    if (fallback && (STAFF_ROLES as readonly string[]).includes(fallback.role)) ctx = fallback;
+  }
   if (!ctx || !(STAFF_ROLES as readonly string[]).includes(ctx.role)) return null;
 
   const isHq = ctx.is_hq ?? false;

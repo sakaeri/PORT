@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowSquareOut, Buildings, Archive, ArrowCounterClockwise, Trash } from "@phosphor-icons/react";
+import { ArrowSquareOut, Buildings, CaretDown, Gear } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { archiveThread, unarchiveThread, deleteCustomer } from "@/app/actions";
+import { DepartmentAdmin, type Department, type MenuOption } from "@/components/StaffAdmin";
+import Modal from "@/components/Modal";
+import RowKebabMenu from "@/components/RowKebabMenu";
+import type { StaffRole } from "@/lib/supabase/types";
 
 interface CustomerRow {
   id: string;
@@ -24,39 +28,43 @@ interface CustomerRow {
 
 const yen = new Intl.NumberFormat("ja-JP");
 
-const smallBtn: React.CSSProperties = {
-  height: 28,
-  width: 28,
-  display: "grid",
-  placeItems: "center",
-  cursor: "pointer",
-  color: "var(--color-neutral-500)",
-  background: "transparent",
-  border: "1px solid var(--color-divider)",
-  borderRadius: "var(--radius-md)",
-};
-
 export default function CustomersList({
   rows: initialRows,
   isHq,
   orgId,
-  departments,
+  currentRole,
+  departments: initialDepartments,
+  menus: initialMenus,
 }: {
   rows: CustomerRow[];
   isHq: boolean;
   orgId: string;
-  departments: { id: string; name: string }[];
+  currentRole: StaffRole | "reception";
+  departments: Department[];
+  menus: MenuOption[];
 }) {
   const router = useRouter();
+  const [departments, setDepartments] = useState(initialDepartments);
+  const [menus, setMenus] = useState(initialMenus);
   const departmentById = new Map(departments.map((d) => [d.id, d.name]));
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [showDepartmentAdmin, setShowDepartmentAdmin] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const visible = rows
     .filter((c) => c.active || showArchived)
     .filter((c) => departmentFilter === "all" || (departmentFilter === "none" ? c.departmentId === null : c.departmentId === departmentFilter));
   const archivedCount = rows.filter((c) => !c.active).length;
+  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "窓口未設定" }];
+  const filterLabel = filterOptions.find((d) => d.id === departmentFilter)?.name ?? "すべて";
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a server-refetched prop (router.refresh()), not state derived from other client state
+    setDepartments(initialDepartments);
+    setMenus(initialMenus);
+  }, [initialDepartments, initialMenus]);
 
   // サーバーから渡された最新の行を反映する（下のポーリング/リアルタイムが
   // router.refresh() でこのページを再取得するたびに initialRows が更新される）。
@@ -109,30 +117,104 @@ export default function CustomersList({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {departments.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {[{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "窓口未設定" }].map((d) => {
-            const on = departmentFilter === d.id;
-            return (
+      <div style={{ position: "relative", alignSelf: "flex-start" }}>
+        <button
+          onClick={() => setFilterOpen((v) => !v)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            height: 30,
+            padding: "0 12px",
+            cursor: "pointer",
+            fontSize: 12.5,
+            color: "var(--color-text)",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-divider)",
+            borderRadius: "var(--radius-md)",
+          }}
+        >
+          窓口：{filterLabel}
+          <CaretDown size={12} color="var(--color-neutral-500)" />
+        </button>
+        {filterOpen && (
+          <>
+            <div onClick={() => setFilterOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 59 }} />
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                marginTop: 4,
+                zIndex: 60,
+                minWidth: 180,
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                padding: 6,
+                borderRadius: "var(--radius-md)",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-divider)",
+                boxShadow: "var(--shadow-md)",
+              }}
+            >
+              {filterOptions.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => {
+                    setDepartmentFilter(d.id);
+                    setFilterOpen(false);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    height: 32,
+                    padding: "0 10px",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    fontSize: 12.5,
+                    borderRadius: "var(--radius-sm)",
+                    border: "none",
+                    color: d.id === departmentFilter ? "var(--color-accent)" : "var(--color-text)",
+                    background: d.id === departmentFilter ? "color-mix(in srgb, var(--color-accent) 14%, transparent)" : "transparent",
+                  }}
+                >
+                  {d.name}
+                </button>
+              ))}
+              <div style={{ height: 1, background: "var(--color-divider)", margin: "3px 2px" }} />
               <button
-                key={d.id}
-                onClick={() => setDepartmentFilter(d.id)}
-                style={{
-                  height: 28,
-                  padding: "0 12px",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
-                  background: on ? "var(--color-accent-900)" : "transparent",
-                  border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
-                  borderRadius: "var(--radius-md)",
+                onClick={() => {
+                  setFilterOpen(false);
+                  setShowDepartmentAdmin(true);
                 }}
+                style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 10px", cursor: "pointer", textAlign: "left", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", borderRadius: "var(--radius-sm)" }}
               >
-                {d.name}
+                <Gear size={13} />
+                窓口を管理
               </button>
-            );
-          })}
-        </div>
+            </div>
+          </>
+        )}
+      </div>
+      {showDepartmentAdmin && (
+        <Modal
+          onClose={() => {
+            setShowDepartmentAdmin(false);
+            router.refresh();
+          }}
+          maxWidth={640}
+        >
+          <DepartmentAdmin
+            currentRole={currentRole}
+            departments={departments}
+            menus={menus}
+            onClose={() => {
+              setShowDepartmentAdmin(false);
+              router.refresh();
+            }}
+          />
+        </Modal>
       )}
       {archivedCount > 0 && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
@@ -201,14 +283,12 @@ export default function CustomersList({
                 )}
               </div>
             )}
-            {c.thread && (
-              <button onClick={() => toggleArchive(c)} disabled={busyId === c.id} aria-label={c.thread.archived ? "一覧に戻す" : "非表示にする"} style={smallBtn}>
-                {c.thread.archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
-              </button>
-            )}
-            <button onClick={() => handleDelete(c)} disabled={busyId === c.id} aria-label="削除" style={{ ...smallBtn, color: "var(--color-accent-200)" }}>
-              <Trash size={13} />
-            </button>
+            <RowKebabMenu
+              archived={c.thread?.archived}
+              onToggleArchive={c.thread ? () => toggleArchive(c) : undefined}
+              onDelete={() => handleDelete(c)}
+              busy={busyId === c.id}
+            />
           </div>
         ))}
       </div>

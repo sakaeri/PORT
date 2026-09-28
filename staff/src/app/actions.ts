@@ -760,6 +760,17 @@ export async function deleteCustomer(customerId: string) {
   if (error) throw error;
 }
 
+// 案件を丸ごと完全削除する（案件トーク一覧の「削除」用）。案件トーク・
+// メッセージ・完了報告・評価・担当スタッフの割り当ても on delete cascade で
+// 連動して消える。アーカイブと違い元に戻せない。入金済みの案件でも削除できて
+// しまうため、呼び出し側で強めの確認を出す。
+export async function deleteCaseRequest(requestId: string) {
+  const ctx = await requireContextWithDelete();
+  const supabase = await createClient();
+  const { error } = await supabase.from("requests").delete().eq("id", requestId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
 // ============================================================
 // 案件（見積もり〜完了報告）。制作者への割り当ては次のフェーズで対応する
 // ため、今は受付が代わりに着手・完了報告まで進める。

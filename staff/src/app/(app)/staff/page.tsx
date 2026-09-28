@@ -17,7 +17,7 @@ export default async function StaffPage() {
   const canBrowseStaff = ctx.role === "owner" || ctx.role === "dept_manager";
   const rosterRoles: StaffRole[] = ctx.role === "dept_manager" ? ["dept_leader"] : ["owner", "dept_manager", "dept_leader"];
   const supabase = await createClient();
-  const [{ data: departments }, { data: profiles }, { data: staffDepartments }, { data: menus }, { data: summaries }] = await Promise.all([
+  const [{ data: departments }, { data: profiles }, { data: staffDepartments }, { data: summaries }] = await Promise.all([
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
     supabase
       .from("profiles")
@@ -26,7 +26,6 @@ export default async function StaffPage() {
       .in("role", rosterRoles)
       .order("created_at", { ascending: true }),
     supabase.from("staff_departments").select("profile_id, department_id"),
-    supabase.from("menus").select("id, label, department_id").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
     supabase.rpc("staff_thread_summaries", { p_org_id: ctx.orgId }),
   ]);
 
@@ -56,6 +55,8 @@ export default async function StaffPage() {
       displayName: p.staff_alias ?? p.display_name,
       role: p.role as StaffRole,
       departmentIds: departmentIdsByProfile.get(p.id) ?? [],
+      threadId: summary?.thread_id ?? null,
+      archived: summary?.archived ?? false,
       lastMessagePreview: previewFor(summary),
       unread: summary?.unread ?? false,
     };
@@ -75,7 +76,6 @@ export default async function StaffPage() {
       staff={staff}
       selfEntry={selfEntry}
       departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
-      menus={(menus ?? []).map((m) => ({ id: m.id, label: m.label, departmentId: m.department_id }))}
     />
   );
 }
