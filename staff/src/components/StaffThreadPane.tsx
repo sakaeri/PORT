@@ -117,11 +117,8 @@ export default function StaffThreadPane({
     const body = draft.trim();
     try {
       await sendInternalMessage(threadId, body);
-      setMessages((m) => [
-        ...m,
-        { id: `temp-${Date.now()}`, sender_id: currentUserId, sender_role: null, kind: "text", body, sent_at: new Date().toISOString(), deleted_at: null },
-      ]);
       setDraft("");
+      await refresh(threadId);
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));
     } finally {
@@ -151,9 +148,6 @@ export default function StaffThreadPane({
             <ArrowLeft size={17} />
           </button>
         )}
-        <div style={{ flex: "none", width: 32, height: 32, display: "grid", placeItems: "center", fontSize: 13, fontWeight: 700, color: "var(--color-accent-100)", background: "var(--color-accent-900)", borderRadius: "50%" }}>
-          {title.slice(0, 1)}
-        </div>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>{title}</div>
         <div style={{ flex: 1 }} />
         {editable && (

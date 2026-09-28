@@ -14,7 +14,7 @@ import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
 import { PHASE_LABEL } from "@/lib/stage";
-import type { AppRole, BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase, StaffRole } from "@/lib/supabase/types";
+import type { AppRole, BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
 
 export interface ThreadAttachment {
   id: string;
@@ -302,7 +302,6 @@ export default function CustomerThread({
   thread,
   departments,
   initialMessages,
-  role,
   currentUserId,
   orgId,
   isHq,
@@ -322,7 +321,6 @@ export default function CustomerThread({
   departments: { id: string; name: string }[];
   initialMessages: Message[];
   initialHasMoreOlder?: boolean;
-  role: StaffRole | "reception";
   currentUserId: string;
   orgId: string;
   isHq: boolean;
@@ -458,11 +456,8 @@ export default function CustomerThread({
     const body = draft.trim();
     try {
       await sendStaffMessage(thread.id, body);
-      setMessages((m) => [
-        ...m,
-        { id: `temp-${Date.now()}`, sender_id: currentUserId, sender_role: role, kind: "text", body, payload: {}, sent_at: new Date().toISOString(), deleted_at: null, attachments: [] },
-      ]);
       setDraft("");
+      await refresh();
     } finally {
       setSending(false);
     }

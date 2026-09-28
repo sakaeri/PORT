@@ -12,8 +12,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const supabase = await createClient();
   const canAssignStaff = ctx.role !== "dept_leader";
 
-  // 互いに依存しないクエリは並列で投げる（案件トークのメッセージだけは
-  // threads.id が要るので、案件トークの行を取ったあとに投げる）。
+  // タップしてからこの画面が出るまでの体感速度のため、全クエリを並列で投げる
+  // （案件トークのメッセージは threads.id が要るが、messages を threads の
+  // embed として一緒に取ることで、往復を1回減らしている）。
   const [{ data: request }, { data: refundPolicies }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }] = await Promise.all([
     supabase
       .from("requests")
@@ -28,29 +29,33 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     canAssignStaff
       ? supabase.from("profiles").select("id, display_name, staff_alias").eq("org_id", ctx.orgId).eq("role", "dept_leader")
       : Promise.resolve({ data: [] }),
-    supabase.from("threads").select("id, archived_at").eq("kind", "case").eq("request_id", id).maybeSingle(),
+    supabase
+      .from("threads")
+      .select("id, archived_at, messages(id, sender_id, sender_role, kind, body, sent_at, deleted_at)")
+      .eq("kind", "case")
+      .eq("request_id", id)
+      .order("sent_at", { referencedTable: "messages", ascending: true })
+      .maybeSingle(),
   ]);
   if (!request) notFound();
 
+  // 表示名は「本人には常に本人の本当の表示名、他人にはエイリアス」が
+  // ルールなので、自分自身の行だけは staff_alias を無視して display_name を使う。
   const assignedStaff = (caseStaffRows ?? []).map((r) => {
     const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
-    return { id: r.profile_id, displayName: profile?.staff_alias ?? profile?.display_name ?? "" };
+    const displayName = r.profile_id === ctx.userId ? (profile?.display_name ?? "") : (profile?.staff_alias ?? profile?.display_name ?? "");
+    return { id: r.profile_id, displayName };
   });
-  const availableStaff = (staffPool ?? []).map((p) => ({ id: p.id, displayName: p.staff_alias ?? p.display_name }));
+  const availableStaff = (staffPool ?? []).map((p) => ({
+    id: p.id,
+    displayName: p.id === ctx.userId ? p.display_name : (p.staff_alias ?? p.display_name),
+  }));
 
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
 
-  let caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null }[] = [];
-  if (caseThread) {
-    const { data } = await supabase
-      .from("messages")
-      .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at")
-      .eq("thread_id", caseThread.id)
-      .order("sent_at", { ascending: true });
-    caseMessages = data ?? [];
-  }
+  const caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null }[] = caseThread?.messages ?? [];
 
   return (
     <CaseDetail

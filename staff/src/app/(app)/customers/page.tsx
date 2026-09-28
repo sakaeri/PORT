@@ -46,26 +46,6 @@ export default async function CustomersPage() {
     list.push(r);
     requestsByCustomerId.set(r.customer_id, list);
   }
-  const activeRequestIds = (requests ?? [])
-    .filter((r) => ACTIVE_PHASES.includes(r.phase))
-    .map((r) => r.id);
-
-  const { data: caseStaff, error: caseStaffError } = activeRequestIds.length
-    ? await supabase
-        .from("case_staff")
-        .select("request_id, profiles!case_staff_profile_id_fkey(display_name, staff_alias)")
-        .in("request_id", activeRequestIds)
-    : { data: [], error: null };
-  if (caseStaffError) console.error("case_staff select failed:", caseStaffError);
-
-  const staffNamesByRequestId = new Map<string, string[]>();
-  for (const cs of caseStaff ?? []) {
-    const profile = Array.isArray(cs.profiles) ? cs.profiles[0] : cs.profiles;
-    if (!profile) continue;
-    const list = staffNamesByRequestId.get(cs.request_id) ?? [];
-    list.push(profile.staff_alias ?? profile.display_name);
-    staffNamesByRequestId.set(cs.request_id, list);
-  }
 
   const rows = (customers ?? [])
     .map((c) => {
@@ -86,13 +66,7 @@ export default async function CustomersPage() {
       const requestCount = billable.length;
       const lifetimeTotal = billable.reduce((sum, r) => sum + r.amount, 0);
       const activeRequest = customerRequests.find((r) => ACTIVE_PHASES.includes(r.phase)) ?? null;
-      const activeCase = activeRequest
-        ? {
-            title: activeRequest.title,
-            phaseLabel: PHASE_LABEL[activeRequest.phase],
-            staffNames: staffNamesByRequestId.get(activeRequest.id) ?? [],
-          }
-        : null;
+      const activeCase = activeRequest ? { title: activeRequest.title, phaseLabel: PHASE_LABEL[activeRequest.phase] } : null;
 
       return {
         id: c.id,

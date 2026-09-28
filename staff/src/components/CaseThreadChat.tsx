@@ -72,11 +72,8 @@ export default function CaseThreadChat({
     const body = draft.trim();
     try {
       await sendCaseMessage(threadId, body);
-      setMessages((m) => [
-        ...m,
-        { id: `temp-${Date.now()}`, sender_id: currentUserId, sender_role: null, kind: "text", body, sent_at: new Date().toISOString(), deleted_at: null },
-      ]);
       setDraft("");
+      await refresh();
     } finally {
       setSending(false);
     }

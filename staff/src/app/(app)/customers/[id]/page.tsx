@@ -127,7 +127,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       departments={(departmentRows ?? []).map((d) => ({ id: d.id, name: d.name }))}
       initialMessages={initialMessages}
       initialHasMoreOlder={hasMoreOlder}
-      role={ctx.role}
       currentUserId={ctx.userId}
       orgId={ctx.orgId}
       isHq={ctx.isHq}

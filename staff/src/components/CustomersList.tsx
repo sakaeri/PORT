@@ -19,15 +19,10 @@ interface CustomerRow {
   unread: boolean;
   requestCount: number;
   lifetimeTotal: number;
-  activeCase: { title: string; phaseLabel: string; staffNames: string[] } | null;
+  activeCase: { title: string; phaseLabel: string } | null;
 }
 
 const yen = new Intl.NumberFormat("ja-JP");
-
-function formatStaffNames(names: string[]): string {
-  if (names.length <= 2) return names.join("・");
-  return `${names.slice(0, 2).join("・")} 他${names.length - 2}名`;
-}
 
 const smallBtn: React.CSSProperties = {
   height: 28,
@@ -162,11 +157,8 @@ export default function CustomersList({
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.lastMessagePreview ?? "まだやり取りがありません"}</div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 3 }}>
-                <div style={{ fontSize: 11, color: c.activeCase ? "var(--color-neutral-400)" : "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {c.activeCase && c.activeCase.staffNames.length > 0 ? `対応 ${formatStaffNames(c.activeCase.staffNames)}` : "進行中の案件なし"}
-                </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.lastMessagePreview ?? "まだやり取りがありません"}</div>
                 {c.requestCount > 0 && (
                   <div style={{ flex: "none", fontSize: 11, color: "var(--color-neutral-500)" }}>
                     依頼{c.requestCount}件・累計¥{yen.format(c.lifetimeTotal)}
