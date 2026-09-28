@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DotsThreeVertical, Archive, ArrowCounterClockwise, Trash } from "@phosphor-icons/react";
 
 const kebabBtn: React.CSSProperties = {
@@ -31,8 +31,13 @@ const menuItem: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
+const MENU_WIDTH = 150;
+
 // 一覧行の「非表示にする／一覧に戻す」「削除」をまとめる共通の「…」メニュー。
 // 依頼主・案件トーク・スタッフの3つの一覧で同じ見た目・操作感にするために共通化する。
+// 一覧の一番下の行で開くと画面の外にはみ出してしまう（スクロールしても届かない）
+// ため、position: fixed でボタンの実際の画面位置から出し、下に収まらなければ
+// 上に開く。
 export default function RowKebabMenu({
   archived,
   onToggleArchive,
@@ -51,24 +56,55 @@ export default function RowKebabMenu({
   deleteLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function close() {
+      setOpen(false);
+    }
+    // スクロール・リサイズが起きたら、ボタンから浮いた位置のままにならないよう閉じる
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+
   if (!onToggleArchive && !onDelete) return null;
+
+  function handleToggle() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const itemCount = (onToggleArchive ? 1 : 0) + (onDelete ? 1 : 0);
+      const menuHeight = itemCount * 32 + 12;
+      const openUpward = window.innerHeight - rect.bottom < menuHeight + 8;
+      setPos({
+        left: Math.max(8, rect.right - MENU_WIDTH),
+        ...(openUpward ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+      });
+    }
+    setOpen((v) => !v);
+  }
 
   return (
     <div style={{ position: "relative", flex: "none" }}>
-      <button onClick={() => setOpen((v) => !v)} disabled={busy} aria-label="操作メニュー" style={kebabBtn}>
+      <button ref={btnRef} onClick={handleToggle} disabled={busy} aria-label="操作メニュー" style={kebabBtn}>
         <DotsThreeVertical size={15} />
       </button>
-      {open && (
+      {open && pos && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 59 }} />
           <div
             style={{
-              position: "absolute",
-              top: "100%",
-              right: 0,
-              marginTop: 4,
+              position: "fixed",
+              top: pos.top,
+              bottom: pos.bottom,
+              left: pos.left,
               zIndex: 60,
-              minWidth: 150,
+              width: MENU_WIDTH,
               display: "flex",
               flexDirection: "column",
               gap: 2,

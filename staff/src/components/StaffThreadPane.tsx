@@ -231,7 +231,7 @@ const editInput: React.CSSProperties = {
   padding: "0 10px",
   fontSize: 13,
   color: "var(--color-text)",
-  background: "var(--color-bg)",
+  background: "var(--color-surface)",
   border: "1px solid var(--color-divider)",
   borderRadius: "var(--radius-md)",
   outline: "none",
@@ -306,7 +306,7 @@ function StaffEditPanel({
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={editLabel}>役職</span>
-          <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={{ ...editInput, width: 170 }}>
+          <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={{ ...editInput, maxWidth: 260 }}>
             {INVITE_ROLES.map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r]}
