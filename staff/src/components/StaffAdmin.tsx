@@ -6,7 +6,6 @@ import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { createDepartment, renameDepartment, deleteDepartment, updateMenuDepartment, createStaffInvite } from "@/app/actions";
 import InfoTooltip from "@/components/InfoTooltip";
-import type { StaffRole } from "@/lib/supabase/types";
 
 export interface Department {
   id: string;
@@ -78,20 +77,19 @@ function ModalHeader({ title, onClose }: { title: string; onClose?: () => void }
 }
 
 export function DepartmentAdmin({
-  currentRole,
+  canManage,
   departments: initialDepartments,
   menus: initialMenus,
   onClose,
 }: {
-  currentRole: StaffRole | "reception";
+  canManage: boolean;
   departments: Department[];
   menus: MenuOption[];
   onClose?: () => void;
 }) {
   const [departments, setDepartments] = useState(initialDepartments);
   const [menus, setMenus] = useState(initialMenus);
-  const canManage = currentRole === "owner";
-  const canDelete = currentRole === "owner";
+  const canDelete = canManage;
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 600, width: "100%", margin: "0 auto" }}>

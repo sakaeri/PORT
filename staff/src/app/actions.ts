@@ -47,7 +47,9 @@ async function requireContextWithDelete(opts?: { allowLocked?: boolean }) {
 // ============================================================
 export async function startSubscriptionSetup() {
   const ctx = await requireContext({ allowLocked: true });
-  if (ctx.role !== "owner") throw new Error("お支払い設定の変更はオーナーのみ行えます");
+  if (ctx.role !== "owner" && !(ctx.isHq && ctx.role === "dept_manager")) {
+    throw new Error("お支払い設定の変更は本部のみ行えます");
+  }
 
   const stripe = getStripe();
   const supabase = await createClient();
@@ -353,7 +355,7 @@ export async function deleteIntakeField(id: string) {
 // キャンセル・返金ポリシー（段階は固定。返金の扱いと割合だけを設定する）
 // ============================================================
 export async function updateRefundPolicy(orgId: string, stage: RefundStage, mode: RefundMode, pct: number) {
-  await requireOwner();
+  await requireHqPrivileged();
   const supabase = await createClient();
   const { error } = await supabase
     .from("refund_policies")
@@ -1266,20 +1268,36 @@ export async function deleteWorkMemo(id: string) {
 // ============================================================
 // 窓口（部署）とスタッフの役職管理
 // ============================================================
-// 役職は3段階：オーナー（全窓口・依頼主対応可・全権限）／マネージャー=
-// dept_manager（自分の窓口・依頼主対応可・削除可）／スタッフ=dept_leader
+// 役職は本部（is_hq の組織に所属）／マネージャー=dept_manager（自分の窓口・
+// 依頼主対応可・自分のスタッフの採用や削除も可）／スタッフ=dept_leader
 // （自分の窓口の案件について社内トークでの作業のみ、依頼主とは直接
-// やり取りしない・削除不可）。
-// dept_leader という値自体はDB上の名残で、表示・実際の役割は「スタッフ」。
+// やり取りしない・削除不可）の構成。"owner" ロールはDB上まだ残っているが
+// （既存データの後方互換のため）、新規に割り当てることはない。
+// dept_leader という値自体もDB上の名残で、表示・実際の役割は「スタッフ」。
 
-async function requireOwner() {
+// メニュー・価格・窓口構成・支払い設定など、全社共通の設定を変更できるのは
+// 本部（is_hq の組織のスタッフ）だけ。旧ownerロールのアカウントは、まだ
+// is_hq移行が済んでいなくても同じ権限を持てるよう後方互換で許可する。
+async function requireHqPrivileged() {
   const ctx = await requireContext();
-  if (ctx.role !== "owner") throw new Error("この操作はオーナーのみ行えます");
+  if (ctx.role !== "owner" && !(ctx.isHq && ctx.role === "dept_manager")) {
+    throw new Error("この操作は本部のみ行えます");
+  }
+  return ctx;
+}
+
+// 自分の窓口のスタッフの採用・削除・役職変更はマネージャーもできる
+// （オーナーロールへの昇格はUI上も選択肢に無く、下でも明示的に弾く）。
+async function requireManagerOrAbove() {
+  const ctx = await requireContext();
+  if (ctx.role !== "owner" && ctx.role !== "dept_manager") {
+    throw new Error("この操作はマネージャー以上のみ行えます");
+  }
   return ctx;
 }
 
 export async function createDepartment(name: string) {
-  const ctx = await requireOwner();
+  const ctx = await requireHqPrivileged();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("窓口名を入力してください");
   const admin = createServiceRoleClient();
@@ -1289,7 +1307,7 @@ export async function createDepartment(name: string) {
 }
 
 export async function renameDepartment(id: string, name: string) {
-  const ctx = await requireOwner();
+  const ctx = await requireHqPrivileged();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("窓口名を入力してください");
   const admin = createServiceRoleClient();
@@ -1300,15 +1318,14 @@ export async function renameDepartment(id: string, name: string) {
 // 窓口を削除しても、紐付いていたメニュー・スタッフは「窓口未設定」に戻る
 // だけ（on delete set null）。案件やトーク自体は消えない。
 export async function deleteDepartment(id: string) {
-  const ctx = await requireContext();
-  if (ctx.role !== "owner") throw new Error("窓口の削除はオーナーのみ行えます");
+  const ctx = await requireHqPrivileged();
   const admin = createServiceRoleClient();
   const { error } = await admin.from("departments").delete().eq("id", id).eq("org_id", ctx.orgId);
   if (error) throw error;
 }
 
 export async function updateMenuDepartment(menuId: string, departmentId: string | null) {
-  const ctx = await requireOwner();
+  const ctx = await requireHqPrivileged();
   const supabase = await createClient();
   const { error } = await supabase.from("menus").update({ department_id: departmentId }).eq("id", menuId).eq("org_id", ctx.orgId);
   if (error) throw error;
@@ -1334,7 +1351,7 @@ async function replaceStaffDepartments(admin: ReturnType<typeof createServiceRol
 // あとで変更できるので、招待の時点で決め切る意味がない）。招待は常に
 // 一番権限の小さいスタッフ（dept_leader）として作られる。
 export async function createStaffInvite() {
-  const ctx = await requireOwner();
+  const ctx = await requireManagerOrAbove();
   const admin = createServiceRoleClient();
   const { data, error } = await admin
     .from("staff_invites")
@@ -1400,11 +1417,15 @@ export async function acceptStaffInvite(inviteId: string, fields: { email: strin
   return { email: fields.email.trim() };
 }
 
-// alias はオーナーがこのスタッフに付ける社内向けの呼び方。本人が自分で
-// 決める本当の表示名（profiles.display_name、updateMyDisplayName経由でしか
-// 変更できない）は書き換えない — LINEのニックネームと同じ発想。
+// alias はマネージャー（または本部）がこのスタッフに付ける社内向けの
+// 呼び方。本人が自分で決める本当の表示名（profiles.display_name、
+// updateMyDisplayName経由でしか変更できない）は書き換えない — LINEの
+// ニックネームと同じ発想。役職の選択肢はUI（INVITE_ROLES）にも "owner" が
+// 無いが、直接このアクションを呼ばれた場合の昇格を防ぐため、ここでも
+// 明示的に弾く。
 export async function updateStaffMember(profileId: string, role: StaffRole, departmentIds: string[], alias: string) {
-  const ctx = await requireOwner();
+  const ctx = await requireManagerOrAbove();
+  if (role === "owner" && ctx.role !== "owner") throw new Error("この役職には変更できません");
   const trimmedAlias = alias.trim();
   if (!trimmedAlias) throw new Error("表示名を入力してください");
   const resolvedDepartmentIds = normalizeStaffDepartments(role, departmentIds);
@@ -1415,10 +1436,11 @@ export async function updateStaffMember(profileId: string, role: StaffRole, depa
 }
 
 export async function removeStaffMember(profileId: string) {
-  const ctx = await requireContext();
-  if (ctx.role !== "owner") throw new Error("スタッフの削除はオーナーのみ行えます");
+  const ctx = await requireManagerOrAbove();
   if (profileId === ctx.userId) throw new Error("自分自身は削除できません");
   const admin = createServiceRoleClient();
+  const { data: target } = await admin.from("profiles").select("role").eq("id", profileId).eq("org_id", ctx.orgId).maybeSingle();
+  if (target?.role === "owner" && ctx.role !== "owner") throw new Error("この操作は本部のみ行えます");
   const { error } = await admin.from("profiles").delete().eq("id", profileId).eq("org_id", ctx.orgId);
   if (error) throw error;
   await admin.auth.admin.deleteUser(profileId);

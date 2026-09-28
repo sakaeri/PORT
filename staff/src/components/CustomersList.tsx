@@ -9,7 +9,6 @@ import { archiveThread, unarchiveThread, deleteCustomer } from "@/app/actions";
 import { DepartmentAdmin, type Department, type MenuOption } from "@/components/StaffAdmin";
 import Modal from "@/components/Modal";
 import RowKebabMenu from "@/components/RowKebabMenu";
-import type { StaffRole } from "@/lib/supabase/types";
 
 interface CustomerRow {
   id: string;
@@ -32,14 +31,14 @@ export default function CustomersList({
   rows: initialRows,
   isHq,
   orgId,
-  currentRole,
+  canManageDepartments,
   departments: initialDepartments,
   menus: initialMenus,
 }: {
   rows: CustomerRow[];
   isHq: boolean;
   orgId: string;
-  currentRole: StaffRole | "reception";
+  canManageDepartments: boolean;
   departments: Department[];
   menus: MenuOption[];
 }) {
@@ -206,7 +205,7 @@ export default function CustomersList({
           maxWidth={640}
         >
           <DepartmentAdmin
-            currentRole={currentRole}
+            canManage={canManageDepartments}
             departments={departments}
             menus={menus}
             onClose={() => {

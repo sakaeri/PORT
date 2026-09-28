@@ -9,12 +9,11 @@ export default async function StaffPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
 
-  // オーナーはスタッフの管理（招待・役職変更・削除・窓口管理）ができる。
-  // マネージャーは一覧を見てスタッフとチャットできるだけ（管理操作は不可）。
+  // マネージャー（と本部）はスタッフの管理（招待・役職変更・削除）ができる。
   // マネージャーの一覧には他のマネージャー・オーナーは含めない
   // （マネージャーが実際にやり取りする相手はスタッフだけのため）。
-  const canAdmin = ctx.role === "owner";
-  const canBrowseStaff = ctx.role === "owner" || ctx.role === "dept_manager";
+  const canAdmin = ctx.role === "owner" || ctx.role === "dept_manager";
+  const canBrowseStaff = canAdmin;
   const rosterRoles: StaffRole[] = ctx.role === "dept_manager" ? ["dept_leader"] : ["owner", "dept_manager", "dept_leader"];
   const supabase = await createClient();
   const [{ data: departments }, { data: profiles }, { data: staffDepartments }, { data: summaries }] = await Promise.all([
@@ -63,8 +62,9 @@ export default async function StaffPage() {
   });
 
   // マネージャーの一覧に出す「本部」自身の枠（自分のスレッドの最終メッセージ・未読）。
-  const selfSummary = !canAdmin ? (summaryByProfileId.get(ctx.userId) ?? null) : null;
-  const selfEntry = !canAdmin ? { lastMessagePreview: previewFor(selfSummary), unread: selfSummary?.unread ?? false } : undefined;
+  const isManager = ctx.role === "dept_manager";
+  const selfSummary = isManager ? (summaryByProfileId.get(ctx.userId) ?? null) : null;
+  const selfEntry = isManager ? { lastMessagePreview: previewFor(selfSummary), unread: selfSummary?.unread ?? false } : undefined;
 
   return (
     <StaffChat

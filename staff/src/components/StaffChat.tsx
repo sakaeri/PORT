@@ -44,15 +44,14 @@ export default function StaffChat({
   currentUserId: string;
   currentRole: StaffRole | "reception";
   orgId: string;
-  // オーナー：招待・役職変更・削除ができる。
+  // オーナー・マネージャー：招待・役職変更・削除ができる。
   canAdmin: boolean;
-  // オーナー・マネージャー：スタッフ一覧を見てチャットできる（マネージャーは
-  // 一覧・チャットだけで管理操作はできない）。falseなら自分の「本部」との
-  // やり取り画面だけが表示される（スタッフ=dept_leader向け）。
+  // オーナー・マネージャー：スタッフ一覧を見てチャットできる。falseなら
+  // 自分の「本部」とのやり取り画面だけが表示される（スタッフ=dept_leader向け）。
   canBrowseStaff: boolean;
   staff: StaffDirectoryRow[];
-  // マネージャーの一覧の先頭に出す「本部」＝自分自身の窓口担当スレッド。
-  // オーナーには不要（オーナー自身がHQなので、自分宛のスレッドという概念がない）。
+  // スタッフの一覧の先頭に出す「本部」＝自分自身の窓口担当スレッド。
+  // canAdmin がtrueの側には不要（自分宛のスレッドという概念がない）。
   selfEntry?: { lastMessagePreview: string | null; unread: boolean };
   departments: Department[];
 }) {
@@ -89,12 +88,15 @@ export default function StaffChat({
   const otherStaff = staff.filter((s) => s.id !== currentUserId);
   const archivedCount = otherStaff.filter((s) => s.archived).length;
   const visibleOtherStaff = otherStaff.filter((s) => !s.archived || showArchived);
-  const entries: RosterEntry[] = canAdmin
-    ? visibleOtherStaff.map((s) => ({ id: s.id, displayName: s.displayName, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false }))
-    : [
-        { id: currentUserId, displayName: "本部", lastMessagePreview: selfEntry?.lastMessagePreview ?? null, unread: selfEntry?.unread ?? false, isSelf: true },
-        ...visibleOtherStaff.map((s) => ({ id: s.id, displayName: s.displayName, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false })),
-      ];
+  // マネージャーには、チーム一覧の先頭に「本部」＝本部と自分の1対1スレッドも
+  // 表示する（オーナー・本部視点では自分宛のスレッドという概念がないので出さない）。
+  const entries: RosterEntry[] =
+    currentRole === "dept_manager"
+      ? [
+          { id: currentUserId, displayName: "本部", lastMessagePreview: selfEntry?.lastMessagePreview ?? null, unread: selfEntry?.unread ?? false, isSelf: true },
+          ...visibleOtherStaff.map((s) => ({ id: s.id, displayName: s.displayName, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false })),
+        ]
+      : visibleOtherStaff.map((s) => ({ id: s.id, displayName: s.displayName, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false }));
 
   const selectedEntry = selectedId ? entries.find((e) => e.id === selectedId) : null;
   const selectedStaff = selectedEntry && !selectedEntry.isSelf ? otherStaff.find((s) => s.id === selectedEntry.id) : null;
@@ -175,7 +177,7 @@ export default function StaffChat({
                     role: selectedStaff.role,
                     departmentIds: selectedStaff.departmentIds,
                     departments,
-                    canDelete: currentRole === "owner" && selectedStaff.role !== "owner",
+                    canDelete: canAdmin && selectedStaff.role !== "owner",
                     onSaved: (patch) => setStaff((rows) => rows.map((r) => (r.id === selectedStaff.id ? { ...r, ...patch } : r))),
                     onRemoved: () => {
                       setStaff((rows) => rows.filter((r) => r.id !== selectedStaff.id));

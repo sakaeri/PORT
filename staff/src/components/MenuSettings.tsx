@@ -283,8 +283,8 @@ export default function MenuSettings({
   initialBankInfo: BankTransferInfo;
   initialCardPaymentLinks: CardPaymentLink[];
   // 受付メニュー・返信テンプレはマネージャーも使うので常に編集可。それ以外
-  // （会社情報・決済設定・返金ポリシー・スタッフ連携）はオーナー専用で、
-  // マネージャーには閲覧のみで見せる。
+  // （会社情報・決済設定・返金ポリシー・スタッフ連携）は本部専用で、
+  // 本部以外のマネージャーには閲覧のみで見せる。
   canEdit: boolean;
 }) {
   const [tab, setTab] = useState<TabKey>("company");
