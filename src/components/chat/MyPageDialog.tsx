@@ -407,7 +407,7 @@ export default function MyPageDialog({
               <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
                 <div style={{ fontFamily: "var(--font-heading)", fontSize: 14, lineHeight: 1.5 }}>この窓口のしくみを、自社でも</div>
                 <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.65 }}>
-                  この画面は PORT という受付のしくみです。同じやり方で、自社の依頼受付にもお使いいただけます。月額 ¥4,800〜。
+                  この画面は PORT という受付システムです。こちらから企業アカウントを作成して自社の依頼受付にもお使いいただけます。月額 ¥4,800
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: "var(--color-accent-200)" }}>
                   <Gift size={14} />
@@ -421,7 +421,7 @@ export default function MyPageDialog({
                     onClick={handleReferralClick}
                     style={{ height: 36, padding: "0 14px", display: "inline-flex", alignItems: "center", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap", color: "var(--color-accent-100)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", textDecoration: "none" }}
                   >
-                    90日間無料で始める
+                    企業アカウントを作成する
                   </a>
                   <button onClick={() => setRefOpen((v) => !v)} style={{ height: 34, padding: "0 12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
                     {refOpen ? <CaretDown size={13} /> : <CaretRight size={13} />}
@@ -432,8 +432,8 @@ export default function MyPageDialog({
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 9, borderTop: "1px solid var(--color-divider)" }}>
                     {[
                       { icon: <ChatsCircle size={13} />, text: "依頼はトーク1本。フォームも管理表も作らずに受け付けられます" },
-                      { icon: <Receipt size={13} />, text: "見積・決済・完了報告・領収書までこの画面の中で完結します" },
-                      { icon: <UsersThree size={13} />, text: "外注先や社内スタッフへの割り振りと報酬の集計まで含まれます" },
+                      { icon: <Receipt size={13} />, text: "見積・決済・完了報告・領収書までこのシステムの中で完結します" },
+                      { icon: <UsersThree size={13} />, text: "スタッフ連携を使えば、案件ごとに自動でスタッフを割り振って運用することも可能です" },
                     ].map((p, i) => (
                       <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 11.5, color: "var(--color-neutral-400)", lineHeight: 1.6 }}>
                         <span style={{ flex: "none", marginTop: 2, color: "var(--color-accent)" }}>{p.icon}</span>
