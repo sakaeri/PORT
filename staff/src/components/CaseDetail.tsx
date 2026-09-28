@@ -133,8 +133,8 @@ export default function CaseDetail({
       () => startCaseRequest(request.id),
       request.phase === "quoted" ? "入金なしでこの案件に着手します。よろしいですか？" : undefined,
     );
-  const handleConfirmPayment = () => runAction(() => confirmPayment(request.id), "入金を確認しましたか？この操作で着手できるようになります。");
-  const handleConfirmDeposit = () => runAction(() => confirmDeposit(request.id), "予約金の入金を確認しましたか？この操作で着手できるようになります。");
+  const handleConfirmPayment = () => runAction(() => confirmPayment(request.id), "入金を確認しましたか？この操作で着手も行われます。");
+  const handleConfirmDeposit = () => runAction(() => confirmDeposit(request.id), "予約金の入金を確認しましたか？この操作で着手も行われます。");
   const handleConfirmFinal = () => runAction(() => confirmFinalPayment(request.id), request.paymentTiming === "deposit" ? "残金の入金を確認しましたか？" : "入金を確認しましたか？");
   const handleApproveReport = () => runAction(() => approveCaseReport(request.id), "この内容で依頼主に完了報告を送信します。よろしいですか？");
   const handleToggleArchive = () =>
@@ -252,17 +252,17 @@ export default function CaseDetail({
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {canSeeFinance && request.paymentTiming === "prepay_full" && (
               <>
-                <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金待ちです。チャットで送った決済案内の着金を確認したら押してください。</div>
+                <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金待ちです。チャットで送った決済案内の着金を確認したら押してください（入金確認と同時に着手します）。</div>
                 <button onClick={handleConfirmPayment} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
-                  {busy ? "処理中…" : "入金を確認した"}
+                  {busy ? "処理中…" : "入金を確認して着手する"}
                 </button>
               </>
             )}
             {canSeeFinance && request.paymentTiming === "deposit" && (
               <>
-                <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>予約金の入金待ちです。着金を確認したら押してください。</div>
+                <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>予約金の入金待ちです。着金を確認したら押してください（入金確認と同時に着手します）。</div>
                 <button onClick={handleConfirmDeposit} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
-                  {busy ? "処理中…" : "予約金の入金を確認した"}
+                  {busy ? "処理中…" : "予約金の入金を確認して着手する"}
                 </button>
               </>
             )}

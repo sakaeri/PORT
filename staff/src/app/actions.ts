@@ -903,7 +903,9 @@ async function postCaseNotice(supabase: Awaited<ReturnType<typeof createClient>>
   await admin.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", caseThreadId);
 }
 
-// preparing（入金確認済み）からの着手に加え、発送前入金・後払いなら入金なしで quoted から直接着手できる。
+// 発送前入金・後払いなら、入金確認なしで quoted から直接着手できる。
+// 「preparing」はこの変更以降は作られないが、過去に入金確認だけ済んで
+// preparing のまま止まっている案件を後方互換として着手できるようにしておく。
 export async function startCaseRequest(requestId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
@@ -916,6 +918,8 @@ export async function startCaseRequest(requestId: string) {
   if (fetchError) throw fetchError;
   const canStartFromQuoted =
     current?.phase === "quoted" && (current.payment_timing === "before_shipping" || current.payment_timing === "postpay");
+  const canStartFromPreparing = current?.phase === "preparing";
+  if (!canStartFromQuoted && !canStartFromPreparing) throw new Error("着手できる状態ではありません");
   const fromPhase = canStartFromQuoted ? "quoted" : "preparing";
 
   const now = new Date().toISOString();
@@ -934,16 +938,31 @@ export async function startCaseRequest(requestId: string) {
   await postCaseNotice(supabase, requestId, "着手しました");
 }
 
-// 先払い：着手前に全額の入金確認が必要。quoted → preparing。
+// 先払い：入金確認と同時に着手する（間に準備中フェーズを挟まない。分けると
+// 着手ボタンの押し忘れが起き、その間 due_at が設定されず納期管理が働かない）。
 export async function confirmPayment(requestId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
+  const { data: current, error: fetchError } = await supabase
+    .from("requests")
+    .select("lead_hours")
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId)
+    .eq("phase", "quoted")
+    .eq("payment_timing", "prepay_full")
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!current) throw new Error("入金確認できる状態ではありません");
+
   const now = new Date().toISOString();
+  const dueAt = current.lead_hours != null ? new Date(Date.now() + current.lead_hours * 3600 * 1000).toISOString() : null;
   const { data, error } = await supabase
     .from("requests")
     .update({
-      phase: "preparing",
+      phase: "started",
+      started_at: now,
       accepted_at: now,
+      due_at: dueAt,
       pay_status: "paid",
       paid_at: now,
       paid_marked_by: ctx.userId,
@@ -951,24 +970,37 @@ export async function confirmPayment(requestId: string) {
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
     .eq("phase", "quoted")
-    .eq("payment_timing", "prepay_full")
     .select("id, customer_id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
-  await postCaseNotice(supabase, requestId, "入金を確認しました");
+  await postCaseNotice(supabase, requestId, "入金を確認し、着手しました");
   await notifyCustomerPaymentConfirmed(createServiceRoleClient(), ctx.orgId, data[0].customer_id, "ご入金");
 }
 
-// 予約金：予約金分だけの入金確認で着手できるようにする。quoted → preparing、pay_statusはprocessing止まり。
+// 予約金：予約金分だけの入金確認と同時に着手する（同上の理由でpreparingを挟まない）。pay_statusはprocessing止まり。
 export async function confirmDeposit(requestId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
+  const { data: current, error: fetchError } = await supabase
+    .from("requests")
+    .select("lead_hours")
+    .eq("id", requestId)
+    .eq("org_id", ctx.orgId)
+    .eq("phase", "quoted")
+    .eq("payment_timing", "deposit")
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!current) throw new Error("入金確認できる状態ではありません");
+
   const now = new Date().toISOString();
+  const dueAt = current.lead_hours != null ? new Date(Date.now() + current.lead_hours * 3600 * 1000).toISOString() : null;
   const { data, error } = await supabase
     .from("requests")
     .update({
-      phase: "preparing",
+      phase: "started",
+      started_at: now,
       accepted_at: now,
+      due_at: dueAt,
       pay_status: "processing",
       deposit_paid_at: now,
       deposit_paid_marked_by: ctx.userId,
@@ -976,11 +1008,10 @@ export async function confirmDeposit(requestId: string) {
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
     .eq("phase", "quoted")
-    .eq("payment_timing", "deposit")
     .select("id, customer_id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
-  await postCaseNotice(supabase, requestId, "予約金の入金を確認しました");
+  await postCaseNotice(supabase, requestId, "予約金の入金を確認し、着手しました");
   await notifyCustomerPaymentConfirmed(createServiceRoleClient(), ctx.orgId, data[0].customer_id, "予約金のご入金");
 }
 
