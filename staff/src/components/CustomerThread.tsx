@@ -3,12 +3,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X, CaretDown, CaretRight } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X, CaretDown, CaretRight, Plus } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { createClient } from "@/lib/supabase/client";
-import { sendStaffMessage, deleteMessage, markThreadRead, convertCustomerToOrg, createCaseRequest, sendTemplateMessage, reassignThreadDepartment } from "@/app/actions";
+import {
+  sendStaffMessage,
+  deleteMessage,
+  markThreadRead,
+  convertCustomerToOrg,
+  createCaseRequest,
+  sendTemplateMessage,
+  reassignThreadDepartment,
+  createIntakeForm,
+  updateIntakeForm,
+  deleteIntakeForm,
+} from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import TextComposer from "@/components/TextComposer";
@@ -81,12 +92,16 @@ interface TemplateInfo {
 
 function TemplatesModal({
   templates,
+  setTemplates,
+  orgId,
   busy,
   onClose,
   onSendForm,
   onUseText,
 }: {
   templates: TemplateInfo[];
+  setTemplates: React.Dispatch<React.SetStateAction<TemplateInfo[]>>;
+  orgId: string;
   busy: boolean;
   onClose: () => void;
   onSendForm: (id: string) => void;
@@ -94,6 +109,35 @@ function TemplatesModal({
 }) {
   const forms = templates.filter((t) => t.fieldCount > 0);
   const plain = templates.filter((t) => t.fieldCount === 0);
+  const [creating, setCreating] = useState(false);
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
+
+  async function handleAdd() {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const id = await createIntakeForm(orgId);
+      setTemplates((ts) => [...ts, { id, label: "新しいテンプレ", note: null, fieldCount: 0, fields: [] }]);
+      setJustCreatedId(id);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  function patchLocal(id: string, patch: Partial<TemplateInfo>) {
+    setTemplates((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  }
+
+  async function commit(t: TemplateInfo) {
+    await updateIntakeForm(t.id, { label: t.label, note: t.note ?? "" });
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("このテンプレを削除しますか？")) return;
+    await deleteIntakeForm(id);
+    setTemplates((ts) => ts.filter((t) => t.id !== id));
+  }
+
   return (
     <Modal onClose={onClose} maxWidth={440}>
       <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -106,40 +150,55 @@ function TemplatesModal({
         </div>
         {forms.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--color-neutral-500)" }}>入力してもらう</span>
+            <span style={{ ...templateSectionLabel, color: "var(--color-accent-300)" }}>入力してもらう</span>
             {forms.map((t) => (
-              <TemplateFormRow key={t.id} template={t} busy={busy} onSend={() => onSendForm(t.id)} />
+              <TemplateFormRow key={t.id} template={t} busy={busy} onSend={() => onSendForm(t.id)} onDelete={() => handleDelete(t.id)} />
             ))}
           </div>
         )}
-        {plain.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ fontSize: 11, letterSpacing: "0.05em", color: "var(--color-neutral-500)" }}>送るだけ</span>
-            {plain.map((t) => (
-              <TemplateTextRow key={t.id} template={t} onUse={() => onUseText(t.note ?? t.label)} />
-            ))}
-          </div>
-        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span style={{ ...templateSectionLabel, color: "var(--stb-seal-ink)" }}>送るだけ</span>
+          {plain.length === 0 && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>まだテンプレがありません。</div>}
+          {plain.map((t) => (
+            <TemplateTextRow
+              key={t.id}
+              template={t}
+              initialOpen={t.id === justCreatedId}
+              onUse={() => onUseText(t.note ?? t.label)}
+              onPatch={(patch) => patchLocal(t.id, patch)}
+              onCommit={() => commit(t)}
+              onDelete={() => handleDelete(t.id)}
+            />
+          ))}
+          <button onClick={handleAdd} disabled={creating} style={templateAddBtn}>
+            <Plus size={13} /> 新しいテンプレを作る
+          </button>
+        </div>
       </div>
     </Modal>
   );
 }
 
+const templateSectionLabel: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: "0.05em" };
 const templateRowHeader: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, padding: "10px 12px" };
 const templateCaretBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, cursor: "pointer", background: "transparent", border: "none", textAlign: "left", color: "var(--color-text)" };
-const templateCountBadge: React.CSSProperties = { flex: "none", fontSize: 10.5, color: "var(--color-neutral-500)" };
+const templateCountBadge: React.CSSProperties = { flex: "none", fontSize: 10.5 };
 const templateSendBtn: React.CSSProperties = { flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
+const templateSendBtnText: React.CSSProperties = { flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--stb-seal-ink)", background: "transparent", border: "1px solid var(--stb-seal-ink)", borderRadius: "var(--radius-md)" };
+const templateDeleteBtn: React.CSSProperties = { alignSelf: "flex-end", display: "flex", alignItems: "center", gap: 4, marginTop: 4, cursor: "pointer", fontSize: 11, color: "var(--stb-seal-ink)", background: "transparent", border: "none" };
+const templateAddBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--stb-seal-ink)", background: "transparent", border: "1px dashed var(--stb-seal-ink)", borderRadius: "var(--radius-md)" };
+const templateEditInput: React.CSSProperties = { height: 32, padding: "0 10px", fontSize: 12.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" };
 
-function TemplateFormRow({ template, busy, onSend }: { template: TemplateInfo; busy: boolean; onSend: () => void }) {
+function TemplateFormRow({ template, busy, onSend, onDelete }: { template: TemplateInfo; busy: boolean; onSend: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
+    <div style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", borderLeft: "3px solid var(--color-accent)", overflow: "hidden" }}>
       <div style={templateRowHeader}>
         <button onClick={() => setOpen((v) => !v)} style={templateCaretBtn}>
           {open ? <CaretDown size={13} color="var(--color-neutral-500)" /> : <CaretRight size={13} color="var(--color-neutral-500)" />}
           <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{template.label}</span>
         </button>
-        <span style={templateCountBadge}>{template.fieldCount}項目</span>
+        <span style={{ ...templateCountBadge, color: "var(--color-accent-300)" }}>{template.fieldCount}項目</span>
         <button onClick={onSend} disabled={busy} aria-label="この内容で送信" style={templateSendBtn}>
           <PaperPlaneTilt size={13} />
         </button>
@@ -157,29 +216,69 @@ function TemplateFormRow({ template, busy, onSend }: { template: TemplateInfo; b
               <span style={{ flex: "none", fontSize: 10.5, padding: "2px 8px", borderRadius: 999, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)" }}>記入</span>
             </div>
           ))}
+          <button onClick={onDelete} style={templateDeleteBtn}>
+            <Trash size={12} /> このテンプレを削除
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-function TemplateTextRow({ template, onUse }: { template: TemplateInfo; onUse: () => void }) {
-  const [open, setOpen] = useState(false);
+function TemplateTextRow({
+  template,
+  initialOpen,
+  onUse,
+  onPatch,
+  onCommit,
+  onDelete,
+}: {
+  template: TemplateInfo;
+  initialOpen?: boolean;
+  onUse: () => void;
+  onPatch: (patch: Partial<TemplateInfo>) => void;
+  onCommit: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(!!initialOpen);
   const text = template.note ?? template.label;
   const lineCount = text.split("\n").length;
   return (
-    <div style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
+    <div style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", borderLeft: "3px solid var(--stb-seal-ink)", overflow: "hidden" }}>
       <div style={templateRowHeader}>
         <button onClick={() => setOpen((v) => !v)} style={templateCaretBtn}>
           {open ? <CaretDown size={13} color="var(--color-neutral-500)" /> : <CaretRight size={13} color="var(--color-neutral-500)" />}
-          <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{template.label}</span>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{template.label || "（無題）"}</span>
         </button>
-        <span style={templateCountBadge}>{lineCount}行</span>
-        <button onClick={onUse} aria-label="この内容を入力欄にセット" style={templateSendBtn}>
+        <span style={{ ...templateCountBadge, color: "var(--stb-seal-ink)" }}>{lineCount}行</span>
+        <button onClick={onUse} aria-label="この内容を入力欄にセット" style={templateSendBtnText}>
           <PaperPlaneTilt size={13} />
         </button>
       </div>
-      {open && <div style={{ padding: "0 12px 12px", fontSize: 12.5, color: "var(--color-neutral-500)", whiteSpace: "pre-wrap" }}>{text}</div>}
+      {open && (
+        <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <input
+            value={template.label}
+            onChange={(e) => onPatch({ label: e.target.value })}
+            onBlur={onCommit}
+            placeholder="テンプレ名"
+            className="vid-input"
+            style={templateEditInput}
+          />
+          <textarea
+            value={template.note ?? ""}
+            onChange={(e) => onPatch({ note: e.target.value })}
+            onBlur={onCommit}
+            rows={3}
+            placeholder="送信する文章"
+            className="vid-input"
+            style={{ ...templateEditInput, height: "auto", padding: "8px 10px", resize: "vertical" }}
+          />
+          <button onClick={onDelete} style={templateDeleteBtn}>
+            <Trash size={12} /> このテンプレを削除
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -306,7 +405,7 @@ export default function CustomerThread({
   orgId,
   isHq,
   convertedOrg,
-  templates,
+  templates: initialTemplates,
   menus,
   memos,
   ratings,
@@ -325,7 +424,7 @@ export default function CustomerThread({
   orgId: string;
   isHq: boolean;
   convertedOrg: { displayName: string; slug: string | null } | null;
-  templates: { id: string; label: string; note: string | null; fieldCount: number; fields: { label: string; required: boolean }[] }[];
+  templates: TemplateInfo[];
   menus: MenuOption[];
   memos: WorkMemo[];
   ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
@@ -338,6 +437,7 @@ export default function CustomerThread({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [templates, setTemplates] = useState(initialTemplates);
   const [showTemplates, setShowTemplates] = useState(false);
   const isMobile = useIsMobile();
   const [showInfoPanel, setShowInfoPanel] = useState(false);
@@ -592,6 +692,8 @@ export default function CustomerThread({
       {thread && showTemplates && (
         <TemplatesModal
           templates={templates}
+          setTemplates={setTemplates}
+          orgId={orgId}
           busy={busy}
           onClose={() => setShowTemplates(false)}
           onSendForm={sendTemplateForm}
@@ -609,15 +711,13 @@ export default function CustomerThread({
           sending={sending}
           placeholder="返信を入力…"
           leftButton={
-            templates.length > 0 ? (
-              <button
-                onClick={() => setShowTemplates((v) => !v)}
-                aria-label="テンプレを選ぶ"
-                style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-              >
-                <ChatCircleText size={16} />
-              </button>
-            ) : undefined
+            <button
+              onClick={() => setShowTemplates((v) => !v)}
+              aria-label="テンプレを選ぶ"
+              style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+            >
+              <ChatCircleText size={16} />
+            </button>
           }
         />
       )}
