@@ -13,6 +13,7 @@ export interface CaseRow {
   amount: number;
   phase: RequestPhase;
   paid: boolean;
+  dueAt: string | null;
   overdue: boolean;
   cancelRequested: boolean;
   customerName: string;
@@ -21,7 +22,7 @@ export interface CaseRow {
   lastMessagePreview: string | null;
 }
 
-export default function CasesList({ rows: initialRows, canDelete }: { rows: CaseRow[]; canDelete: boolean }) {
+export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }: { rows: CaseRow[]; canDelete: boolean; canSeeAmount: boolean }) {
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -72,10 +73,21 @@ export default function CasesList({ rows: initialRows, canDelete }: { rows: Case
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{r.customerName}</div>
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lastMessagePreview ?? "まだ記録がありません"}</div>
             </Link>
-            <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>¥{r.amount.toLocaleString("ja-JP")}</div>
-            {r.overdue && (
-              <div style={{ flex: "none", fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--stb-seal-ink)", color: "var(--stb-seal-ink)", whiteSpace: "nowrap" }}>
-                納期超過
+            {canSeeAmount && <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>¥{r.amount.toLocaleString("ja-JP")}</div>}
+            {r.dueAt && ["preparing", "started"].includes(r.phase) && (
+              <div
+                style={{
+                  flex: "none",
+                  fontSize: 11,
+                  padding: "3px 10px",
+                  borderRadius: 6,
+                  border: `1px solid ${r.overdue ? "var(--stb-seal-ink)" : "var(--color-divider)"}`,
+                  color: r.overdue ? "var(--stb-seal-ink)" : "var(--color-neutral-400)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                納期：{new Date(r.dueAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                {r.overdue && "（超過）"}
               </div>
             )}
             {r.cancelRequested && (

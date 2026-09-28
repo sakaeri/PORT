@@ -14,6 +14,7 @@ import {
   confirmFinalPayment,
   startCaseRequest,
   submitCaseReport,
+  approveCaseReport,
   declineQuote,
   confirmCancellation,
   setFinalPaymentLink,
@@ -72,6 +73,7 @@ export default function CaseDetail({
   assignedStaff,
   availableStaff,
   canAssignStaff,
+  canSeeFinance,
 }: {
   request: {
     id: string;
@@ -95,7 +97,7 @@ export default function CaseDetail({
   };
   refundPolicies: RefundPolicyRow[];
   customer: { id: string; name: string } | null;
-  report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[] } | null;
+  report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[]; pending: boolean } | null;
   rating: { stars: number | null; comment: string | null; skipped: boolean } | null;
   caseThread: { id: string; archived: boolean } | null;
   caseMessages: CaseMessage[];
@@ -104,6 +106,8 @@ export default function CaseDetail({
   assignedStaff: { id: string; displayName: string }[];
   availableStaff: { id: string; displayName: string }[];
   canAssignStaff: boolean;
+  // オーナー・マネージャーだけ金額・支払い・返金の情報を見られる。
+  canSeeFinance: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -132,6 +136,7 @@ export default function CaseDetail({
   const handleConfirmPayment = () => runAction(() => confirmPayment(request.id), "入金を確認しましたか？この操作で着手できるようになります。");
   const handleConfirmDeposit = () => runAction(() => confirmDeposit(request.id), "予約金の入金を確認しましたか？この操作で着手できるようになります。");
   const handleConfirmFinal = () => runAction(() => confirmFinalPayment(request.id), request.paymentTiming === "deposit" ? "残金の入金を確認しましたか？" : "入金を確認しましたか？");
+  const handleApproveReport = () => runAction(() => approveCaseReport(request.id), "この内容で依頼主に完了報告を送信します。よろしいですか？");
   const handleToggleArchive = () =>
     runAction(() => (caseThread?.archived ? unarchiveCaseThread(caseThread.id) : archiveCaseThread(caseThread!.id)));
 
@@ -204,7 +209,7 @@ export default function CaseDetail({
         )}
         {request.note && <div style={{ fontSize: 13, lineHeight: 1.6 }}>{request.note}</div>}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 20, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{request.amount.toLocaleString("ja-JP")}</span>
+          {canSeeFinance && <span style={{ fontSize: 20, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{request.amount.toLocaleString("ja-JP")}</span>}
           <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)" }}>{PHASE_LABEL[request.phase]}</span>
           {request.dueAt && ["preparing", "started"].includes(request.phase) && (
             <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: `1px solid ${isOverdue ? "var(--stb-seal-ink)" : "var(--color-divider)"}`, color: isOverdue ? "var(--stb-seal-ink)" : "var(--color-neutral-400)" }}>
@@ -214,7 +219,7 @@ export default function CaseDetail({
           )}
         </div>
 
-        {request.cancelRequestedAt && canCancel && (
+        {canSeeFinance && request.cancelRequestedAt && canCancel && (
           <div style={{ fontSize: 12, color: "var(--stb-seal-ink)", padding: "8px 10px", borderRadius: "var(--radius-md)", background: "color-mix(in srgb, var(--stb-seal-ink) 10%, transparent)" }}>
             依頼主からキャンセルの申請があります（
             {new Date(request.cancelRequestedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
@@ -222,17 +227,19 @@ export default function CaseDetail({
           </div>
         )}
 
-        <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-          支払い：{PAYMENT_TIMING_LABEL[request.paymentTiming]}
-          {request.paymentTiming === "deposit" && request.depositAmount != null && `（予約金 ¥${request.depositAmount.toLocaleString("ja-JP")}・${request.depositPercent}%）`}
-          ・{request.payMethod === "card" ? "カード決済" : "銀行振込"}
-        </div>
-        {request.payMethod === "bank" && request.bankTransferInfo && (
+        {canSeeFinance && (
+          <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+            支払い：{PAYMENT_TIMING_LABEL[request.paymentTiming]}
+            {request.paymentTiming === "deposit" && request.depositAmount != null && `（予約金 ¥${request.depositAmount.toLocaleString("ja-JP")}・${request.depositPercent}%）`}
+            ・{request.payMethod === "card" ? "カード決済" : "銀行振込"}
+          </div>
+        )}
+        {canSeeFinance && request.payMethod === "bank" && request.bankTransferInfo && (
           <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.7 }}>
             {request.bankTransferInfo.bankName} {request.bankTransferInfo.branchName}　{request.bankTransferInfo.accountType} {request.bankTransferInfo.accountNumber}　{request.bankTransferInfo.holder}
           </div>
         )}
-        {request.payMethod === "card" && request.cardPaymentLink && (
+        {canSeeFinance && request.payMethod === "card" && request.cardPaymentLink && (
           <div style={{ fontSize: 11.5, lineHeight: 1.7 }}>
             <a href={request.cardPaymentLink} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
               {request.cardPaymentLink}
@@ -243,7 +250,7 @@ export default function CaseDetail({
 
         {request.phase === "quoted" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {request.paymentTiming === "prepay_full" && (
+            {canSeeFinance && request.paymentTiming === "prepay_full" && (
               <>
                 <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金待ちです。チャットで送った決済案内の着金を確認したら押してください。</div>
                 <button onClick={handleConfirmPayment} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
@@ -251,7 +258,7 @@ export default function CaseDetail({
                 </button>
               </>
             )}
-            {request.paymentTiming === "deposit" && (
+            {canSeeFinance && request.paymentTiming === "deposit" && (
               <>
                 <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>予約金の入金待ちです。着金を確認したら押してください。</div>
                 <button onClick={handleConfirmDeposit} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
@@ -276,34 +283,59 @@ export default function CaseDetail({
           </button>
         )}
 
-        {request.phase === "started" && <CompletionReportForm requestId={request.id} />}
+        {request.phase === "started" && !report && <CompletionReportForm requestId={request.id} canSendDirectly={canSeeFinance} />}
 
-        {request.payStatus === "paid" ? (
+        {request.phase === "started" && report?.pending && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{canSeeFinance ? "スタッフが提出した完了報告（未送信）" : "完了報告を提出しました。マネージャーの確認をお待ちください。"}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{report.summary}</div>
+            {report.details.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {report.details.map((d, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
+                    <span style={{ width: 72, flex: "none", color: "var(--color-neutral-500)" }}>{d.label}</span>
+                    <span style={{ minWidth: 0, flex: 1 }}>{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {report.noteToCustomer && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{report.noteToCustomer}</div>}
+            {canSeeFinance && (
+              <button onClick={handleApproveReport} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
+                {busy ? "処理中…" : "承認して依頼主へ送る"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {canSeeFinance && request.payStatus === "paid" ? (
           request.phase !== "quoted" && <div style={{ fontSize: 12, color: "var(--color-accent-300)" }}>入金確認済み（¥{request.amount.toLocaleString("ja-JP")}）</div>
         ) : (
-          <>
-            {request.paymentTiming === "deposit" && request.payStatus === "processing" && ["started", "completed"].includes(request.phase) && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          canSeeFinance && (
+            <>
+              {request.paymentTiming === "deposit" && request.payStatus === "processing" && ["started", "completed"].includes(request.phase) && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>残金 ¥{(request.amount - (request.depositAmount ?? 0)).toLocaleString("ja-JP")} は未確認です</span>
+                    <button onClick={handleConfirmFinal} disabled={busy} style={{ ...btn, height: 32 }}>
+                      {busy ? "処理中…" : "残金の入金を確認した"}
+                    </button>
+                  </div>
+                  {request.payMethod === "card" && (
+                    <FinalPaymentLinkForm requestId={request.id} currentLink={request.finalCardPaymentLink} />
+                  )}
+                </div>
+              )}
+              {(request.paymentTiming === "before_shipping" || request.paymentTiming === "postpay") && request.phase === "completed" && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>残金 ¥{(request.amount - (request.depositAmount ?? 0)).toLocaleString("ja-JP")} は未確認です</span>
+                  <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金は未確認です</span>
                   <button onClick={handleConfirmFinal} disabled={busy} style={{ ...btn, height: 32 }}>
-                    {busy ? "処理中…" : "残金の入金を確認した"}
+                    {busy ? "処理中…" : "入金を確認した"}
                   </button>
                 </div>
-                {request.payMethod === "card" && (
-                  <FinalPaymentLinkForm requestId={request.id} currentLink={request.finalCardPaymentLink} />
-                )}
-              </div>
-            )}
-            {(request.paymentTiming === "before_shipping" || request.paymentTiming === "postpay") && request.phase === "completed" && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金は未確認です</span>
-                <button onClick={handleConfirmFinal} disabled={busy} style={{ ...btn, height: 32 }}>
-                  {busy ? "処理中…" : "入金を確認した"}
-                </button>
-              </div>
-            )}
-          </>
+              )}
+            </>
+          )
         )}
 
         {canCancel && request.phase === "quoted" && (
@@ -415,7 +447,7 @@ export default function CaseDetail({
   );
 }
 
-function CompletionReportForm({ requestId }: { requestId: string }) {
+function CompletionReportForm({ requestId, canSendDirectly }: { requestId: string; canSendDirectly: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
@@ -442,13 +474,18 @@ function CompletionReportForm({ requestId }: { requestId: string }) {
   if (!open) {
     return (
       <button onClick={() => setOpen(true)} style={{ ...btn, alignSelf: "flex-start" }}>
-        完了報告を送る
+        {canSendDirectly ? "完了報告を送る" : "完了報告を提出する"}
       </button>
     );
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {!canSendDirectly && (
+        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+          提出するとマネージャー・オーナーの確認待ちになります。承認されるまで依頼主には送られません。
+        </div>
+      )}
       <textarea
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
@@ -470,7 +507,7 @@ function CompletionReportForm({ requestId }: { requestId: string }) {
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={submit} disabled={saving || !summary.trim()} style={btn}>
-          {saving ? "送信中…" : "この内容で完了報告する"}
+          {saving ? "送信中…" : canSendDirectly ? "この内容で完了報告する" : "この内容で提出する"}
         </button>
         <button onClick={() => setOpen(false)} style={{ ...btn, color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
           キャンセル

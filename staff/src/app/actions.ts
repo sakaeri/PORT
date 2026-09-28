@@ -1003,6 +1003,9 @@ export async function confirmFinalPayment(requestId: string) {
   await notifyCustomerPaymentConfirmed(createServiceRoleClient(), ctx.orgId, data[0].customer_id, label);
 }
 
+// スタッフ（dept_leader）が提出した完了報告は、そのまま依頼主に送らず
+// マネージャー・オーナーの確認待ち（下書き）にする。オーナー・マネージャー
+// 自身が提出した場合は、自分の確認が要らないのでそのまま依頼主に送る。
 export async function submitCaseReport(
   requestId: string,
   summary: string,
@@ -1024,6 +1027,7 @@ export async function submitCaseReport(
     ...(delivery.trim() ? [{ label: "受け渡し", value: delivery.trim() }] : []),
   ];
 
+  const canSendDirectly = ctx.role === "owner" || ctx.role === "dept_manager";
   const now = new Date().toISOString();
   const { error: reportError } = await supabase.from("completion_reports").insert({
     request_id: requestId,
@@ -1031,13 +1035,45 @@ export async function submitCaseReport(
     details,
     note_to_customer: noteToCustomer.trim() || null,
     submitted_at: now,
-    sent_at: now,
+    sent_at: canSendDirectly ? now : null,
   });
   if (reportError) throw reportError;
+
+  if (!canSendDirectly) {
+    await postCaseNotice(supabase, requestId, "完了報告を提出しました（マネージャーの確認待ち）");
+    return;
+  }
 
   const { error: reqError } = await supabase.from("requests").update({ phase: "completed", completed_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
   if (reqError) throw reqError;
   await postCaseNotice(supabase, requestId, "完了報告を送信しました");
+  await notifyCustomerCompletionReport(createServiceRoleClient(), ctx.orgId, request.customer_id);
+}
+
+// スタッフが提出した完了報告（下書き）を、マネージャー・オーナーが確認して
+// 依頼主に送る。
+export async function approveCaseReport(requestId: string) {
+  const ctx = await requireContext();
+  if (ctx.role !== "owner" && ctx.role !== "dept_manager") throw new Error("この操作はオーナー・マネージャーのみ行えます");
+  const supabase = await createClient();
+
+  const { data: request } = await supabase.from("requests").select("id, phase, customer_id").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
+  if (!request) throw new Error("案件が見つかりません");
+  if (request.phase !== "started") throw new Error("確認待ちの完了報告が見つかりません");
+
+  const now = new Date().toISOString();
+  const { data: updatedReports, error: reportError } = await supabase
+    .from("completion_reports")
+    .update({ sent_at: now })
+    .eq("request_id", requestId)
+    .is("sent_at", null)
+    .select("id");
+  if (reportError) throw reportError;
+  if (!updatedReports || updatedReports.length === 0) throw new Error("確認待ちの完了報告が見つかりません");
+
+  const { error: reqError } = await supabase.from("requests").update({ phase: "completed", completed_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
+  if (reqError) throw reqError;
+  await postCaseNotice(supabase, requestId, "完了報告を確認し、依頼主に送信しました");
   await notifyCustomerCompletionReport(createServiceRoleClient(), ctx.orgId, request.customer_id);
 }
 

@@ -11,6 +11,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
 
   const supabase = await createClient();
   const canAssignStaff = ctx.role !== "dept_leader";
+  // スタッフ（dept_leader）には金額・支払い方法・返金関連の情報を一切渡さない
+  // （表示を隠すだけでなく、サーバー側で値そのものを送らないようにする）。
+  const canSeeFinance = ctx.role === "owner" || ctx.role === "dept_manager";
 
   // タップしてからこの画面が出るまでの体感速度のため、全クエリを並列で投げる
   // （案件トークのメッセージは threads.id が要るが、messages を threads の
@@ -54,6 +57,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
+  const reportPending = !!report && !report.sent_at;
 
   const caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null }[] = caseThread?.messages ?? [];
 
@@ -63,25 +67,25 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         id: request.id,
         title: request.title,
         note: request.note,
-        amount: request.amount,
+        amount: canSeeFinance ? request.amount : 0,
         phase: request.phase,
         createdAt: request.created_at,
         dueAt: request.due_at,
         cancelRequestedAt: request.cancel_requested_at,
-        paidAt: request.paid_at,
+        paidAt: canSeeFinance ? request.paid_at : null,
         paymentTiming: request.payment_timing,
-        depositPercent: request.deposit_percent,
-        depositAmount: request.deposit_amount,
-        depositPaidAt: request.deposit_paid_at,
-        payMethod: request.pay_method,
-        payStatus: request.pay_status,
-        bankTransferInfo: request.bank_transfer_info,
-        cardPaymentLink: request.card_payment_link,
-        finalCardPaymentLink: request.final_card_payment_link,
+        depositPercent: canSeeFinance ? request.deposit_percent : null,
+        depositAmount: canSeeFinance ? request.deposit_amount : null,
+        depositPaidAt: canSeeFinance ? request.deposit_paid_at : null,
+        payMethod: canSeeFinance ? request.pay_method : null,
+        payStatus: canSeeFinance ? request.pay_status : "",
+        bankTransferInfo: canSeeFinance ? request.bank_transfer_info : null,
+        cardPaymentLink: canSeeFinance ? request.card_payment_link : null,
+        finalCardPaymentLink: canSeeFinance ? request.final_card_payment_link : null,
       }}
-      refundPolicies={refundPolicies ?? []}
+      refundPolicies={canSeeFinance ? (refundPolicies ?? []) : []}
       customer={customer ? { id: customer.id, name: customer.name } : null}
-      report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer, details: report.details ?? [] } : null}
+      report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer, details: report.details ?? [], pending: reportPending } : null}
       rating={rating ? { stars: rating.stars, comment: rating.comment, skipped: rating.skipped } : null}
       caseThread={caseThread ? { id: caseThread.id, archived: !!caseThread.archived_at } : null}
       caseMessages={caseMessages}
@@ -90,6 +94,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       assignedStaff={assignedStaff}
       availableStaff={availableStaff}
       canAssignStaff={canAssignStaff}
+      canSeeFinance={canSeeFinance}
     />
   );
 }

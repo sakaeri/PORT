@@ -43,6 +43,7 @@ export default async function CasesPage() {
       amount: r.amount,
       phase: r.phase,
       paid: r.pay_status === "paid",
+      dueAt: r.due_at,
       overdue,
       cancelRequested: r.cancel_requested_at != null,
       customerName: customer?.name ?? "—",
@@ -64,7 +65,9 @@ export default async function CasesPage() {
         </div>
       )}
 
-      {!error && rows.length > 0 && <CasesList rows={rows} canDelete={ctx.role === "owner" || ctx.role === "dept_manager"} />}
+      {!error && rows.length > 0 && (
+        <CasesList rows={rows} canDelete={ctx.role === "owner" || ctx.role === "dept_manager"} canSeeAmount={ctx.role === "owner" || ctx.role === "dept_manager"} />
+      )}
     </div>
   );
 }
