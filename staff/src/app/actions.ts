@@ -3,7 +3,6 @@
 import { cookies } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
-import { computeRefund } from "@/lib/refund";
 import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
 import { notifyCustomerCompletionReport, notifyCustomerPaymentConfirmed, notifyCustomerQuoteCreated } from "@/lib/notify";
 import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage, StaffRole } from "@/lib/supabase/types";
@@ -800,6 +799,10 @@ export async function createCaseRequest(
 
   const amount = items.reduce((sum, it) => sum + it.price * it.qty, 0);
   const title = items.length > 2 ? `${items[0].label}ほか${items.length - 1}件` : items.map((it) => it.label).join("・");
+  // 着手時に納期（due_at）を計算するための作業時間の目安を保存しておく
+  // （項目ごとの目安時間 × 数量。複数項目は並行して進む前提でmaxを取る）。
+  const knownLeadHours = items.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
+  const leadHoursTotal = knownLeadHours.length > 0 ? Math.max(...knownLeadHours) : null;
 
   const depositPercent = input.paymentTiming === "deposit" ? Math.min(100, Math.max(1, Math.round(input.depositPercent ?? 0))) : null;
   if (input.paymentTiming === "deposit" && !depositPercent) throw new Error("予約金の割合を入力してください");
@@ -832,6 +835,7 @@ export async function createCaseRequest(
       amount,
       phase: "quoted",
       quoted_at: new Date().toISOString(),
+      lead_hours: leadHoursTotal,
       payment_timing: input.paymentTiming,
       deposit_percent: depositPercent,
       deposit_amount: depositAmount,
@@ -905,7 +909,7 @@ export async function startCaseRequest(requestId: string) {
   const supabase = await createClient();
   const { data: current, error: fetchError } = await supabase
     .from("requests")
-    .select("phase, payment_timing")
+    .select("phase, payment_timing, lead_hours")
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
     .maybeSingle();
@@ -915,9 +919,12 @@ export async function startCaseRequest(requestId: string) {
   const fromPhase = canStartFromQuoted ? "quoted" : "preparing";
 
   const now = new Date().toISOString();
+  // 着手した瞬間を起点に、社内タスク管理用の納期目安（due_at）を計算する。
+  // 依頼主の入金待ちなどの時間は含めない（本人の対応が遅れないよう）。
+  const dueAt = current?.lead_hours != null ? new Date(Date.now() + current.lead_hours * 3600 * 1000).toISOString() : null;
   const { data, error } = await supabase
     .from("requests")
-    .update(canStartFromQuoted ? { phase: "started", started_at: now, accepted_at: now } : { phase: "started", started_at: now })
+    .update(canStartFromQuoted ? { phase: "started", started_at: now, accepted_at: now, due_at: dueAt } : { phase: "started", started_at: now, due_at: dueAt })
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
     .eq("phase", fromPhase)
@@ -1070,36 +1077,47 @@ export async function setFinalPaymentLink(requestId: string, url: string) {
   await postCaseNotice(supabase, requestId, "残金の決済リンクを送信しました");
 }
 
-// 受付側からのキャンセル・強制終了。これまで依頼のキャンセルは依頼主側にしか
-// 手段がなかったが、対応が大幅に遅れて受付側から終了させたい場合などのために追加。
-// 返金計算は依頼主アプリの cancelRequest と同じロジック（lib/refund.ts）を使う。
-export async function cancelCaseRequest(requestId: string) {
+// 見積もり段階（まだ入金前）の見送り。費用が発生していないので即確定でよい。
+export async function declineQuote(requestId: string) {
   const ctx = await requireContext({ allowLocked: true });
   const supabase = await createClient();
 
-  const { data: r, error: fetchError } = await supabase.from("requests").select("*").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
+  const { data: r, error: fetchError } = await supabase.from("requests").select("phase").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!r) throw new Error("案件が見つかりません");
+  if (r.phase !== "quoted") throw new Error("この操作は見積もり段階のみ行えます");
+
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("requests").update({ phase: "declined", cancelled_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+  await postCaseNotice(supabase, requestId, "受付が見積もりを見送りにしました");
+}
+
+// キャンセル時の返金額は、ポリシー通りの金額を自動確定させず、必ずここで
+// 事業主が内容を確認・入力してから確定する（依頼主からの申請があった
+// 場合も、対応の目安を過ぎた場合も、自動で返金扱いにはしない）。
+// refundAmount は依頼主アプリ側の computeRefund の結果をそのまま渡してもいいし、
+// 事業主が上書きした金額でもよい。
+export async function confirmCancellation(requestId: string, refundAmount: number) {
+  const ctx = await requireContext({ allowLocked: true });
+  const supabase = await createClient();
+
+  const { data: r, error: fetchError } = await supabase.from("requests").select("phase, amount").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
   if (fetchError) throw fetchError;
   if (!r) throw new Error("案件が見つかりません");
   if (["completed", "cancelled", "declined"].includes(r.phase)) throw new Error("この依頼はすでに終了しています");
+  if (!Number.isFinite(refundAmount) || refundAmount < 0 || refundAmount > r.amount) throw new Error("返金額が正しくありません");
 
-  const { data: policies } = await supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId);
-  const refund = computeRefund(r, policies ?? []);
   const now = new Date().toISOString();
-  const nextPhase = r.phase === "quoted" ? "declined" : "cancelled";
-
+  const pct = r.amount > 0 ? Math.round((refundAmount / r.amount) * 100) : 0;
   const { error } = await supabase
     .from("requests")
-    .update({ phase: nextPhase, cancelled_at: now, refund_pct: refund.pct, refunded_amount: refund.amount })
+    .update({ phase: "cancelled", cancelled_at: now, cancel_requested_at: null, refund_pct: pct, refunded_amount: refundAmount })
     .eq("id", requestId)
     .eq("org_id", ctx.orgId);
   if (error) throw error;
 
-  await postCaseNotice(
-    supabase,
-    requestId,
-    nextPhase === "declined" ? "受付が見積もりを見送りにしました" : `受付が対応を終了し、キャンセル扱いにしました（返金 ¥${refund.amount.toLocaleString("ja-JP")}）`,
-  );
-  return refund;
+  await postCaseNotice(supabase, requestId, `キャンセルが確定しました（返金 ¥${refundAmount.toLocaleString("ja-JP")}）`);
 }
 
 // 案件トーク（スタッフ内メモ・進捗ログ）への書き込み。削除は deleteMessage を共用する

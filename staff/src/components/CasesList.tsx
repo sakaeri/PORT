@@ -13,6 +13,8 @@ export interface CaseRow {
   amount: number;
   phase: RequestPhase;
   paid: boolean;
+  overdue: boolean;
+  cancelRequested: boolean;
   customerName: string;
   threadId: string | null;
   archived: boolean;
@@ -71,6 +73,16 @@ export default function CasesList({ rows: initialRows, canDelete }: { rows: Case
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lastMessagePreview ?? "まだ記録がありません"}</div>
             </Link>
             <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>¥{r.amount.toLocaleString("ja-JP")}</div>
+            {r.overdue && (
+              <div style={{ flex: "none", fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--stb-seal-ink)", color: "var(--stb-seal-ink)", whiteSpace: "nowrap" }}>
+                納期超過
+              </div>
+            )}
+            {r.cancelRequested && (
+              <div style={{ flex: "none", fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--stb-seal-ink)", color: "var(--stb-seal-ink)", whiteSpace: "nowrap" }}>
+                キャンセル申請中
+              </div>
+            )}
             <div style={{ flex: "none", fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)", whiteSpace: "nowrap" }}>
               {PHASE_LABEL[r.phase]}
             </div>

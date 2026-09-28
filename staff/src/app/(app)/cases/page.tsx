@@ -13,7 +13,7 @@ export default async function CasesPage() {
   const [{ data: requests, error }, { data: caseThreads, error: threadsError }, { data: summaries, error: summariesError }] = await Promise.all([
     supabase
       .from("requests")
-      .select("id, title, amount, phase, pay_status, created_at, customers(name)")
+      .select("id, title, amount, phase, pay_status, due_at, cancel_requested_at, created_at, customers(name)")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
     supabase.from("threads").select("id, request_id, archived_at").eq("org_id", ctx.orgId).eq("kind", "case"),
@@ -36,12 +36,15 @@ export default async function CasesPage() {
             staffSenderLabel(summary.last_message_sender_role),
           )
         : null;
+    const overdue = r.due_at != null && ["preparing", "started"].includes(r.phase) && new Date(r.due_at) < new Date();
     return {
       id: r.id,
       title: r.title,
       amount: r.amount,
       phase: r.phase,
       paid: r.pay_status === "paid",
+      overdue,
+      cancelRequested: r.cancel_requested_at != null,
       customerName: customer?.name ?? "—",
       threadId: thread?.id ?? null,
       archived: !!thread?.archived_at,

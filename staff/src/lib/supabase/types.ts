@@ -322,6 +322,7 @@ export interface Database {
           started_at: string | null;
           completed_at: string | null;
           cancelled_at: string | null;
+          cancel_requested_at: string | null;
           payment_timing: PaymentTiming;
           deposit_percent: number | null;
           deposit_amount: number | null;

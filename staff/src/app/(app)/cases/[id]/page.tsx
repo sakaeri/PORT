@@ -19,7 +19,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, customers(id, name), completion_reports(*), ratings(*)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, customers(id, name), completion_reports(*), ratings(*)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -67,6 +67,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         phase: request.phase,
         createdAt: request.created_at,
         dueAt: request.due_at,
+        cancelRequestedAt: request.cancel_requested_at,
         paidAt: request.paid_at,
         paymentTiming: request.payment_timing,
         depositPercent: request.deposit_percent,

@@ -300,16 +300,28 @@ export async function cancelRequest(requestId: string) {
   if (r.phase === "completed" || r.phase === "cancelled" || r.phase === "declined") {
     throw new Error("この依頼はすでに終了しています");
   }
+  if (r.cancel_requested_at) throw new Error("すでにキャンセルを申請済みです");
 
+  const now = new Date().toISOString();
+
+  // 見積もり段階（まだ入金前）は費用が発生していないため、その場で断ってよい。
+  if (r.phase === "quoted") {
+    await admin.from("requests").update({ phase: "declined", cancelled_at: now }).eq("id", requestId);
+    const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
+    if (caseThread) {
+      await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body: "依頼主が見積もりをキャンセルしました" });
+      await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
+    }
+    return;
+  }
+
+  // すでに入金が発生している段階は、その場で返金額を確定させない。
+  // 「キャンセル申請」として記録するだけにして、実際の返金額の確定と
+  // 依頼主への案内は事業主が内容を確認してから行う（自動実行はしない）。
   const policies = await getRefundPolicies(ctx.orgId);
   const refund = computeRefund(r, policies);
-  const now = new Date().toISOString();
-  const nextPhase = r.phase === "quoted" ? "declined" : "cancelled";
 
-  await admin
-    .from("requests")
-    .update({ phase: nextPhase, cancelled_at: now, refund_pct: refund.pct, refunded_amount: refund.amount })
-    .eq("id", requestId);
+  await admin.from("requests").update({ cancel_requested_at: now }).eq("id", requestId);
 
   const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
   if (caseThread) {
@@ -318,7 +330,7 @@ export async function cancelRequest(requestId: string) {
       sender_id: null,
       sender_role: null,
       kind: "notice",
-      body: nextPhase === "declined" ? "依頼主が見積もりをキャンセルしました" : `依頼主が依頼をキャンセルしました（返金 ${refund.amount.toLocaleString("ja-JP")}円）`,
+      body: `依頼主がキャンセルを申請しました（規定上の目安：¥${refund.amount.toLocaleString("ja-JP")}・要確認）`,
     });
     await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
   }

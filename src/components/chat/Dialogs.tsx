@@ -5,7 +5,7 @@ import { X, Timer } from "@phosphor-icons/react";
 import type { RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { stageInfoFor, statusBadgeFor, STAGE_LABELS } from "@/lib/stage";
-import { computeRefund, type RefundResult } from "@/lib/refund";
+import { computeRefund } from "@/lib/refund";
 import type { MenuRow } from "@/lib/chat-types";
 import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
@@ -75,7 +75,7 @@ export function ProgressPanel({
           {items.map(({ request: r, items: lineItems }) => {
               const badge = statusBadgeFor(r);
               const stage = stageInfoFor(r);
-              const canCancel = r.phase === "quoted" || ["preparing", "started"].includes(r.phase);
+              const canCancel = !r.cancel_requested_at && (r.phase === "quoted" || ["preparing", "started"].includes(r.phase));
               const refund = computeRefund(r, refundPolicies);
               return (
                 <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 9, padding: 13, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
@@ -104,7 +104,15 @@ export function ProgressPanel({
                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
                     <Timer size={13} />
                     <span style={{ minWidth: 0, flex: 1 }}>
-                      {r.phase === "completed" ? "完了しました" : r.phase === "declined" ? "費用は発生していません" : r.phase === "cancelled" ? `${yen(r.refunded_amount)} 返金済み` : lineItems[0]?.label ?? ""}
+                      {r.phase === "completed"
+                        ? "完了しました"
+                        : r.phase === "declined"
+                          ? "費用は発生していません"
+                          : r.phase === "cancelled"
+                            ? `${yen(r.refunded_amount)} 返金済み`
+                            : r.cancel_requested_at
+                              ? "キャンセルを申請中です（返金についてはご案内をお待ちください）"
+                              : lineItems[0]?.label ?? ""}
                     </span>
                     <span style={{ flex: "none" }}>{yen(r.amount)}</span>
                   </div>
@@ -129,11 +137,12 @@ export function ProgressPanel({
 }
 
 // ---------- キャンセルダイアログ ----------
-function cancelCopy(refund: RefundResult): { reason: string; confirmLabel: string } {
-  if (refund.mode === "nocharge") return { reason: "まだ決済前のため、費用は発生しません。この見積もりを断ります。", confirmLabel: "見積もりを断る" };
-  if (refund.stage === "terminate") return { reason: "お待たせしているため、全額返金の上キャンセルできます。", confirmLabel: "全額返金してキャンセル" };
-  if (refund.mode === "full") return { reason: "まだ制作に着手していないため、全額返金の上キャンセルできます。", confirmLabel: "全額返金してキャンセル" };
-  return { reason: "すでに対応が始まっているため、返金は決済額の50%になります。", confirmLabel: `${yen(refund.amount)} 返金してキャンセル` };
+// 見積もり段階（まだ入金前）はその場で断ってよいが、入金が発生している段階は
+// 金額をその場では確定させず「申請」に留める（事業主が内容を確認してから
+// 実際の返金額を確定する）。
+function cancelCopy(isQuoteStage: boolean): { reason: string; confirmLabel: string } {
+  if (isQuoteStage) return { reason: "まだ決済前のため、費用は発生しません。この見積もりを断ります。", confirmLabel: "見積もりを断る" };
+  return { reason: "内容を確認のうえ、返金についてこちらからご案内します。", confirmLabel: "キャンセルを申請する" };
 }
 
 export function CancelDialog({
@@ -149,18 +158,25 @@ export function CancelDialog({
   onConfirm: () => void;
   confirming: boolean;
 }) {
+  const isQuoteStage = bundle.request.phase === "quoted";
   const refund = computeRefund(bundle.request, refundPolicies);
-  const copy = cancelCopy(refund);
+  const copy = cancelCopy(isQuoteStage);
   return (
     <Centered onBackdrop={onClose}>
       <div style={dialogTitle}>依頼をキャンセルしますか？</div>
       <div style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.85 }}>{copy.reason}</div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "11px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-        <span style={{ flex: 1, fontSize: 12, color: "var(--color-neutral-500)" }}>返金額</span>
-        <span style={{ fontFamily: "var(--font-heading)", fontSize: 19 }}>{yen(refund.amount)}</span>
-        <span style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>/ {refund.paid ? `${yen(refund.paid)} 決済済み` : "未決済"}</span>
+      {!isQuoteStage && (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "11px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+          <span style={{ flex: 1, fontSize: 12, color: "var(--color-neutral-500)" }}>返金額の目安</span>
+          <span style={{ fontFamily: "var(--font-heading)", fontSize: 19 }}>{yen(refund.amount)}</span>
+          <span style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>/ {refund.paid ? `${yen(refund.paid)} 決済済み` : "未決済"}</span>
+        </div>
+      )}
+      <div style={{ fontSize: 11.5, lineHeight: 1.6, color: "var(--color-neutral-600)" }}>
+        {isQuoteStage
+          ? "返金規定：対応開始前は全額、対応開始後は50%、対応が大幅に遅れている場合は全額をお返しします。"
+          : "上の金額は規定に基づく目安です。実際の返金額は事業主が内容を確認のうえ確定し、あらためてご案内します。"}
       </div>
-      <div style={{ fontSize: 11.5, lineHeight: 1.6, color: "var(--color-neutral-600)" }}>返金規定：対応開始前は全額、対応開始後は50%、対応が大幅に遅れている場合は全額をお返しします。</div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
         <button onClick={onClose} style={ghostBtn}>依頼を続ける</button>
         <button onClick={onConfirm} disabled={confirming} style={{ ...accentBtn, opacity: confirming ? 0.6 : 1 }}>
