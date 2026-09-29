@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, ArrowSquareOut, Trash } from "@phosphor-icons/react";
+import { Plus, ArrowSquareOut, Trash, Lock, LockOpen } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
-import { createOrgAccount, deleteOrgForHq } from "@/app/actions";
+import { createOrgAccount, deleteOrgForHq, setOrgLockState } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
 interface Org {
@@ -55,6 +55,22 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{ displayName: string; slug: string; email: string; password: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  async function handleToggleLock(o: Org) {
+    if (togglingId) return;
+    const locking = o.plan_status !== "paused";
+    if (locking && !confirm(`「${o.display_name}」をロックします。ロック中は新しい依頼のやり取りができなくなります（閲覧は可能）。よろしいですか？`)) return;
+    setTogglingId(o.id);
+    try {
+      await setOrgLockState(o.id, locking);
+      setOrgs((rows) => rows.map((r) => (r.id === o.id ? { ...r, plan_status: locking ? "paused" : "active" } : r)));
+    } catch (e) {
+      alert(errorMessage(e, "変更できませんでした"));
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   async function handleDelete(o: Org) {
     if (deletingId) return;
@@ -86,7 +102,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
     try {
       const result = await createOrgAccount(form);
       setCreated({ displayName: form.display_name, slug: result.slug, email: form.owner_email, password: form.owner_password });
-      setOrgs((o) => [{ id: result.orgId, name: form.name, display_name: form.display_name, slug: result.slug, plan_status: "trial", created_at: new Date().toISOString() }, ...o]);
+      setOrgs((o) => [{ id: result.orgId, name: form.name, display_name: form.display_name, slug: result.slug, plan_status: "active", created_at: new Date().toISOString() }, ...o]);
       setForm(EMPTY_ORG_FORM);
       setSlugTouched(false);
       setShowForm(false);
@@ -155,12 +171,21 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
               <div style={{ fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.display_name}</div>
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{o.slug ? `/${o.slug}` : "URLの合言葉が未設定"}</div>
             </div>
-            <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>{PLAN_LABEL[o.plan_status] ?? o.plan_status}</div>
+            <div style={{ flex: "none", fontSize: 11.5, color: o.plan_status === "paused" ? "var(--stb-seal-ink)" : "var(--color-neutral-500)" }}>{PLAN_LABEL[o.plan_status] ?? o.plan_status}</div>
             {o.slug && (
               <a href={`https://port.s-stylegolf.com/${o.slug}`} target="_blank" rel="noreferrer" style={{ flex: "none", display: "flex", color: "var(--color-neutral-400)" }} aria-label="サイトを開く">
                 <ArrowSquareOut size={15} />
               </a>
             )}
+            <button
+              onClick={() => handleToggleLock(o)}
+              disabled={togglingId === o.id}
+              aria-label={o.plan_status === "paused" ? "ロック解除" : "ロックする"}
+              title={o.plan_status === "paused" ? "ロック解除" : "未払いなどでロックする"}
+              style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: o.plan_status === "paused" ? "var(--stb-seal-ink)" : "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+            >
+              {o.plan_status === "paused" ? <LockOpen size={13} /> : <Lock size={13} />}
+            </button>
             <button
               onClick={() => handleDelete(o)}
               disabled={deletingId === o.id}

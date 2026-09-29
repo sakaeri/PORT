@@ -391,9 +391,10 @@ function validateSlug(rawSlug: string) {
 
 // 事業者の行＋既定のキャンセル/返金ポリシーを作るだけの部分。オーナーの
 // ログインをどう用意するか（新規作成 or 今のログインに追加）は呼び出し側で分ける。
-// referredByUserId が入っていれば紹介経由として扱い、トライアルを90日にする
-// （通常は30日）。
-async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createServiceRoleClient>, referredByUserId?: string | null) {
+// 人間秘書の契約が決まってから本部が作るアカウントなので、無料トライアルは
+// 挟まず最初から契約中（active）として作る。支払いが滞ったら本部が
+// setOrgLockState で手動でロックする。
+async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createServiceRoleClient>) {
   const slug = validateSlug(fields.slug);
   if (!fields.display_name.trim()) {
     throw new Error("表示名は必須です");
@@ -405,7 +406,6 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
   const { data: existing } = await admin.from("organizations").select("id").eq("slug", slug).maybeSingle();
   if (existing) throw new Error("このURLの合言葉はすでに使われています");
 
-  const trialDays = referredByUserId ? 90 : 30;
   const { data: org, error: orgErr } = await admin
     .from("organizations")
     .insert({
@@ -416,9 +416,7 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
       email: fields.email.trim() || null,
       slug,
       solo: true,
-      plan_status: "trial",
-      trial_ends_on: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-      referred_by_user_id: referredByUserId ?? null,
+      plan_status: "active",
     })
     .select("id")
     .single();
@@ -436,7 +434,7 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
   return { orgId: org.id as string, slug };
 }
 
-async function createOrgCore(fields: OrgAccountFields, referredByUserId?: string | null) {
+async function createOrgCore(fields: OrgAccountFields) {
   if (fields.owner_password.length < 8) {
     throw new Error("パスワードは8文字以上にしてください");
   }
@@ -456,10 +454,9 @@ async function createOrgCore(fields: OrgAccountFields, referredByUserId?: string
   }
   const userId = userRes.user.id;
 
-  // セルフサインアップでは連絡用メールアドレスの入力欄自体を出していない
-  // ため、空欄ならログインメールアドレスをそのまま代わりに使う（Stripeの
-  // 領収書送付先にもなる）。あとから会社情報タブで正式なものに直せる。
-  // 正式名称の表示名からのフォールバックは createOrgRow 側で行う。
+  // 連絡用メールアドレスが空欄なら、ログインメールアドレスをそのまま代わりに
+  // 使う（Stripeの領収書送付先にもなる）。あとから会社情報タブで正式な
+  // ものに直せる。正式名称の表示名からのフォールバックは createOrgRow 側で行う。
   const orgFields = {
     ...fields,
     email: fields.email.trim() || fields.owner_email.trim(),
@@ -467,7 +464,7 @@ async function createOrgCore(fields: OrgAccountFields, referredByUserId?: string
 
   let result: { orgId: string; slug: string };
   try {
-    result = await createOrgRow(orgFields, admin, referredByUserId);
+    result = await createOrgRow(orgFields, admin);
   } catch (e) {
     await admin.auth.admin.deleteUser(userId);
     throw e;
@@ -586,6 +583,20 @@ export async function deleteOrgForHq(orgId: string) {
 
   if (primaryProfile) await admin.auth.admin.deleteUser(primaryProfile.id);
   await clearStaffOrgCookieIfCurrent(orgId);
+}
+
+// マネージャー（FC）からのロイヤリティ等の未払いを、本部が手動でロック/解除する。
+// 自動トライアル失効の代わりに、この手動フラグだけで isLocked を制御する
+// （getStaffContext の isLocked 判定は元々 plan_status を見ているので、
+// ここでは active⇄paused を切り替えるだけでよい）。
+export async function setOrgLockState(orgId: string, locked: boolean) {
+  await requireHq();
+  const admin = createServiceRoleClient();
+  const { error } = await admin
+    .from("organizations")
+    .update({ plan_status: locked ? "paused" : "active" })
+    .eq("id", orgId);
+  if (error) throw error;
 }
 
 // 「自分のログインで追加した窓口」をセルフサービスで削除する。今のログイン
