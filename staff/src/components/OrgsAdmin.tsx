@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, ArrowSquareOut, Trash, Lock, LockOpen } from "@phosphor-icons/react";
+import { Plus, ArrowSquareOut, Trash, Lock, LockOpen, CaretDown, CaretRight, Star } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
-import { createOrgAccount, deleteOrgForHq, setOrgLockState } from "@/app/actions";
+import { createOrgAccount, deleteOrgForHq, setOrgLockState, setOrgRoyaltyPct, markHqFeedbackRead } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
+
+interface Feedback {
+  id: string;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+}
 
 interface Org {
   id: string;
@@ -13,6 +20,11 @@ interface Org {
   display_name: string;
   slug: string | null;
   plan_status: string;
+  royalty_pct: number | null;
+  monthRevenue: number;
+  avgRating: number | null;
+  ratingCount: number;
+  feedback: Feedback[];
   created_at: string;
 }
 
@@ -56,6 +68,46 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
   const [created, setCreated] = useState<{ displayName: string; slug: string; email: string; password: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [royaltyDraft, setRoyaltyDraft] = useState<Record<string, string>>({});
+  const [savingRoyaltyId, setSavingRoyaltyId] = useState<string | null>(null);
+  const [markingId, setMarkingId] = useState<string | null>(null);
+
+  async function handleSaveRoyalty(o: Org) {
+    if (savingRoyaltyId) return;
+    const raw = royaltyDraft[o.id];
+    const pct = raw === undefined || raw.trim() === "" ? null : Number(raw);
+    if (pct != null && (Number.isNaN(pct) || pct < 0 || pct > 100)) {
+      alert("0〜100の範囲で入力してください");
+      return;
+    }
+    setSavingRoyaltyId(o.id);
+    try {
+      await setOrgRoyaltyPct(o.id, pct);
+      setOrgs((rows) => rows.map((r) => (r.id === o.id ? { ...r, royalty_pct: pct } : r)));
+    } catch (e) {
+      alert(errorMessage(e, "変更できませんでした"));
+    } finally {
+      setSavingRoyaltyId(null);
+    }
+  }
+
+  async function handleMarkFeedbackRead(orgId: string, feedbackId: string) {
+    if (markingId) return;
+    setMarkingId(feedbackId);
+    try {
+      await markHqFeedbackRead(feedbackId);
+      setOrgs((rows) =>
+        rows.map((r) =>
+          r.id === orgId ? { ...r, feedback: r.feedback.map((f) => (f.id === feedbackId ? { ...f, read_at: new Date().toISOString() } : f)) } : r,
+        ),
+      );
+    } catch (e) {
+      alert(errorMessage(e, "変更できませんでした"));
+    } finally {
+      setMarkingId(null);
+    }
+  }
 
   async function handleToggleLock(o: Org) {
     if (togglingId) return;
@@ -102,7 +154,22 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
     try {
       const result = await createOrgAccount(form);
       setCreated({ displayName: form.display_name, slug: result.slug, email: form.owner_email, password: form.owner_password });
-      setOrgs((o) => [{ id: result.orgId, name: form.name, display_name: form.display_name, slug: result.slug, plan_status: "active", created_at: new Date().toISOString() }, ...o]);
+      setOrgs((o) => [
+        {
+          id: result.orgId,
+          name: form.name,
+          display_name: form.display_name,
+          slug: result.slug,
+          plan_status: "active",
+          royalty_pct: null,
+          monthRevenue: 0,
+          avgRating: null,
+          ratingCount: 0,
+          feedback: [],
+          created_at: new Date().toISOString(),
+        },
+        ...o,
+      ]);
       setForm(EMPTY_ORG_FORM);
       setSlugTouched(false);
       setShowForm(false);
@@ -165,37 +232,113 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
         {orgs.length === 0 && !loadError && (
           <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ登録事業者がいません。</div>
         )}
-        {orgs.map((o) => (
-          <div key={o.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.display_name}</div>
-              <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{o.slug ? `/${o.slug}` : "URLの合言葉が未設定"}</div>
+        {orgs.map((o) => {
+          const expanded = expandedId === o.id;
+          const unreadFeedback = o.feedback.filter((f) => !f.read_at).length;
+          const royaltyAmount = o.royalty_pct != null ? Math.round((o.monthRevenue * o.royalty_pct) / 100) : null;
+          return (
+            <div key={o.id} style={{ borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
+                <button
+                  onClick={() => setExpandedId(expanded ? null : o.id)}
+                  aria-label="詳細"
+                  style={{ flex: "none", display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}
+                >
+                  {expanded ? <CaretDown size={14} /> : <CaretRight size={14} />}
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.display_name}</div>
+                    {unreadFeedback > 0 && (
+                      <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: "var(--radius-sm)", padding: "1.5px 6px" }}>
+                        意見{unreadFeedback}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{o.slug ? `/${o.slug}` : "URLの合言葉が未設定"}</div>
+                </div>
+                <div style={{ flex: "none", fontSize: 11.5, color: o.plan_status === "paused" ? "var(--stb-seal-ink)" : "var(--color-neutral-500)" }}>{PLAN_LABEL[o.plan_status] ?? o.plan_status}</div>
+                {o.slug && (
+                  <a href={`https://port.s-stylegolf.com/${o.slug}`} target="_blank" rel="noreferrer" style={{ flex: "none", display: "flex", color: "var(--color-neutral-400)" }} aria-label="サイトを開く">
+                    <ArrowSquareOut size={15} />
+                  </a>
+                )}
+                <button
+                  onClick={() => handleToggleLock(o)}
+                  disabled={togglingId === o.id}
+                  aria-label={o.plan_status === "paused" ? "ロック解除" : "ロックする"}
+                  title={o.plan_status === "paused" ? "ロック解除" : "未払いなどでロックする"}
+                  style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: o.plan_status === "paused" ? "var(--stb-seal-ink)" : "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+                >
+                  {o.plan_status === "paused" ? <LockOpen size={13} /> : <Lock size={13} />}
+                </button>
+                <button
+                  onClick={() => handleDelete(o)}
+                  disabled={deletingId === o.id}
+                  aria-label="削除"
+                  style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+                >
+                  <Trash size={13} />
+                </button>
+              </div>
+
+              {expanded && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 14px 14px", borderTop: "1px solid var(--color-divider)", marginTop: 2, paddingTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>ロイヤリティ率</span>
+                    <input
+                      value={royaltyDraft[o.id] ?? (o.royalty_pct != null ? String(o.royalty_pct) : "")}
+                      onChange={(e) => setRoyaltyDraft((d) => ({ ...d, [o.id]: e.target.value }))}
+                      placeholder="未設定"
+                      inputMode="numeric"
+                      style={{ width: 56, height: 30, padding: "4px 8px", fontSize: 12.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
+                    />
+                    <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>%</span>
+                    <button onClick={() => handleSaveRoyalty(o)} disabled={savingRoyaltyId === o.id} style={{ ...smallBtn, height: 30, padding: "0 10px" }}>
+                      保存
+                    </button>
+                    {royaltyAmount != null && (
+                      <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
+                        今月の売上 ¥{o.monthRevenue.toLocaleString("ja-JP")}（ロイヤリティ ¥{royaltyAmount.toLocaleString("ja-JP")}）
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-500)" }}>
+                    <Star size={13} weight={o.avgRating != null ? "fill" : "regular"} style={{ color: "var(--color-accent)" }} />
+                    {o.avgRating != null ? (
+                      <span>
+                        直近90日の評価：{o.avgRating.toFixed(1)}（{o.ratingCount}件）
+                      </span>
+                    ) : (
+                      <span>直近90日の評価はまだありません</span>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>ご意見・ご要望</span>
+                    {o.feedback.length === 0 && <span style={{ fontSize: 12, color: "var(--color-neutral-600)" }}>まだありません</span>}
+                    {o.feedback.map((f) => (
+                      <div key={f.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", opacity: f.read_at ? 0.6 : 1 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{f.body}</div>
+                          <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)", marginTop: 2 }}>
+                            {new Date(f.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                        </div>
+                        {!f.read_at && (
+                          <button onClick={() => handleMarkFeedbackRead(o.id, f.id)} disabled={markingId === f.id} style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                            既読にする
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            <div style={{ flex: "none", fontSize: 11.5, color: o.plan_status === "paused" ? "var(--stb-seal-ink)" : "var(--color-neutral-500)" }}>{PLAN_LABEL[o.plan_status] ?? o.plan_status}</div>
-            {o.slug && (
-              <a href={`https://port.s-stylegolf.com/${o.slug}`} target="_blank" rel="noreferrer" style={{ flex: "none", display: "flex", color: "var(--color-neutral-400)" }} aria-label="サイトを開く">
-                <ArrowSquareOut size={15} />
-              </a>
-            )}
-            <button
-              onClick={() => handleToggleLock(o)}
-              disabled={togglingId === o.id}
-              aria-label={o.plan_status === "paused" ? "ロック解除" : "ロックする"}
-              title={o.plan_status === "paused" ? "ロック解除" : "未払いなどでロックする"}
-              style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: o.plan_status === "paused" ? "var(--stb-seal-ink)" : "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-            >
-              {o.plan_status === "paused" ? <LockOpen size={13} /> : <Lock size={13} />}
-            </button>
-            <button
-              onClick={() => handleDelete(o)}
-              disabled={deletingId === o.id}
-              aria-label="削除"
-              style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-            >
-              <Trash size={13} />
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

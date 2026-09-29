@@ -327,6 +327,19 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["referral_leads"]["Row"]>;
         Relationships: [];
       };
+      hq_feedback: {
+        Row: {
+          id: string;
+          org_id: string;
+          customer_id: string;
+          body: string;
+          created_at: string;
+          read_at: string | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["hq_feedback"]["Row"]> & { org_id: string; customer_id: string; body: string };
+        Update: Partial<Database["public"]["Tables"]["hq_feedback"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

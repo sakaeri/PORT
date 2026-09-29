@@ -100,6 +100,7 @@ export interface Database {
           is_hq: boolean;
           card_payment_enabled: boolean;
           bank_transfer_info: BankTransferInfo;
+          royalty_pct: number | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["organizations"]["Row"]>;
@@ -498,6 +499,19 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["referral_credits"]["Row"]> & { referrer_user_id: string; referrer_org_id: string; referred_org_id: string };
         Update: Partial<Database["public"]["Tables"]["referral_credits"]["Row"]>;
+        Relationships: [];
+      };
+      hq_feedback: {
+        Row: {
+          id: string;
+          org_id: string;
+          customer_id: string;
+          body: string;
+          created_at: string;
+          read_at: string | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["hq_feedback"]["Row"]> & { org_id: string; customer_id: string; body: string };
+        Update: Partial<Database["public"]["Tables"]["hq_feedback"]["Row"]>;
         Relationships: [];
       };
       staff_org_links: {

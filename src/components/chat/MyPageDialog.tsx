@@ -4,7 +4,7 @@ import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
 import type { VaultRow } from "@/lib/chat-types";
-import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange } from "@/app/actions";
+import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, sendHqFeedback } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 import LoginPanel from "@/components/chat/LoginPanel";
 import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
@@ -94,6 +94,26 @@ export default function MyPageDialog({
   const [emSaving, setEmSaving] = useState(false);
 
   const [vaultRows, setVaultRows] = useState(vault.map((v) => ({ ...v })));
+
+  const [fbOpen, setFbOpen] = useState(false);
+  const [fbText, setFbText] = useState("");
+  const [fbSending, setFbSending] = useState(false);
+  const [fbSent, setFbSent] = useState(false);
+
+  async function sendFeedback() {
+    if (!fbText.trim() || fbSending) return;
+    setFbSending(true);
+    try {
+      await sendHqFeedback(fbText.trim());
+      setFbText("");
+      setFbSent(true);
+      setFbOpen(false);
+    } catch {
+      /* 送信失敗時は開いたままにして、そのまま再送できるようにする */
+    } finally {
+      setFbSending(false);
+    }
+  }
 
   const [authView, setAuthView] = useState<"none" | "login" | "create">("none");
 
@@ -387,6 +407,38 @@ export default function MyPageDialog({
             )}
               </>
             )}
+
+            {/* 担当マネージャーには見えない、本部への直接のご意見・ご要望 */}
+            <div style={{ paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>
+              {!fbOpen ? (
+                <button
+                  onClick={() => { setFbOpen(true); setFbSent(false); }}
+                  style={{ fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                >
+                  ご意見・ご要望はこちら
+                </button>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>担当者には共有されず、運営に直接届きます</span>
+                  <textarea
+                    value={fbText}
+                    onChange={(e) => setFbText(e.target.value)}
+                    rows={3}
+                    className="vid-textarea"
+                    style={{ width: "100%", resize: "vertical", padding: "8px 10px", font: "inherit", fontSize: 13.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                    <button onClick={() => setFbOpen(false)} style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                      閉じる
+                    </button>
+                    <button onClick={sendFeedback} disabled={fbSending || !fbText.trim()} style={{ height: 32, padding: "0 14px", cursor: "pointer", fontSize: 12, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: fbSending ? 0.6 : 1 }}>
+                      {fbSending ? "送信中…" : "送信"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {fbSent && <span style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>送信しました</span>}
+            </div>
           </div>
         </div>
       </div>

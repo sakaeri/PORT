@@ -599,6 +599,23 @@ export async function setOrgLockState(orgId: string, locked: boolean) {
   if (error) throw error;
 }
 
+// マネージャー（FC加盟店）から本部が取るロイヤリティの率。nullなら対象外。
+export async function setOrgRoyaltyPct(orgId: string, pct: number | null) {
+  await requireHq();
+  if (pct != null && (pct < 0 || pct > 100)) throw new Error("0〜100の範囲で入力してください");
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("organizations").update({ royalty_pct: pct }).eq("id", orgId);
+  if (error) throw error;
+}
+
+// 依頼主から本部への「ご意見・ご要望」を既読にする。
+export async function markHqFeedbackRead(feedbackId: string) {
+  await requireHq();
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("hq_feedback").update({ read_at: new Date().toISOString() }).eq("id", feedbackId);
+  if (error) throw error;
+}
+
 // 「自分のログインで追加した窓口」をセルフサービスで削除する。今のログイン
 // の本来の事業者（primary）は対象外（削除するとそのログイン自体が
 // プロフィールを失って詰む）。staff_org_links 経由で追加した分だけ許可。

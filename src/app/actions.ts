@@ -302,3 +302,15 @@ export async function cancelRequest(requestId: string) {
   }
 }
 
+// 担当マネージャーには見えない、本部直通の「ご意見・ご要望」。普段の
+// トークとは別のテーブル（hq_feedback）に入れるだけで、通常のスレッドには
+// 一切残さない。
+export async function sendHqFeedback(body: string) {
+  const ctx = await requireContext();
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error("内容を入力してください");
+  const supabase = await createClient();
+  const { error } = await supabase.from("hq_feedback").insert({ org_id: ctx.orgId, customer_id: ctx.customerId, body: trimmed });
+  if (error) throw error;
+}
+
