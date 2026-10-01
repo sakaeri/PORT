@@ -1,10 +1,16 @@
 -- チャージ残高での支払いを案件の正式な支払いタイミングとして追加する。
--- 依頼主が見積もりカードから直接「残高から支払う」を押すと、支払いと
--- 着手が同時に完了する（スタッフの入金確認を待たない）。
+-- 依頼主が見積もりカードから直接「残高から支払う」を押すと支払いが確定するが、
+-- 着手（phase='started'・started_at）はスタッフ／担当者が別途「着手する」を
+-- 押すまで行わない。他の支払い方法と違い、ここはお金のやり取りに人の目を
+-- 挟まないぶん、実際に手を動かし始めるタイミングは引き続き人（スタッフ）が
+-- 決める。支払い直後は既存の「preparing（承諾済み・着手前）」フェーズに
+-- 入るだけなので、スタッフ側の案件詳細に元々ある「着手する」ボタンが
+-- そのまま使える。時間精算案件では、この着手の瞬間こそが課金の起点になる
+-- ため、支払い完了と着手を分けることは料金計算の正確さにも直結する。
 alter type payment_timing add value if not exists 'balance';
 
 -- 残高からの支払い。二重消費を防ぐため、依頼主の残高行をロックしてから
--- チェック・差し引き・案件の着手処理までを1つのトランザクションで行う。
+-- チェック・差し引き・案件のフェーズ更新までを1つのトランザクションで行う。
 -- auth.uid() が実際にこの依頼の依頼主本人であることをここで検証するので、
 -- 呼び出し側（依頼主アプリ）は request_id を渡すだけでよい。
 create or replace function pay_request_from_balance(p_request_id uuid) returns void
@@ -13,7 +19,6 @@ declare
   v_customer_id uuid;
   v_org_id uuid;
   v_amount integer;
-  v_lead_hours integer;
   v_balance integer;
   v_now timestamptz := now();
 begin
@@ -25,7 +30,7 @@ begin
   -- 残高行をロックして、同時に2回支払われることを防ぐ。
   select balance into v_balance from customers where id = v_customer_id for update;
 
-  select amount, lead_hours, org_id into v_amount, v_lead_hours, v_org_id
+  select amount, org_id into v_amount, v_org_id
   from requests
   where id = p_request_id and customer_id = v_customer_id and phase = 'quoted' and payment_timing = 'balance'
   for update;
@@ -41,12 +46,11 @@ begin
   insert into customer_balance_transactions (customer_id, org_id, amount, kind, request_id)
   values (v_customer_id, v_org_id, -v_amount, 'deduction', p_request_id);
 
+  -- 着手はここでは行わない（スタッフ側の「着手する」待ち）。
   update requests
   set
-    phase = 'started',
-    started_at = v_now,
+    phase = 'preparing',
     accepted_at = v_now,
-    due_at = case when v_lead_hours is not null then v_now + (v_lead_hours || ' hours')::interval else null end,
     pay_status = 'paid',
     paid_at = v_now
   where id = p_request_id;

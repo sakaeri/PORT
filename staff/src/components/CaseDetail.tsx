@@ -283,7 +283,7 @@ export default function CaseDetail({
             )}
             {request.paymentTiming === "balance" && (
               <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
-                依頼主がチャージ残高から直接お支払いいただくと、自動で着手になります。
+                依頼主がチャージ残高から直接お支払いいただくと、着手待ち（準備中）になります。着手はこの後、担当者が「着手する」を押して開始してください。
               </div>
             )}
           </div>
