@@ -166,6 +166,7 @@ export interface Database {
           member_no: string | null;
           creator_id: string | null;
           active: boolean;
+          balance: number;
           converted_org_id: string | null;
           created_at: string;
         };
@@ -512,6 +513,26 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["hq_feedback"]["Row"]> & { org_id: string; customer_id: string; body: string };
         Update: Partial<Database["public"]["Tables"]["hq_feedback"]["Row"]>;
+        Relationships: [];
+      };
+      customer_balance_transactions: {
+        Row: {
+          id: string;
+          customer_id: string;
+          org_id: string;
+          amount: number;
+          kind: "charge" | "deduction" | "refund_credit";
+          request_id: string | null;
+          stripe_checkout_session_id: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["customer_balance_transactions"]["Row"]> & {
+          customer_id: string;
+          org_id: string;
+          amount: number;
+          kind: "charge" | "deduction" | "refund_credit";
+        };
+        Update: Partial<Database["public"]["Tables"]["customer_balance_transactions"]["Row"]>;
         Relationships: [];
       };
       staff_org_links: {

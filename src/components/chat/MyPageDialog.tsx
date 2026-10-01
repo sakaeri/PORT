@@ -4,7 +4,7 @@ import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
 import type { VaultRow } from "@/lib/chat-types";
-import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, sendHqFeedback } from "@/app/actions";
+import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, sendHqFeedback, startBalanceCharge } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 import LoginPanel from "@/components/chat/LoginPanel";
 import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
@@ -59,6 +59,7 @@ export default function MyPageDialog({
   isDark,
   onToggleTheme,
   onClose,
+  balance,
 }: {
   userId: string;
   memberNo: string | null;
@@ -74,6 +75,7 @@ export default function MyPageDialog({
   isDark: boolean;
   onToggleTheme: () => void;
   onClose: () => void;
+  balance: number;
 }) {
   const [name, setName] = useState(customerName);
   const nameIsPlaceholder = name === NAME_PLACEHOLDER;
@@ -99,6 +101,25 @@ export default function MyPageDialog({
   const [fbText, setFbText] = useState("");
   const [fbSending, setFbSending] = useState(false);
   const [fbSent, setFbSent] = useState(false);
+
+  const CHARGE_AMOUNTS = [10000, 30000, 50000, 100000];
+  const [chargeOpen, setChargeOpen] = useState(false);
+  const [chargeAmount, setChargeAmount] = useState(CHARGE_AMOUNTS[0]);
+  const [chargeStarting, setChargeStarting] = useState(false);
+  const [chargeError, setChargeError] = useState("");
+
+  async function startCharge() {
+    if (chargeStarting) return;
+    setChargeStarting(true);
+    setChargeError("");
+    try {
+      const url = await startBalanceCharge(chargeAmount);
+      window.location.href = url;
+    } catch (e) {
+      setChargeError(errorMessage(e, "決済ページを開けませんでした"));
+      setChargeStarting(false);
+    }
+  }
 
   async function sendFeedback() {
     if (!fbText.trim() || fbSending) return;
@@ -202,6 +223,51 @@ export default function MyPageDialog({
                 <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>{memberNo ?? "—"}</span>
               </div>
             )}
+
+            {/* チャージ残高 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>残高</span>
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: 18 }}>¥{balance.toLocaleString("ja-JP")}</span>
+              </div>
+              {!chargeOpen ? (
+                <button onClick={() => setChargeOpen(true)} style={{ ...smallBtn, alignSelf: "flex-start" }}>
+                  チャージする
+                </button>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {CHARGE_AMOUNTS.map((a) => (
+                      <button
+                        key={a}
+                        onClick={() => setChargeAmount(a)}
+                        style={{
+                          height: 32,
+                          padding: "0 12px",
+                          cursor: "pointer",
+                          fontSize: 12.5,
+                          color: chargeAmount === a ? "var(--color-accent-100)" : "var(--color-accent)",
+                          background: chargeAmount === a ? "var(--color-accent-900)" : "transparent",
+                          border: "1px solid var(--color-accent)",
+                          borderRadius: "var(--radius-md)",
+                        }}
+                      >
+                        ¥{a.toLocaleString("ja-JP")}
+                      </button>
+                    ))}
+                  </div>
+                  {chargeError && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{chargeError}</span>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setChargeOpen(false)} style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                      閉じる
+                    </button>
+                    <button onClick={startCharge} disabled={chargeStarting} style={{ height: 32, padding: "0 14px", cursor: "pointer", fontSize: 12, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: chargeStarting ? 0.6 : 1 }}>
+                      {chargeStarting ? "処理中…" : `¥${chargeAmount.toLocaleString("ja-JP")}をチャージ`}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* 画面の色合い */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

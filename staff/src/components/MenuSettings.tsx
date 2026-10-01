@@ -68,7 +68,6 @@ import {
   addIntakeField,
   updateIntakeField,
   deleteIntakeField,
-  updateRefundPolicy,
 } from "@/app/actions";
 import type { BankTransferInfo, RefundMode, RefundStage } from "@/lib/supabase/types";
 
@@ -363,7 +362,7 @@ export default function MenuSettings({
       )}
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
-      {tab === "refund" && <RefundPolicyCard orgId={orgId} initialPolicy={initialRefundPolicy} canEdit={canEdit} />}
+      {tab === "refund" && <RefundPolicyCard initialPolicy={initialRefundPolicy} />}
       {tab === "login" && <LoginInfoCard initialEmail={initialLoginEmail} />}
     </div>
   );
@@ -1251,103 +1250,26 @@ function refundModeLabel(mode: RefundMode, pct: number): string {
   return mode === "partial" ? `${base}（${pct}%）` : base;
 }
 
-function RefundPolicyCard({ orgId, initialPolicy, canEdit }: { orgId: string; initialPolicy: RefundPolicyRow[]; canEdit: boolean }) {
-  const makeRows = () =>
-    REFUND_STAGES.map((s) => {
-      const found = initialPolicy.find((p) => p.stage === s.key);
-      return { ...s, mode: found?.mode ?? ("none" as RefundMode), pct: found?.pct ?? 0 };
-    });
-  const [saved, setSaved] = useState(makeRows);
-  const [rows, setRows] = useState(saved);
-  const [editing, setEditing] = useState(false);
-
-  function patch(i: number, p: Partial<{ mode: RefundMode; pct: number }>) {
-    setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...p } : row)));
-  }
-
-  async function commit(row: (typeof rows)[number]) {
-    await updateRefundPolicy(orgId, row.key, row.mode, row.pct);
-    setSaved((r) => r.map((s) => (s.key === row.key ? row : s)));
-  }
+// キャンセル・返金は固定ルール（着手後は原則返金なし。例外は未着手と著しい
+// 遅延の2つだけ全額）になったため、事業者ごとに%を変更する画面はもう無い。
+// ここは今のルールを確認するための説明だけの表示。
+function RefundPolicyCard({ initialPolicy }: { initialPolicy: RefundPolicyRow[] }) {
+  const rows = REFUND_STAGES.map((s) => {
+    const found = initialPolicy.find((p) => p.stage === s.key);
+    return { ...s, mode: found?.mode ?? ("none" as RefundMode), pct: found?.pct ?? 0 };
+  });
 
   return (
     <div style={card}>
-      <CardHeader
-        title="キャンセル・返金ポリシー"
-        info="段階は依頼の進み方で決まるため固定です。受付が決めるのは、それぞれの段階の返金の扱いと割合だけです。"
-        editing={editing}
-        onEdit={() => { setRows(saved); setEditing(true); }}
-        canEdit={canEdit}
-      />
-
-      {!editing ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {saved.map((r) => (
-            <InfoRow key={r.key} label={r.label} value={refundModeLabel(r.mode, r.pct)} labelWidth={168} />
-          ))}
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {rows.map((r, i) => (
-              <div
-                key={r.key}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  padding: "12px 14px",
-                  borderRadius: "var(--radius-md)",
-                  background: "var(--color-neutral-800)",
-                  border: "1px solid var(--color-divider)",
-                }}
-              >
-                <div style={{ minWidth: 180, flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ fontSize: 12.5 }}>{r.label}</span>
-                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>{r.when}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "none" }}>
-                  <select
-                    value={r.mode}
-                    onChange={(e) => { const mode = e.target.value as RefundMode; patch(i, { mode }); commit({ ...r, mode }); }}
-                    className="vid-input"
-                    style={{ ...input, width: 140, height: 34 }}
-                  >
-                    {REFUND_MODES.map((m) => (
-                      <option key={m.value} value={m.value}>{m.label}</option>
-                    ))}
-                  </select>
-                  {r.mode === "partial" && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <input
-                        type="number"
-                        value={r.pct}
-                        onChange={(e) => patch(i, { pct: Number(e.target.value) })}
-                        onBlur={() => commit(rows[i])}
-                        className="vid-input"
-                        style={{ ...input, width: 60, height: 34 }}
-                      />
-                      <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>%</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: "flex", gap: 9, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-neutral-800)", border: "1px solid var(--color-divider)" }}>
-            <div style={{ minWidth: 0, fontSize: 11.5, color: "var(--color-neutral-400)", lineHeight: 1.6 }}>
-              「着手」の定義：受付が対象の案件で「着手する」を押した時点です。押していなければ未着手として扱われ、キャンセル時は原則全額返金になります。
-            </div>
-          </div>
-
-          <button onClick={() => setEditing(false)} style={{ ...smallBtn, height: 36, alignSelf: "flex-start", color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-            閉じる
-          </button>
-        </>
-      )}
+      <CardHeader title="キャンセル・返金ポリシー" info="着手後は実働が発生しているため、原則返金しません。未着手のキャンセルと、著しい遅延など本部側の責任による場合だけ全額返金します。" editing={false} onEdit={() => {}} canEdit={false} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {rows.map((r) => (
+          <InfoRow key={r.key} label={r.label} value={refundModeLabel(r.mode, r.pct)} labelWidth={168} />
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+        これ以外の個別の事情（本部側の不手際など）での返金は、キャンセル処理の画面から金額を手入力して個別に対応できます。
+      </div>
     </div>
   );
 }

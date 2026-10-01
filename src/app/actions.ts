@@ -5,6 +5,7 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getCustomerContext, getRefundPolicies } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
 import { notifyNewInquiryIfFirst } from "@/lib/notify";
+import { getStripe } from "@/lib/stripe";
 
 async function requireContext() {
   const ctx = await getCustomerContext();
@@ -300,6 +301,41 @@ export async function cancelRequest(requestId: string) {
     });
     await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
   }
+}
+
+// チャージ残高の入金。Stripeのホスト型Checkoutページへ飛ばし、支払い完了は
+// Webhook（route.ts）側で検知して残高に反映する。ここでは決済ページのURLを
+// 用意するだけで、残高はまだ一切動かさない（決済が実際に成立するまで反映
+// しないことで、二重加算や未払いの加算を防ぐ）。
+export async function startBalanceCharge(amountYen: number): Promise<string> {
+  const ctx = await requireContext();
+  if (!Number.isInteger(amountYen) || amountYen < 1000) throw new Error("チャージ額は1,000円以上で指定してください");
+
+  const h = await headers();
+  const host = h.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  const origin = `${protocol}://${host}`;
+
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    payment_method_types: ["card"],
+    line_items: [
+      {
+        price_data: {
+          currency: "jpy",
+          unit_amount: amountYen,
+          product_data: { name: "チャージ" },
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: { customer_id: ctx.customerId, org_id: ctx.orgId },
+    success_url: `${origin}/?charge=success`,
+    cancel_url: `${origin}/?charge=cancel`,
+  });
+  if (!session.url) throw new Error("決済ページを作成できませんでした");
+  return session.url;
 }
 
 // 担当マネージャーには見えない、本部直通の「ご意見・ご要望」。普段の

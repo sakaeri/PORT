@@ -306,6 +306,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
           isDark={isDark}
           onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}
+          balance={ctx.balance}
         />
       )}
     </div>

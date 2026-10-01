@@ -42,7 +42,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
   let customer = (
     await supabase
       .from("customers")
-      .select("id, org_id, name, member_no")
+      .select("id, org_id, name, member_no, balance")
       .eq("profile_id", auth.user.id)
       .eq("org_id", orgId)
       .maybeSingle()
@@ -57,7 +57,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     customer = (
       await supabase
         .from("customers")
-        .select("id, org_id, name, member_no")
+        .select("id, org_id, name, member_no, balance")
         .eq("id", newCustomerId)
         .maybeSingle()
     ).data;
@@ -108,6 +108,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     isAnonymous: auth.user.is_anonymous ?? false,
     avatarUrl: profile?.avatar_url ?? null,
     orgLocked,
+    balance: customer.balance,
   };
 });
 

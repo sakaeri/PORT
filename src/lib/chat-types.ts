@@ -62,4 +62,6 @@ export interface CustomerContext {
   // トライアル終了・支払い滞納などで、この事業所への新規の問い合わせ・返信を
   // 止めるべき状態かどうか。過去のやり取りの閲覧は常にできる。
   orgLocked: boolean;
+  // チャージ残高（円）。
+  balance: number;
 }

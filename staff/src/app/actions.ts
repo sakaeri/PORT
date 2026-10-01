@@ -351,17 +351,6 @@ export async function deleteIntakeField(id: string) {
   if (error) throw error;
 }
 
-// ============================================================
-// キャンセル・返金ポリシー（段階は固定。返金の扱いと割合だけを設定する）
-// ============================================================
-export async function updateRefundPolicy(orgId: string, stage: RefundStage, mode: RefundMode, pct: number) {
-  await requireHqPrivileged();
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("refund_policies")
-    .upsert({ org_id: orgId, stage, mode, pct: Math.max(0, Math.min(100, pct)) }, { onConflict: "org_id,stage" });
-  if (error) throw error;
-}
 
 // ============================================================
 // 新規事業者アカウント作成（PORT本部のみ）
@@ -422,10 +411,15 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
     .single();
   if (orgErr || !org) throw orgErr ?? new Error("事業者を作成できませんでした");
 
+  // 着手後は原則返金なし（既に実働が発生しているため）。例外は「未着手」
+  // （accepted）と「著しい遅延」（terminate、本部側の責任に相当）の2つだけ、
+  // この2つは全額返金にする。この表は事業者ごとに設定変更できる作りを
+  // 維持しているが、今はこの固定ルールだけを使う前提で値を決め打ちしている
+  // （MenuSettingsの「返金ポリシー」タブは編集不可の説明表示に変更済み）。
   const defaults: { stage: RefundStage; mode: RefundMode; pct: number }[] = [
     { stage: "prequote", mode: "nocharge", pct: 0 },
     { stage: "accepted", mode: "full", pct: 100 },
-    { stage: "started", mode: "partial", pct: 50 },
+    { stage: "started", mode: "none", pct: 0 },
     { stage: "delivered", mode: "none", pct: 0 },
     { stage: "terminate", mode: "full", pct: 100 },
   ];
@@ -614,6 +608,45 @@ export async function markHqFeedbackRead(feedbackId: string) {
   const admin = createServiceRoleClient();
   const { error } = await admin.from("hq_feedback").update({ read_at: new Date().toISOString() }).eq("id", feedbackId);
   if (error) throw error;
+}
+
+// チャージ残高の手動調整。キャンセル時の返金（未着手・著しい遅延以外の、
+// 本部側の責任による個別対応）をチャージ残高へのクレジットとして戻したい
+// 時や、金額の訂正に使う。マイナスも可（誤加算の取り消しなど）。
+// 現金での返金ではなく残高への戻しにする（資金決済法上、前払い残高の
+// 現金払い戻しは原則できないため、ルール上もこの形が自然）。
+export async function adjustCustomerBalance(customerId: string, amount: number, note: string) {
+  const ctx = await requireManagerOrAbove();
+  if (!Number.isInteger(amount) || amount === 0) throw new Error("金額を入力してください");
+  const admin = createServiceRoleClient();
+
+  const { data: customer } = await admin.from("customers").select("balance").eq("id", customerId).eq("org_id", ctx.orgId).maybeSingle();
+  if (!customer) throw new Error("依頼主が見つかりません");
+
+  const { error: txError } = await admin.from("customer_balance_transactions").insert({
+    customer_id: customerId,
+    org_id: ctx.orgId,
+    amount,
+    kind: amount > 0 ? "refund_credit" : "deduction",
+  });
+  if (txError) throw txError;
+
+  const { error } = await admin.from("customers").update({ balance: customer.balance + amount }).eq("id", customerId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+
+  if (note.trim()) {
+    const { data: thread } = await admin.from("threads").select("id").eq("customer_id", customerId).eq("kind", "customer").maybeSingle();
+    if (thread) {
+      await admin.from("messages").insert({
+        thread_id: thread.id,
+        sender_id: null,
+        sender_role: null,
+        kind: "notice",
+        body: `残高を調整しました（${amount > 0 ? "+" : ""}¥${amount.toLocaleString("ja-JP")}）：${note.trim()}`,
+      });
+      await admin.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", thread.id);
+    }
+  }
 }
 
 // 「自分のログインで追加した窓口」をセルフサービスで削除する。今のログイン

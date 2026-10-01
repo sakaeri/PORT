@@ -122,10 +122,31 @@ export interface Database {
           member_no: string | null;
           creator_id: string | null;
           active: boolean;
+          balance: number;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
+        Relationships: [];
+      };
+      customer_balance_transactions: {
+        Row: {
+          id: string;
+          customer_id: string;
+          org_id: string;
+          amount: number;
+          kind: "charge" | "deduction" | "refund_credit";
+          request_id: string | null;
+          stripe_checkout_session_id: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["customer_balance_transactions"]["Row"]> & {
+          customer_id: string;
+          org_id: string;
+          amount: number;
+          kind: "charge" | "deduction" | "refund_credit";
+        };
+        Update: Partial<Database["public"]["Tables"]["customer_balance_transactions"]["Row"]>;
         Relationships: [];
       };
       customer_vault_items: {
