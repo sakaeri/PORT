@@ -24,9 +24,8 @@ async function sendEmail(to: string | string[], subject: string, html: string) {
   }
 }
 
-// 依頼主はほとんどが匿名ログインで、メールアドレスは「アカウント作成」を
-// した人だけが持っている。それ以外は customers.profile_id はあっても
-// auth.users.email が空なので、その場合は通知自体が黙ってスキップされる。
+// 利用にはメール確認が必須になっているため基本的に全員メールを持つが、
+// 念のため取れない場合は通知自体を黙ってスキップする。
 async function getCustomerEmail(admin: Admin, customerId: string): Promise<string | null> {
   const { data: customer } = await admin.from("customers").select("profile_id").eq("id", customerId).maybeSingle();
   if (!customer?.profile_id) return null;
@@ -34,16 +33,6 @@ async function getCustomerEmail(admin: Admin, customerId: string): Promise<strin
   return data.user?.email ?? null;
 }
 
-async function getStaffEmails(admin: Admin, orgId: string): Promise<string[]> {
-  const { data: staff } = await admin.from("profiles").select("id").eq("org_id", orgId).in("role", ["owner", "reception"]);
-  if (!staff?.length) return [];
-  const emails: string[] = [];
-  for (const s of staff) {
-    const { data } = await admin.auth.admin.getUserById(s.id);
-    if (data.user?.email) emails.push(data.user.email);
-  }
-  return emails;
-}
 
 async function getOrgSlug(admin: Admin, orgId: string): Promise<{ displayName: string; slug: string | null }> {
   const { data } = await admin.from("organizations").select("display_name, slug").eq("id", orgId).maybeSingle();
@@ -99,29 +88,3 @@ export async function notifyCustomerCompletionReport(admin: Admin, orgId: string
   }
 }
 
-// 見積放置リマインドのcronから使う。1事業者につき複数件たまっていても
-// メール1通にまとめる。
-export async function notifyStaffQuoteStale(
-  admin: Admin,
-  orgId: string,
-  requests: { title: string; amount: number; quotedAt: string }[],
-) {
-  try {
-    const emails = await getStaffEmails(admin, orgId);
-    if (!emails.length) return;
-    const { displayName } = await getOrgSlug(admin, orgId);
-    const rows = requests
-      .map((r) => `<li>${r.title}（¥${r.amount.toLocaleString("ja-JP")}）— ${new Date(r.quotedAt).toLocaleDateString("ja-JP")}見積もり</li>`)
-      .join("");
-    const staffUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
-    await sendEmail(
-      emails,
-      `【PORT】入金確認待ちの見積もりがあります（${displayName}）`,
-      `<p>依頼主からの入金確認がまだ押されていない見積もりが${requests.length}件あります。</p><ul>${rows}</ul>${
-        staffUrl ? `<p><a href="${staffUrl}">受付画面を開いて確認する</a></p>` : ""
-      }`,
-    );
-  } catch (e) {
-    console.error("notifyStaffQuoteStale failed", e);
-  }
-}

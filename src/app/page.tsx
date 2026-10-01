@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getCustomerContext, getMyCompanies, getRefundPolicies, getThreadMessages, getVaultItems, hasAuthSession } from "@/lib/data";
 import ChatScreen from "@/components/chat/ChatScreen";
 import VerifyGate from "@/components/chat/VerifyGate";
+import AccountGate from "@/components/chat/AccountGate";
 
 export async function generateMetadata(): Promise<Metadata> {
   const ctx = await getCustomerContext();
@@ -45,11 +46,19 @@ export default async function Home() {
     );
   }
 
+  // 事業の方針で、メールアドレスの確認（ログイン）をしていない人にはチャット
+  // 画面を見せない。匿名セッション自体はVerifyGateが裏で作っているが、
+  // ここでAccountGateを挟み、名前・メールの登録 or 既存アカウントへの
+  // ログインを済ませるまで先に進ませない。
+  if (ctx.isAnonymous) {
+    return <AccountGate orgDisplayName={ctx.orgDisplayName} />;
+  }
+
   const [{ messages, hasMoreOlder }, refundPolicies, vault, companies] = await Promise.all([
     getThreadMessages(ctx.threadId),
     getRefundPolicies(ctx.orgId),
     getVaultItems(ctx.customerId),
-    ctx.isAnonymous ? Promise.resolve([]) : getMyCompanies(),
+    getMyCompanies(),
   ]);
 
   return (

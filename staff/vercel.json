@@ -1,14 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/expire-trials",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/quote-reminders",
-      "schedule": "0 16 * * *"
-    },
-    {
       "path": "/api/cron/auto-recharge",
       "schedule": "0 13 * * *"
     },
