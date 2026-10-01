@@ -42,7 +42,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
   let customer = (
     await supabase
       .from("customers")
-      .select("id, org_id, name, member_no, balance")
+      .select("id, org_id, name, member_no, balance, stripe_payment_method_id, auto_recharge_enabled, auto_recharge_threshold, auto_recharge_amount")
       .eq("profile_id", auth.user.id)
       .eq("org_id", orgId)
       .maybeSingle()
@@ -57,7 +57,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     customer = (
       await supabase
         .from("customers")
-        .select("id, org_id, name, member_no, balance")
+        .select("id, org_id, name, member_no, balance, stripe_payment_method_id, auto_recharge_enabled, auto_recharge_threshold, auto_recharge_amount")
         .eq("id", newCustomerId)
         .maybeSingle()
     ).data;
@@ -109,6 +109,12 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     avatarUrl: profile?.avatar_url ?? null,
     orgLocked,
     balance: customer.balance,
+    autoRecharge: {
+      enabled: customer.auto_recharge_enabled,
+      threshold: customer.auto_recharge_threshold,
+      amount: customer.auto_recharge_amount,
+      hasCard: !!customer.stripe_payment_method_id,
+    },
   };
 });
 

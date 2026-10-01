@@ -9,6 +9,10 @@
       "schedule": "0 16 * * *"
     },
     {
+      "path": "/api/cron/auto-recharge",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/cron/recurring-subscriptions",
       "schedule": "0 14 * * *"
     }

@@ -64,4 +64,6 @@ export interface CustomerContext {
   orgLocked: boolean;
   // チャージ残高（円）。
   balance: number;
+  // 残高の自動チャージ設定。
+  autoRecharge: { enabled: boolean; threshold: number | null; amount: number | null; hasCard: boolean };
 }

@@ -123,6 +123,12 @@ export interface Database {
           creator_id: string | null;
           active: boolean;
           balance: number;
+          stripe_customer_id: string | null;
+          stripe_payment_method_id: string | null;
+          auto_recharge_enabled: boolean;
+          auto_recharge_threshold: number | null;
+          auto_recharge_amount: number | null;
+          auto_recharge_fail_count: number;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
@@ -373,6 +379,8 @@ export interface Database {
       org_id_by_slug: { Args: { p_slug: string }; Returns: string | null };
       ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
       pay_request_from_balance: { Args: { p_request_id: string }; Returns: void };
+      disable_auto_recharge: { Args: Record<string, never>; Returns: void };
+      increment_customer_balance: { Args: { p_customer_id: string; p_amount: number }; Returns: void };
       my_companies: {
         Args: Record<string, never>;
         Returns: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];

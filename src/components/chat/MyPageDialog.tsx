@@ -4,7 +4,7 @@ import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
 import type { VaultRow } from "@/lib/chat-types";
-import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, sendHqFeedback, startBalanceCharge } from "@/app/actions";
+import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, sendHqFeedback, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 import LoginPanel from "@/components/chat/LoginPanel";
 import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
@@ -60,6 +60,7 @@ export default function MyPageDialog({
   onToggleTheme,
   onClose,
   balance,
+  autoRecharge,
 }: {
   userId: string;
   memberNo: string | null;
@@ -76,6 +77,7 @@ export default function MyPageDialog({
   onToggleTheme: () => void;
   onClose: () => void;
   balance: number;
+  autoRecharge: { enabled: boolean; threshold: number | null; amount: number | null; hasCard: boolean };
 }) {
   const [name, setName] = useState(customerName);
   const nameIsPlaceholder = name === NAME_PLACEHOLDER;
@@ -118,6 +120,47 @@ export default function MyPageDialog({
     } catch (e) {
       setChargeError(errorMessage(e, "決済ページを開けませんでした"));
       setChargeStarting(false);
+    }
+  }
+
+  const [arEnabledOverride, setArEnabledOverride] = useState<boolean | null>(null);
+  const arEnabled = arEnabledOverride ?? autoRecharge.enabled;
+  const [arOpen, setArOpen] = useState(false);
+  const [arThreshold, setArThreshold] = useState(String(autoRecharge.threshold ?? 3000));
+  const [arAmount, setArAmount] = useState(String(autoRecharge.amount ?? 10000));
+  const [arStarting, setArStarting] = useState(false);
+  const [arDisabling, setArDisabling] = useState(false);
+  const [arError, setArError] = useState("");
+
+  async function startAutoRecharge() {
+    if (arStarting) return;
+    const threshold = Number(arThreshold);
+    const amount = Number(arAmount);
+    if (!Number.isInteger(threshold) || threshold <= 0 || !Number.isInteger(amount) || amount < 1000) {
+      setArError("金額を正しく入力してください（チャージ額は1,000円以上）");
+      return;
+    }
+    setArStarting(true);
+    setArError("");
+    try {
+      const url = await startAutoRechargeSetup(threshold, amount);
+      window.location.href = url;
+    } catch (e) {
+      setArError(errorMessage(e, "設定ページを開けませんでした"));
+      setArStarting(false);
+    }
+  }
+
+  async function turnOffAutoRecharge() {
+    if (arDisabling) return;
+    setArDisabling(true);
+    try {
+      await disableAutoRecharge();
+      setArEnabledOverride(false);
+    } catch (e) {
+      setArError(errorMessage(e, "操作に失敗しました"));
+    } finally {
+      setArDisabling(false);
     }
   }
 
@@ -263,6 +306,59 @@ export default function MyPageDialog({
                     </button>
                     <button onClick={startCharge} disabled={chargeStarting} style={{ height: 32, padding: "0 14px", cursor: "pointer", fontSize: 12, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: chargeStarting ? 0.6 : 1 }}>
                       {chargeStarting ? "処理中…" : `¥${chargeAmount.toLocaleString("ja-JP")}をチャージ`}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 残高の自動チャージ */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>残高の自動チャージ</span>
+                <span style={{ fontSize: 12, color: arEnabled ? "var(--color-accent-300)" : "var(--color-neutral-500)" }}>{arEnabled ? "オン" : "オフ"}</span>
+              </div>
+              {arEnabled && (
+                <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+                  残高が¥{(autoRecharge.threshold ?? 0).toLocaleString("ja-JP")}未満になると、保存したカードから自動で¥{(autoRecharge.amount ?? 0).toLocaleString("ja-JP")}チャージします。
+                </div>
+              )}
+              {!arOpen && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setArOpen(true)} style={{ ...smallBtn, alignSelf: "flex-start" }}>
+                    {arEnabled ? "設定を変更" : "設定する"}
+                  </button>
+                  {arEnabled && (
+                    <button
+                      onClick={turnOffAutoRecharge}
+                      disabled={arDisabling}
+                      style={{ height: 36, padding: "0 12px", cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", opacity: arDisabling ? 0.6 : 1 }}
+                    >
+                      {arDisabling ? "処理中…" : "オフにする"}
+                    </button>
+                  )}
+                </div>
+              )}
+              {arOpen && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+                    設定するとカード確認の画面に進みます。保存したカードへ、残高が下回った時に自動で課金することに同意したものとして扱われます。
+                  </div>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
+                    残高がいくら未満になったら
+                    <input value={arThreshold} onChange={(e) => setArThreshold(e.target.value)} type="number" min={1} style={input} />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
+                    いくらチャージするか
+                    <input value={arAmount} onChange={(e) => setArAmount(e.target.value)} type="number" min={1000} style={input} />
+                  </label>
+                  {arError && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{arError}</span>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setArOpen(false)} style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                      閉じる
+                    </button>
+                    <button onClick={startAutoRecharge} disabled={arStarting} style={{ height: 32, padding: "0 14px", cursor: "pointer", fontSize: 12, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: arStarting ? 0.6 : 1 }}>
+                      {arStarting ? "処理中…" : "カードを確認して設定する"}
                     </button>
                   </div>
                 </div>

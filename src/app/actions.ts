@@ -355,6 +355,50 @@ export async function startBalanceCharge(amountYen: number): Promise<string> {
   return session.url;
 }
 
+// 残高の自動チャージを設定する（有効化・変更は常にここを通る）。Stripeの
+// Checkout（setupモード）でカードを確認・保存してもらい、実際の有効化・
+// しきい値／金額の保存は Webhook 側（checkout.session.completed, mode=
+// "setup"）で行う。既にstripe_customer_idがあればそれを使い回し、無ければ
+// Stripe側に新しく作ってもらう。
+export async function startAutoRechargeSetup(thresholdYen: number, amountYen: number): Promise<string> {
+  const ctx = await requireContext();
+  if (!Number.isInteger(thresholdYen) || thresholdYen < 1) throw new Error("しきい値を入力してください");
+  if (!Number.isInteger(amountYen) || amountYen < 1000) throw new Error("チャージ額は1,000円以上で指定してください");
+
+  const supabase = await createClient();
+  const { data: customer } = await supabase.from("customers").select("stripe_customer_id").eq("id", ctx.customerId).maybeSingle();
+
+  const h = await headers();
+  const host = h.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  const origin = `${protocol}://${host}`;
+
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.create({
+    mode: "setup",
+    payment_method_types: ["card"],
+    customer: customer?.stripe_customer_id ?? undefined,
+    customer_creation: customer?.stripe_customer_id ? undefined : "always",
+    metadata: {
+      customer_id: ctx.customerId,
+      org_id: ctx.orgId,
+      auto_recharge_threshold: String(thresholdYen),
+      auto_recharge_amount: String(amountYen),
+    },
+    success_url: `${origin}/?autorecharge=success`,
+    cancel_url: `${origin}/?autorecharge=cancel`,
+  });
+  if (!session.url) throw new Error("設定ページを作成できませんでした");
+  return session.url;
+}
+
+export async function disableAutoRecharge() {
+  await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("disable_auto_recharge");
+  if (error) throw error;
+}
+
 // 担当マネージャーには見えない、本部直通の「ご意見・ご要望」。普段の
 // トークとは別のテーブル（hq_feedback）に入れるだけで、通常のスレッドには
 // 一切残さない。

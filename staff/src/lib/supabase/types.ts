@@ -168,6 +168,12 @@ export interface Database {
           creator_id: string | null;
           active: boolean;
           balance: number;
+          stripe_customer_id: string | null;
+          stripe_payment_method_id: string | null;
+          auto_recharge_enabled: boolean;
+          auto_recharge_threshold: number | null;
+          auto_recharge_amount: number | null;
+          auto_recharge_fail_count: number;
           converted_org_id: string | null;
           created_at: string;
         };
@@ -585,6 +591,7 @@ export interface Database {
       ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
       finalize_hourly_billing: { Args: { p_request_id: string }; Returns: void };
       charge_subscription_occurrence: { Args: { p_subscription_id: string }; Returns: string | null };
+      credit_auto_recharge: { Args: { p_customer_id: string; p_org_id: string; p_amount: number; p_stripe_payment_intent_id: string }; Returns: boolean };
       my_companies: {
         Args: Record<string, never>;
         Returns: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];

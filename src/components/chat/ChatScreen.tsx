@@ -313,6 +313,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
           onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}
           balance={ctx.balance}
+          autoRecharge={ctx.autoRecharge}
         />
       )}
     </div>
