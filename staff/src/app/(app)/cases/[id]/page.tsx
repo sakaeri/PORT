@@ -22,7 +22,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, hourly_rate, hourly_cap, customers(id, name), completion_reports(*), ratings(*)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, hourly_rate, hourly_cap, customers(id, name), completion_reports(*), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -57,6 +57,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
+  const subscription = Array.isArray(request.request_subscriptions) ? request.request_subscriptions[0] : request.request_subscriptions;
   const reportPending = !!report && !report.sent_at;
 
   const caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null }[] = caseThread?.messages ?? [];
@@ -97,6 +98,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       availableStaff={availableStaff}
       canAssignStaff={canAssignStaff}
       canSeeFinance={canSeeFinance}
+      subscription={canSeeFinance && subscription ? { id: subscription.id, cadence: subscription.cadence, active: subscription.active, nextDueAt: subscription.next_due_at } : null}
     />
   );
 }

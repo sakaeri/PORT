@@ -5,7 +5,7 @@ import { errorMessage } from "@/lib/errors";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
 import type { AttachmentRow, MessageWithExtras, RequestBundle, RequestRow } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
-import { PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
+import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
 import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
@@ -261,6 +261,11 @@ export function RequestCard({
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={kicker}>お見積もり</span>
+            {r.cadence && (
+              <span style={{ fontSize: 10.5, padding: "2px 8px", borderRadius: 6, background: "var(--color-accent-900)", color: "var(--color-accent-100)" }}>
+                {CADENCE_LABEL[r.cadence]}
+              </span>
+            )}
             <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--color-neutral-500)", whiteSpace: "nowrap" }}>受付が作成</span>
           </div>
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, lineHeight: 1.2, marginTop: 2 }}>
@@ -306,6 +311,11 @@ export function RequestCard({
                 {r.payment_timing === "balance" ? (
                   <>
                     <div>残高：{yen(balance)}</div>
+                    {r.cadence && (
+                      <div style={{ color: "var(--color-neutral-500)" }}>
+                        確定すると、以降は{CADENCE_LABEL[r.cadence]}自動的に案件が作られ、残高から引き落とされます（今回以降、改めて確定いただく必要はありません）。
+                      </div>
+                    )}
                     {balance < r.amount && (
                       <div style={{ color: "var(--color-accent-200)" }}>残高が不足しています。マイページからチャージしてください。</div>
                     )}

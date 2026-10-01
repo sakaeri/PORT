@@ -42,6 +42,7 @@ export type AgreementKind = "contract" | "employment_part" | "employment_full" |
 export type PayMode = "hourly" | "daily" | "monthly" | "menu" | "share" | "none";
 export type PlanStatus = "trial" | "active" | "past_due" | "paused" | "cancelled";
 export type ReferralStatus = "pending" | "confirmed" | "consumed" | "revoked";
+export type SubscriptionCadence = "weekly" | "monthly";
 
 export interface BankTransferInfo {
   holder?: string;
@@ -336,6 +337,8 @@ export interface Database {
           reminder_sent_at: string | null;
           hourly_rate: number | null;
           hourly_cap: number | null;
+          subscription_id: string | null;
+          cadence: SubscriptionCadence | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]> & { customer_id: string; title: string };
@@ -543,6 +546,35 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["staff_org_links"]["Row"]>;
         Relationships: [];
       };
+      request_subscriptions: {
+        Row: {
+          id: string;
+          org_id: string;
+          customer_id: string;
+          customer_thread_id: string;
+          title: string;
+          note: string | null;
+          amount: number;
+          items: { label: string; price: number; payout: number; qty: number }[];
+          cadence: SubscriptionCadence;
+          active: boolean;
+          next_due_at: string | null;
+          last_insufficient_notice_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          cancelled_at: string | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["request_subscriptions"]["Row"]> & {
+          org_id: string;
+          customer_id: string;
+          customer_thread_id: string;
+          title: string;
+          amount: number;
+          cadence: SubscriptionCadence;
+        };
+        Update: Partial<Database["public"]["Tables"]["request_subscriptions"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -552,6 +584,7 @@ export interface Database {
       org_id_by_slug: { Args: { p_slug: string }; Returns: string | null };
       ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
       finalize_hourly_billing: { Args: { p_request_id: string }; Returns: void };
+      charge_subscription_occurrence: { Args: { p_subscription_id: string }; Returns: string | null };
       my_companies: {
         Args: Record<string, never>;
         Returns: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];

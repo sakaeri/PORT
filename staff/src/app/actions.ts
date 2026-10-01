@@ -5,7 +5,7 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
 import { notifyCustomerCompletionReport, notifyCustomerPaymentConfirmed, notifyCustomerQuoteCreated } from "@/lib/notify";
-import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage, StaffRole } from "@/lib/supabase/types";
+import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage, StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
 // （キャンセル処理や、支払い設定そのものなど）用。既定はロック中なら弾く。
@@ -812,6 +812,11 @@ export async function createCaseRequest(
     // payment_timing は強制的に "balance" にする（時間単価の請求は
     // チャージ残高からの支払い以外あり得ないため）。
     hourly?: { rate: number; cap: number; label: string };
+    // 定期対応（毎週・毎月）にする場合。hourly とは併用不可。設定すると
+    // payment_timing は強制的に "balance" にする（定期の自動引き落としは
+    // チャージ残高以外あり得ないため）。初回の支払いが確定するまでは
+    // 定期対応としては動き出さない（pay_request_from_balance 側で有効化する）。
+    cadence?: SubscriptionCadence;
   },
 ) {
   const ctx = await requireContext();
@@ -831,9 +836,9 @@ export async function createCaseRequest(
   // （項目ごとの目安時間 × 数量。複数項目は並行して進む前提でmaxを取る）。
   // 時間精算案件は着手〜完了の実測で金額を決めるので目安自体は使わない。
   const knownLeadHours = items.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
-  const leadHoursTotal = isHourly ? null : knownLeadHours.length > 0 ? Math.max(...knownLeadHours) : null;
+  const leadHoursTotal = isHourly || input.cadence ? null : knownLeadHours.length > 0 ? Math.max(...knownLeadHours) : null;
 
-  const paymentTiming: PaymentTiming = isHourly ? "balance" : input.paymentTiming;
+  const paymentTiming: PaymentTiming = isHourly || input.cadence ? "balance" : input.paymentTiming;
   const depositPercent = paymentTiming === "deposit" ? Math.min(100, Math.max(1, Math.round(input.depositPercent ?? 0))) : null;
   if (paymentTiming === "deposit" && !depositPercent) throw new Error("予約金の割合を入力してください");
   const depositAmount = depositPercent ? Math.round((amount * depositPercent) / 100) : null;
@@ -874,6 +879,7 @@ export async function createCaseRequest(
       card_payment_link: !isHourly && input.payMethod === "card" ? (input.cardPaymentLink?.trim() || null) : null,
       hourly_rate: isHourly ? input.hourly!.rate : null,
       hourly_cap: isHourly ? input.hourly!.cap : null,
+      cadence: input.cadence ?? null,
     })
     .select("id")
     .single();
@@ -884,6 +890,28 @@ export async function createCaseRequest(
       .from("request_items")
       .insert(items.map((it, i) => ({ request_id: request.id, menu_id: it.menuId, label: it.label, price: it.price, payout: it.payout, qty: it.qty, sort: i })));
     if (itemsError) throw itemsError;
+  }
+
+  // 定期対応の雛形を作っておく。初回の支払いが確定するまでは active=false
+  // のままで、pay_request_from_balance が確定と同時に有効化する。
+  if (input.cadence) {
+    const { data: subscription, error: subError } = await supabase
+      .from("request_subscriptions")
+      .insert({
+        org_id: ctx.orgId,
+        customer_id: customerId,
+        customer_thread_id: customerThreadId,
+        title,
+        note: input.note.trim() || null,
+        amount,
+        items: items.map((it) => ({ label: it.label, price: it.price, payout: it.payout, qty: it.qty })),
+        cadence: input.cadence,
+        created_by: ctx.userId,
+      })
+      .select("id")
+      .single();
+    if (subError || !subscription) throw subError ?? new Error("定期対応の作成に失敗しました");
+    await supabase.from("requests").update({ subscription_id: subscription.id }).eq("id", request.id);
   }
 
   const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: input.due.trim() || undefined };
@@ -920,6 +948,20 @@ export async function createCaseRequest(
   await notifyCustomerQuoteCreated(admin, ctx.orgId, customerId, amount, title);
 
   return request.id as string;
+}
+
+// 定期対応を停止する。すでに作られた（支払い済みの）案件には影響しない
+// （着手・完了報告はそのまま進められる）。次回以降の自動作成・引き落としが
+// 止まるだけ。
+export async function cancelSubscription(subscriptionId: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("request_subscriptions")
+    .update({ active: false, cancelled_at: new Date().toISOString() })
+    .eq("id", subscriptionId)
+    .eq("org_id", ctx.orgId);
+  if (error) throw error;
 }
 
 async function getCaseThreadId(supabase: Awaited<ReturnType<typeof createClient>>, requestId: string) {

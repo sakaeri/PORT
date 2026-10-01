@@ -28,8 +28,8 @@ import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } f
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
-import { PHASE_LABEL } from "@/lib/stage";
-import type { AppRole, BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
+import { CADENCE_LABEL, PHASE_LABEL } from "@/lib/stage";
+import type { AppRole, BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
 
 export interface ThreadAttachment {
   id: string;
@@ -1218,6 +1218,7 @@ function QuoteDialog({
   const [saveAsMenu, setSaveAsMenu] = useState(false);
   const [paymentTiming, setPaymentTiming] = useState<PaymentTiming>("balance");
   const [isHourly, setIsHourly] = useState(false);
+  const [cadence, setCadence] = useState<SubscriptionCadence | "">("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [hourlyCap, setHourlyCap] = useState("");
   const [hourlyLabel, setHourlyLabel] = useState("");
@@ -1295,6 +1296,7 @@ function QuoteDialog({
         cardPaymentLink: payMethod === "card" ? resolvedCardPaymentLink : undefined,
         saveCardPaymentLink: payMethod === "card" && newLinkMode ? { title: newLinkTitle, url: newLinkUrl } : undefined,
         hourly: isHourly ? { rate: Number(hourlyRate), cap: Number(hourlyCap), label: hourlyLabel } : undefined,
+        cadence: !isHourly && cadence ? cadence : undefined,
       });
       onCreated(requestId);
     } catch (e) {
@@ -1323,6 +1325,7 @@ function QuoteDialog({
             onClick={() => {
               setIsHourly(true);
               setPaymentTiming("balance");
+              setCadence("");
             }}
             style={pillStyle(isHourly)}
           >
@@ -1432,10 +1435,46 @@ function QuoteDialog({
           </>
         )}
 
+        {!isHourly && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
+            <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>頻度</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => setCadence("")} style={pillStyle(cadence === "")}>
+                単発
+              </button>
+              <button
+                onClick={() => {
+                  setCadence("weekly");
+                  setPaymentTiming("balance");
+                }}
+                style={pillStyle(cadence === "weekly")}
+              >
+                毎週
+              </button>
+              <button
+                onClick={() => {
+                  setCadence("monthly");
+                  setPaymentTiming("balance");
+                }}
+                style={pillStyle(cadence === "monthly")}
+              >
+                毎月
+              </button>
+            </div>
+            {cadence && (
+              <div style={{ fontSize: 11, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+                定期対応はチャージ残高からのお支払いのみです。依頼主が初回を確定すると、以降は{CADENCE_LABEL[cadence]}自動で案件が作られ、残高から引き落とされます（着手は毎回担当者が手動で行います）。
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
           <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払いタイミング</span>
-          {isHourly ? (
-            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>時間精算はチャージ残高からのお支払いのみです。</div>
+          {isHourly || cadence ? (
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+              {isHourly ? "時間精算はチャージ残高からのお支払いのみです。" : "定期対応はチャージ残高からのお支払いのみです。"}
+            </div>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {PAYMENT_TIMING_OPTIONS.map((opt) => (
@@ -1447,7 +1486,7 @@ function QuoteDialog({
           )}
           {paymentTiming === "balance" && (
             <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-              依頼主が見積もりカードから直接お支払いいただきます。チャージ残高が足りていれば、支払いと同時に着手できます。
+              依頼主が見積もりカードから直接お支払いいただきます。支払いが確定すると「着手前」になり、着手はこの後、担当者が案件詳細の「着手する」を押して行います。
             </div>
           )}
           {paymentTiming === "deposit" && (

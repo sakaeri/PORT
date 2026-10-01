@@ -230,6 +230,7 @@ export interface Database {
           final_card_payment_link: string | null;
           hourly_rate: number | null;
           hourly_cap: number | null;
+          cadence: "weekly" | "monthly" | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]>;

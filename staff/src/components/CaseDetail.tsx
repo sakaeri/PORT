@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Archive, ArrowCounterClockwise, Star, Plus, X } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
-import { PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
+import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
 import {
   confirmPayment,
@@ -22,8 +22,9 @@ import {
   unarchiveCaseThread,
   assignCaseStaff,
   unassignCaseStaff,
+  cancelSubscription,
 } from "@/app/actions";
-import type { BankTransferInfo, Database, PaymentMethod, PaymentTiming, RequestPhase } from "@/lib/supabase/types";
+import type { BankTransferInfo, Database, PaymentMethod, PaymentTiming, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
@@ -74,6 +75,7 @@ export default function CaseDetail({
   availableStaff,
   canAssignStaff,
   canSeeFinance,
+  subscription,
 }: {
   request: {
     id: string;
@@ -110,6 +112,8 @@ export default function CaseDetail({
   canAssignStaff: boolean;
   // オーナー・マネージャーだけ金額・支払い・返金の情報を見られる。
   canSeeFinance: boolean;
+  // この案件が定期対応（毎週・毎月）から生まれたものなら、その定期対応自体の情報。
+  subscription: { id: string; cadence: SubscriptionCadence; active: boolean; nextDueAt: string | null } | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -141,6 +145,8 @@ export default function CaseDetail({
   const handleApproveReport = () => runAction(() => approveCaseReport(request.id), "この内容で依頼主に完了報告を送信します。よろしいですか？");
   const handleToggleArchive = () =>
     runAction(() => (caseThread?.archived ? unarchiveCaseThread(caseThread.id) : archiveCaseThread(caseThread!.id)));
+  const handleCancelSubscription = () =>
+    runAction(() => cancelSubscription(subscription!.id), "定期対応を停止します。すでに支払い済みの今回分には影響しません。よろしいですか？");
 
   const canCancel = !["completed", "cancelled", "declined"].includes(request.phase);
   const isOverdue = request.dueAt != null && ["preparing", "started"].includes(request.phase) && new Date(request.dueAt) < new Date();
@@ -239,6 +245,23 @@ export default function CaseDetail({
         {canSeeFinance && request.hourlyRate != null && (
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
             時間精算：時間単価¥{request.hourlyRate.toLocaleString("ja-JP")}・上限¥{(request.hourlyCap ?? 0).toLocaleString("ja-JP")}
+          </div>
+        )}
+        {canSeeFinance && subscription && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+            <span>
+              定期対応（{CADENCE_LABEL[subscription.cadence]}）{subscription.active ? "・有効" : "・停止済み"}
+              {subscription.active && subscription.nextDueAt && `・次回 ${new Date(subscription.nextDueAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric" })}`}
+            </span>
+            {subscription.active && (
+              <button
+                onClick={handleCancelSubscription}
+                disabled={busy}
+                style={{ height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-300)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+              >
+                定期対応を停止
+              </button>
+            )}
           </div>
         )}
         {canSeeFinance && request.payMethod === "bank" && request.bankTransferInfo && (

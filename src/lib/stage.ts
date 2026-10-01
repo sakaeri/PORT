@@ -11,6 +11,11 @@ export const PAYMENT_TIMING_LABEL: Record<PaymentTiming, string> = {
   balance: "チャージ残高から支払い",
 };
 
+export const CADENCE_LABEL: Record<"weekly" | "monthly", string> = {
+  weekly: "毎週",
+  monthly: "毎月",
+};
+
 export interface StageStep {
   label: string;
   state: "done" | "current" | "todo" | "muted";

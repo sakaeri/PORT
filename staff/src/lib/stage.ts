@@ -18,3 +18,8 @@ export const PAYMENT_TIMING_LABEL: Record<PaymentTiming, string> = {
   postpay: "後払い",
   balance: "チャージ残高から支払い",
 };
+
+export const CADENCE_LABEL: Record<"weekly" | "monthly", string> = {
+  weekly: "毎週",
+  monthly: "毎月",
+};
