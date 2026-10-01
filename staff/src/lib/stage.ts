@@ -16,4 +16,5 @@ export const PAYMENT_TIMING_LABEL: Record<PaymentTiming, string> = {
   deposit: "予約金の先払い",
   before_shipping: "発送前入金",
   postpay: "後払い",
+  balance: "チャージ残高から支払い",
 };

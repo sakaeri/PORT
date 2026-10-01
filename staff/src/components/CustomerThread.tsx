@@ -1165,6 +1165,7 @@ function hoursToDueLabel(hours: number): string {
 }
 
 const PAYMENT_TIMING_OPTIONS: { value: PaymentTiming; label: string }[] = [
+  { value: "balance", label: "チャージ残高から" },
   { value: "prepay_full", label: "先払い" },
   { value: "deposit", label: "予約金の先払い" },
   { value: "before_shipping", label: "発送前入金" },
@@ -1215,7 +1216,11 @@ function QuoteDialog({
   const [customLeadHours, setCustomLeadHours] = useState("");
   const [note, setNote] = useState("");
   const [saveAsMenu, setSaveAsMenu] = useState(false);
-  const [paymentTiming, setPaymentTiming] = useState<PaymentTiming>("prepay_full");
+  const [paymentTiming, setPaymentTiming] = useState<PaymentTiming>("balance");
+  const [isHourly, setIsHourly] = useState(false);
+  const [hourlyRate, setHourlyRate] = useState("");
+  const [hourlyCap, setHourlyCap] = useState("");
+  const [hourlyLabel, setHourlyLabel] = useState("");
   const [depositPercent, setDepositPercent] = useState("30");
   const [payMethod, setPayMethod] = useState<PaymentMethod>("bank");
   const [bankInfo, setBankInfo] = useState<BankTransferInfo>(defaultBankInfo);
@@ -1260,16 +1265,18 @@ function QuoteDialog({
     ...menuItems,
     ...customItems.map((c) => ({ menuId: null as string | null, label: c.label, price: c.price, payout: 0, qty: c.qty, leadHours: c.leadHours })),
   ];
-  const total = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const itemsTotal = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const total = isHourly ? Number(hourlyCap) || 0 : itemsTotal;
   const depositAmount = paymentTiming === "deposit" ? Math.round((total * (Number(depositPercent) || 0)) / 100) : null;
   // 同じ項目を複数個頼むと、その分準備に時間がかかる想定で数量に比例させる
   // （項目ごとの目安時間 × 数量）。違う項目同士は並行して進む前提でmaxを取る。
   const knownLeadHours = allItems.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
   const due = knownLeadHours.length > 0 ? hoursToDueLabel(Math.max(...knownLeadHours)) : "";
+  const canSubmit = isHourly ? Number(hourlyRate) > 0 && Number(hourlyCap) > 0 : allItems.length > 0;
 
   async function submit() {
-    if (saving || allItems.length === 0) return;
-    if (payMethod === "card" && !resolvedCardPaymentLink) {
+    if (saving || !canSubmit) return;
+    if (!isHourly && paymentTiming !== "balance" && payMethod === "card" && !resolvedCardPaymentLink) {
       setError("カード決済のリンクを選ぶか入力してください");
       return;
     }
@@ -1287,6 +1294,7 @@ function QuoteDialog({
         bankInfo: payMethod === "bank" ? bankInfo : undefined,
         cardPaymentLink: payMethod === "card" ? resolvedCardPaymentLink : undefined,
         saveCardPaymentLink: payMethod === "card" && newLinkMode ? { title: newLinkTitle, url: newLinkUrl } : undefined,
+        hourly: isHourly ? { rate: Number(hourlyRate), cap: Number(hourlyCap), label: hourlyLabel } : undefined,
       });
       onCreated(requestId);
     } catch (e) {
@@ -1307,93 +1315,141 @@ function QuoteDialog({
           このトークの内容を正式な依頼にします。発行するとトークに見積もりカードが入ります。
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ flex: 1, fontSize: 11, color: "var(--color-neutral-500)" }}>受付メニュー</span>
-            <button onClick={() => setShowCustomForm((v) => !v)} style={{ ...smallBtn, height: 26 }}>
-              ＋項目を追加
-            </button>
-          </div>
-          {priceableMenus.length === 0 && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>金額の設定されたメニューがありません。</div>}
-          {priceableMenus.map((m) => (
-            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</div>
-                <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>
-                  ¥{m.price.toLocaleString("ja-JP")}・納期{m.leadHours}時間
-                </div>
-              </div>
-              <button onClick={() => bump(m.id, -1)} disabled={!qty[m.id]} style={stepperBtn}>
-                −
-              </button>
-              <span style={{ width: 20, textAlign: "center", fontSize: 13 }}>{qty[m.id] ?? 0}</span>
-              <button onClick={() => bump(m.id, 1)} style={stepperBtn}>
-                ＋
-              </button>
-            </div>
-          ))}
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setIsHourly(false)} style={pillStyle(!isHourly)}>
+            メニューから選ぶ
+          </button>
+          <button
+            onClick={() => {
+              setIsHourly(true);
+              setPaymentTiming("balance");
+            }}
+            style={pillStyle(isHourly)}
+          >
+            時間精算（メニューに無い依頼）
+          </button>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {showCustomForm && (
-            <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>件名</span>
-                <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} className="vid-input" style={inputStyle} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 100 }}>
-                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>金額</span>
-                <input value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} type="number" min={0} className="vid-input" style={inputStyle} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 64 }}>
-                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>数量</span>
-                <input value={customQty} onChange={(e) => setCustomQty(e.target.value)} type="number" min={1} className="vid-input" style={inputStyle} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 90 }}>
-                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間(h)・任意</span>
-                <input value={customLeadHours} onChange={(e) => setCustomLeadHours(e.target.value)} type="number" min={1} placeholder="なし" className="vid-input" style={inputStyle} />
-              </div>
-              <button onClick={addCustomItem} style={{ ...smallBtn, height: 36 }}>
-                追加
-              </button>
+        {isHourly ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>件名</span>
+              <input value={hourlyLabel} onChange={(e) => setHourlyLabel(e.target.value)} placeholder="例：資料のフォーマット整え" className="vid-input" style={inputStyle} />
             </div>
-          )}
-          {customItems.map((c, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
-              <span style={{ flex: 1, minWidth: 0 }}>{c.label}</span>
-              <span style={{ color: "var(--color-neutral-500)" }}>
-                ¥{c.price.toLocaleString("ja-JP")}
-                {c.leadHours != null && `・納期${c.leadHours}時間`}
-              </span>
-              <button onClick={() => bumpCustomQty(i, -1)} disabled={c.qty <= 1} style={stepperBtn}>
-                −
-              </button>
-              <span style={{ width: 20, textAlign: "center" }}>{c.qty}</span>
-              <button onClick={() => bumpCustomQty(i, 1)} style={stepperBtn}>
-                ＋
-              </button>
-              <button onClick={() => setCustomItems((rows) => rows.filter((_, j) => j !== i))} style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
-                <Trash size={12} />
-              </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>時間単価（円/時間）</span>
+                <input value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} type="number" min={0} className="vid-input" style={inputStyle} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>上限額（円）</span>
+                <input value={hourlyCap} onChange={(e) => setHourlyCap(e.target.value)} type="number" min={0} className="vid-input" style={inputStyle} />
+              </div>
             </div>
-          ))}
-          {customItems.length > 0 && (
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--color-neutral-400)" }}>
-              <input type="checkbox" checked={saveAsMenu} onChange={(e) => setSaveAsMenu(e.target.checked)} />
-              この内容を受付メニューにも追加する
-            </label>
-          )}
-        </div>
+            <div style={{ fontSize: 11, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+              実際の請求額は「着手〜完了報告の時間（30分単位で切り上げ・最低3,000円）×時間単価」で、上限額を超えることはありません。依頼主にはこの上限額を見積もりとして提示します。
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ flex: 1, fontSize: 11, color: "var(--color-neutral-500)" }}>受付メニュー</span>
+                <button onClick={() => setShowCustomForm((v) => !v)} style={{ ...smallBtn, height: 26 }}>
+                  ＋項目を追加
+                </button>
+              </div>
+              {priceableMenus.length === 0 && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>金額の設定されたメニューがありません。</div>}
+              {priceableMenus.map((m) => (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</div>
+                    <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>
+                      ¥{m.price.toLocaleString("ja-JP")}・納期{m.leadHours}時間
+                    </div>
+                  </div>
+                  <button onClick={() => bump(m.id, -1)} disabled={!qty[m.id]} style={stepperBtn}>
+                    −
+                  </button>
+                  <span style={{ width: 20, textAlign: "center", fontSize: 13 }}>{qty[m.id] ?? 0}</span>
+                  <button onClick={() => bump(m.id, 1)} style={stepperBtn}>
+                    ＋
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {showCustomForm && (
+                <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>件名</span>
+                    <input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} className="vid-input" style={inputStyle} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 100 }}>
+                    <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>金額</span>
+                    <input value={customPrice} onChange={(e) => setCustomPrice(e.target.value)} type="number" min={0} className="vid-input" style={inputStyle} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 64 }}>
+                    <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>数量</span>
+                    <input value={customQty} onChange={(e) => setCustomQty(e.target.value)} type="number" min={1} className="vid-input" style={inputStyle} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 90 }}>
+                    <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間(h)・任意</span>
+                    <input value={customLeadHours} onChange={(e) => setCustomLeadHours(e.target.value)} type="number" min={1} placeholder="なし" className="vid-input" style={inputStyle} />
+                  </div>
+                  <button onClick={addCustomItem} style={{ ...smallBtn, height: 36 }}>
+                    追加
+                  </button>
+                </div>
+              )}
+              {customItems.map((c, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>{c.label}</span>
+                  <span style={{ color: "var(--color-neutral-500)" }}>
+                    ¥{c.price.toLocaleString("ja-JP")}
+                    {c.leadHours != null && `・納期${c.leadHours}時間`}
+                  </span>
+                  <button onClick={() => bumpCustomQty(i, -1)} disabled={c.qty <= 1} style={stepperBtn}>
+                    −
+                  </button>
+                  <span style={{ width: 20, textAlign: "center" }}>{c.qty}</span>
+                  <button onClick={() => bumpCustomQty(i, 1)} style={stepperBtn}>
+                    ＋
+                  </button>
+                  <button onClick={() => setCustomItems((rows) => rows.filter((_, j) => j !== i))} style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
+                    <Trash size={12} />
+                  </button>
+                </div>
+              ))}
+              {customItems.length > 0 && (
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--color-neutral-400)" }}>
+                  <input type="checkbox" checked={saveAsMenu} onChange={(e) => setSaveAsMenu(e.target.checked)} />
+                  この内容を受付メニューにも追加する
+                </label>
+              )}
+            </div>
+          </>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
           <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払いタイミング</span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {PAYMENT_TIMING_OPTIONS.map((opt) => (
-              <button key={opt.value} onClick={() => setPaymentTiming(opt.value)} style={pillStyle(paymentTiming === opt.value)}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          {isHourly ? (
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>時間精算はチャージ残高からのお支払いのみです。</div>
+          ) : (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {PAYMENT_TIMING_OPTIONS.map((opt) => (
+                <button key={opt.value} onClick={() => setPaymentTiming(opt.value)} style={pillStyle(paymentTiming === opt.value)}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {paymentTiming === "balance" && (
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+              依頼主が見積もりカードから直接お支払いいただきます。チャージ残高が足りていれば、支払いと同時に着手できます。
+            </div>
+          )}
           {paymentTiming === "deposit" && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 12.5 }}>予約金</span>
@@ -1416,68 +1472,70 @@ function QuoteDialog({
           )}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払い方法</span>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => setPayMethod("bank")} style={pillStyle(payMethod === "bank")}>
-              銀行振込
-            </button>
-            {cardPaymentEnabled && (
-              <button onClick={() => setPayMethod("card")} style={pillStyle(payMethod === "card")}>
-                カード決済
+        {paymentTiming !== "balance" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払い方法</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => setPayMethod("bank")} style={pillStyle(payMethod === "bank")}>
+                銀行振込
               </button>
+              {cardPaymentEnabled && (
+                <button onClick={() => setPayMethod("card")} style={pillStyle(payMethod === "card")}>
+                  カード決済
+                </button>
+              )}
+            </div>
+            {payMethod === "bank" ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <input value={bankInfo.holder ?? ""} onChange={(e) => setBankField("holder", e.target.value)} placeholder="口座名義" className="vid-input" style={inputStyle} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  <input value={bankInfo.bankName ?? ""} onChange={(e) => setBankField("bankName", e.target.value)} placeholder="銀行名" className="vid-input" style={inputStyle} />
+                  <input value={bankInfo.branchName ?? ""} onChange={(e) => setBankField("branchName", e.target.value)} placeholder="支店名" className="vid-input" style={inputStyle} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  <input value={bankInfo.accountType ?? ""} onChange={(e) => setBankField("accountType", e.target.value)} placeholder="口座種別（普通・当座）" className="vid-input" style={inputStyle} />
+                  <input value={bankInfo.accountNumber ?? ""} onChange={(e) => setBankField("accountNumber", e.target.value)} placeholder="口座番号" className="vid-input" style={inputStyle} />
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {cardPaymentLinks.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {cardPaymentLinks.map((l) => (
+                      <button
+                        key={l.id}
+                        onClick={() => {
+                          setSelectedLinkId(l.id);
+                          setNewLinkMode(false);
+                        }}
+                        style={pillStyle(!newLinkMode && selectedLinkId === l.id)}
+                      >
+                        {l.title}
+                      </button>
+                    ))}
+                    <button onClick={() => setNewLinkMode(true)} style={pillStyle(newLinkMode)}>
+                      ＋新しいリンク
+                    </button>
+                  </div>
+                )}
+                {newLinkMode ? (
+                  <>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>リンクのタイトル（一覧での表示名）</span>
+                      <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="例：Stripe決済リンクA" className="vid-input" style={inputStyle} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>決済リンクのURL（依頼主に直接表示されます）</span>
+                      <input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="vid-input" style={inputStyle} />
+                    </div>
+                  </>
+                ) : (
+                  selectedLink && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedLink.url}</div>
+                )}
+              </div>
             )}
           </div>
-          {payMethod === "bank" ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <input value={bankInfo.holder ?? ""} onChange={(e) => setBankField("holder", e.target.value)} placeholder="口座名義" className="vid-input" style={inputStyle} />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                <input value={bankInfo.bankName ?? ""} onChange={(e) => setBankField("bankName", e.target.value)} placeholder="銀行名" className="vid-input" style={inputStyle} />
-                <input value={bankInfo.branchName ?? ""} onChange={(e) => setBankField("branchName", e.target.value)} placeholder="支店名" className="vid-input" style={inputStyle} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                <input value={bankInfo.accountType ?? ""} onChange={(e) => setBankField("accountType", e.target.value)} placeholder="口座種別（普通・当座）" className="vid-input" style={inputStyle} />
-                <input value={bankInfo.accountNumber ?? ""} onChange={(e) => setBankField("accountNumber", e.target.value)} placeholder="口座番号" className="vid-input" style={inputStyle} />
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {cardPaymentLinks.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {cardPaymentLinks.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => {
-                        setSelectedLinkId(l.id);
-                        setNewLinkMode(false);
-                      }}
-                      style={pillStyle(!newLinkMode && selectedLinkId === l.id)}
-                    >
-                      {l.title}
-                    </button>
-                  ))}
-                  <button onClick={() => setNewLinkMode(true)} style={pillStyle(newLinkMode)}>
-                    ＋新しいリンク
-                  </button>
-                </div>
-              )}
-              {newLinkMode ? (
-                <>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>リンクのタイトル（一覧での表示名）</span>
-                    <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="例：Stripe決済リンクA" className="vid-input" style={inputStyle} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>決済リンクのURL（依頼主に直接表示されます）</span>
-                    <input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="vid-input" style={inputStyle} />
-                  </div>
-                </>
-              ) : (
-                selectedLink && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedLink.url}</div>
-              )}
-            </div>
-          )}
-        </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
           {due && (
@@ -1497,13 +1555,13 @@ function QuoteDialog({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
-          <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>請求額（依頼主に表示）</span>
+          <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{isHourly ? "上限額（依頼主に表示）" : "請求額（依頼主に表示）"}</span>
           <span style={{ fontSize: 18, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{total.toLocaleString("ja-JP")}</span>
         </div>
 
         {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={submit} disabled={saving || allItems.length === 0} style={{ ...smallBtn, height: 36, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
+          <button onClick={submit} disabled={saving || !canSubmit} style={{ ...smallBtn, height: 36, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
             {saving ? "送信中…" : "見積もりを送る"}
           </button>
           <button onClick={onClose} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>

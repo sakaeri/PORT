@@ -22,7 +22,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, customers(id, name), completion_reports(*), ratings(*)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, hourly_rate, hourly_cap, customers(id, name), completion_reports(*), ratings(*)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -82,6 +82,8 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         bankTransferInfo: canSeeFinance ? request.bank_transfer_info : null,
         cardPaymentLink: canSeeFinance ? request.card_payment_link : null,
         finalCardPaymentLink: canSeeFinance ? request.final_card_payment_link : null,
+        hourlyRate: canSeeFinance ? request.hourly_rate : null,
+        hourlyCap: canSeeFinance ? request.hourly_cap : null,
       }}
       refundPolicies={canSeeFinance ? (refundPolicies ?? []) : []}
       customer={customer ? { id: customer.id, name: customer.name } : null}

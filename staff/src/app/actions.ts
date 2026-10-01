@@ -808,25 +808,37 @@ export async function createCaseRequest(
     bankInfo?: BankTransferInfo;
     cardPaymentLink?: string;
     saveCardPaymentLink?: { title: string; url: string };
+    // メニューに無い依頼を時間精算にする場合。設定すると items は無視し、
+    // payment_timing は強制的に "balance" にする（時間単価の請求は
+    // チャージ残高からの支払い以外あり得ないため）。
+    hourly?: { rate: number; cap: number; label: string };
   },
 ) {
   const ctx = await requireContext();
   const supabase = await createClient();
-  const items = input.items.filter((it) => it.qty > 0 && it.label.trim());
-  if (items.length === 0) throw new Error("見積もりの項目を1つ以上追加してください");
+  const isHourly = !!input.hourly;
+  const items = isHourly ? [] : input.items.filter((it) => it.qty > 0 && it.label.trim());
+  if (!isHourly && items.length === 0) throw new Error("見積もりの項目を1つ以上追加してください");
+  if (isHourly && (!input.hourly!.rate || !input.hourly!.cap)) throw new Error("時間単価と上限額を入力してください");
 
-  const amount = items.reduce((sum, it) => sum + it.price * it.qty, 0);
-  const title = items.length > 2 ? `${items[0].label}ほか${items.length - 1}件` : items.map((it) => it.label).join("・");
+  const amount = isHourly ? input.hourly!.cap : items.reduce((sum, it) => sum + it.price * it.qty, 0);
+  const title = isHourly
+    ? input.hourly!.label.trim() || "時間精算の依頼"
+    : items.length > 2
+      ? `${items[0].label}ほか${items.length - 1}件`
+      : items.map((it) => it.label).join("・");
   // 着手時に納期（due_at）を計算するための作業時間の目安を保存しておく
   // （項目ごとの目安時間 × 数量。複数項目は並行して進む前提でmaxを取る）。
+  // 時間精算案件は着手〜完了の実測で金額を決めるので目安自体は使わない。
   const knownLeadHours = items.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
-  const leadHoursTotal = knownLeadHours.length > 0 ? Math.max(...knownLeadHours) : null;
+  const leadHoursTotal = isHourly ? null : knownLeadHours.length > 0 ? Math.max(...knownLeadHours) : null;
 
-  const depositPercent = input.paymentTiming === "deposit" ? Math.min(100, Math.max(1, Math.round(input.depositPercent ?? 0))) : null;
-  if (input.paymentTiming === "deposit" && !depositPercent) throw new Error("予約金の割合を入力してください");
+  const paymentTiming: PaymentTiming = isHourly ? "balance" : input.paymentTiming;
+  const depositPercent = paymentTiming === "deposit" ? Math.min(100, Math.max(1, Math.round(input.depositPercent ?? 0))) : null;
+  if (paymentTiming === "deposit" && !depositPercent) throw new Error("予約金の割合を入力してください");
   const depositAmount = depositPercent ? Math.round((amount * depositPercent) / 100) : null;
 
-  if (input.saveAsMenu) {
+  if (!isHourly && input.saveAsMenu) {
     const customItems = items.filter((it) => !it.menuId);
     if (customItems.length > 0) {
       const { error: menuError } = await supabase
@@ -836,7 +848,7 @@ export async function createCaseRequest(
     }
   }
 
-  if (input.payMethod === "card" && input.saveCardPaymentLink?.url.trim()) {
+  if (!isHourly && input.payMethod === "card" && input.saveCardPaymentLink?.url.trim()) {
     const { error: linkError } = await supabase
       .from("card_payment_links")
       .insert({ org_id: ctx.orgId, title: input.saveCardPaymentLink.title.trim() || "決済リンク", url: input.saveCardPaymentLink.url.trim() });
@@ -854,21 +866,25 @@ export async function createCaseRequest(
       phase: "quoted",
       quoted_at: new Date().toISOString(),
       lead_hours: leadHoursTotal,
-      payment_timing: input.paymentTiming,
+      payment_timing: paymentTiming,
       deposit_percent: depositPercent,
       deposit_amount: depositAmount,
-      pay_method: input.payMethod,
-      bank_transfer_info: input.payMethod === "bank" ? (input.bankInfo ?? {}) : null,
-      card_payment_link: input.payMethod === "card" ? (input.cardPaymentLink?.trim() || null) : null,
+      pay_method: paymentTiming === "balance" ? null : input.payMethod,
+      bank_transfer_info: !isHourly && input.payMethod === "bank" ? (input.bankInfo ?? {}) : null,
+      card_payment_link: !isHourly && input.payMethod === "card" ? (input.cardPaymentLink?.trim() || null) : null,
+      hourly_rate: isHourly ? input.hourly!.rate : null,
+      hourly_cap: isHourly ? input.hourly!.cap : null,
     })
     .select("id")
     .single();
   if (reqError || !request) throw reqError ?? new Error("案件の作成に失敗しました");
 
-  const { error: itemsError } = await supabase
-    .from("request_items")
-    .insert(items.map((it, i) => ({ request_id: request.id, menu_id: it.menuId, label: it.label, price: it.price, payout: it.payout, qty: it.qty, sort: i })));
-  if (itemsError) throw itemsError;
+  if (!isHourly) {
+    const { error: itemsError } = await supabase
+      .from("request_items")
+      .insert(items.map((it, i) => ({ request_id: request.id, menu_id: it.menuId, label: it.label, price: it.price, payout: it.payout, qty: it.qty, sort: i })));
+    if (itemsError) throw itemsError;
+  }
 
   const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: input.due.trim() || undefined };
   const { error: msgError } = await supabase.from("messages").insert({
@@ -1095,6 +1111,10 @@ export async function submitCaseReport(
 
   const { error: reqError } = await supabase.from("requests").update({ phase: "completed", completed_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
   if (reqError) throw reqError;
+  // 時間精算案件なら、ここで着手〜完了の実働時間から最終金額を確定し、
+  // 見積もり時に引き落とした上限額との差額をチャージ残高に戻す
+  // （固定額案件（hourly_rateがnull）には何もしない）。
+  await supabase.rpc("finalize_hourly_billing", { p_request_id: requestId });
   await postCaseNotice(supabase, requestId, "完了報告を送信しました");
   await notifyCustomerCompletionReport(createServiceRoleClient(), ctx.orgId, request.customer_id);
 }
@@ -1122,6 +1142,7 @@ export async function approveCaseReport(requestId: string) {
 
   const { error: reqError } = await supabase.from("requests").update({ phase: "completed", completed_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
   if (reqError) throw reqError;
+  await supabase.rpc("finalize_hourly_billing", { p_request_id: requestId });
   await postCaseNotice(supabase, requestId, "完了報告を確認し、依頼主に送信しました");
   await notifyCustomerCompletionReport(createServiceRoleClient(), ctx.orgId, request.customer_id);
 }

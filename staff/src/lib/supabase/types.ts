@@ -37,7 +37,7 @@ export type RefundStage = "prequote" | "accepted" | "started" | "delivered" | "t
 export type RefundMode = "nocharge" | "full" | "partial" | "none";
 export type PaymentMethod = "card" | "bank";
 export type PaymentStatus = "unpaid" | "processing" | "paid" | "refunded" | "failed";
-export type PaymentTiming = "prepay_full" | "deposit" | "before_shipping" | "postpay";
+export type PaymentTiming = "prepay_full" | "deposit" | "before_shipping" | "postpay" | "balance";
 export type AgreementKind = "contract" | "employment_part" | "employment_full" | "nda" | "consent";
 export type PayMode = "hourly" | "daily" | "monthly" | "menu" | "share" | "none";
 export type PlanStatus = "trial" | "active" | "past_due" | "paused" | "cancelled";
@@ -334,6 +334,8 @@ export interface Database {
           card_payment_link: string | null;
           final_card_payment_link: string | null;
           reminder_sent_at: string | null;
+          hourly_rate: number | null;
+          hourly_cap: number | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]> & { customer_id: string; title: string };
@@ -549,6 +551,7 @@ export interface Database {
       org_id_by_domain: { Args: { p_domain: string }; Returns: string };
       org_id_by_slug: { Args: { p_slug: string }; Returns: string | null };
       ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
+      finalize_hourly_billing: { Args: { p_request_id: string }; Returns: void };
       my_companies: {
         Args: Record<string, never>;
         Returns: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];

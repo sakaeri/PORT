@@ -253,6 +253,23 @@ export async function skipRating(requestId: string) {
   if (error) throw error;
 }
 
+// チャージ残高からの支払い。二重消費を防ぐためのロック・検証はすべて
+// pay_request_from_balance（DB側のsecurity definer関数）の中で行う。
+export async function payFromBalance(requestId: string) {
+  await requireActiveContext();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("pay_request_from_balance", { p_request_id: requestId });
+  if (error) throw error;
+
+  const admin = createServiceRoleClient();
+  const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
+  if (caseThread) {
+    const now = new Date().toISOString();
+    await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body: "残高からお支払いいただき、着手しました" });
+    await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
+  }
+}
+
 export async function cancelRequest(requestId: string) {
   const ctx = await requireContext();
   const admin = createServiceRoleClient();

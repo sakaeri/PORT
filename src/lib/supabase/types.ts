@@ -34,7 +34,7 @@ export type RefundStage = "prequote" | "accepted" | "started" | "delivered" | "t
 export type RefundMode = "nocharge" | "full" | "partial" | "none";
 export type PaymentMethod = "card" | "bank";
 export type PaymentStatus = "unpaid" | "processing" | "paid" | "refunded" | "failed";
-export type PaymentTiming = "prepay_full" | "deposit" | "before_shipping" | "postpay";
+export type PaymentTiming = "prepay_full" | "deposit" | "before_shipping" | "postpay" | "balance";
 
 export interface BankTransferInfo {
   holder?: string;
@@ -228,6 +228,8 @@ export interface Database {
           bank_transfer_info: BankTransferInfo | null;
           card_payment_link: string | null;
           final_card_payment_link: string | null;
+          hourly_rate: number | null;
+          hourly_cap: number | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]>;
@@ -369,6 +371,7 @@ export interface Database {
       org_id_by_domain: { Args: { p_domain: string }; Returns: string };
       org_id_by_slug: { Args: { p_slug: string }; Returns: string | null };
       ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
+      pay_request_from_balance: { Args: { p_request_id: string }; Returns: void };
       my_companies: {
         Args: Record<string, never>;
         Returns: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];

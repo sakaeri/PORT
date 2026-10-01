@@ -14,6 +14,7 @@ import {
   cancelRequest,
   submitRating,
   skipRating,
+  payFromBalance,
 } from "@/app/actions";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
@@ -259,7 +260,12 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
                   msg={m}
                   bundle={m.requestBundle}
                   refundPolicies={refundPolicies}
+                  balance={ctx.balance}
                   onCancel={setCancelTargetId}
+                  onPay={async (id) => {
+                    await payFromBalance(id);
+                    await refresh();
+                  }}
                   onSubmitRating={async (id, stars, comment) => {
                     await submitRating(id, stars, comment);
                     await refresh();

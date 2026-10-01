@@ -94,6 +94,8 @@ export default function CaseDetail({
     bankTransferInfo: BankTransferInfo | null;
     cardPaymentLink: string | null;
     finalCardPaymentLink: string | null;
+    hourlyRate: number | null;
+    hourlyCap: number | null;
   };
   refundPolicies: RefundPolicyRow[];
   customer: { id: string; name: string } | null;
@@ -231,7 +233,12 @@ export default function CaseDetail({
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
             支払い：{PAYMENT_TIMING_LABEL[request.paymentTiming]}
             {request.paymentTiming === "deposit" && request.depositAmount != null && `（予約金 ¥${request.depositAmount.toLocaleString("ja-JP")}・${request.depositPercent}%）`}
-            ・{request.payMethod === "card" ? "カード決済" : "銀行振込"}
+            {request.payMethod && `・${request.payMethod === "card" ? "カード決済" : "銀行振込"}`}
+          </div>
+        )}
+        {canSeeFinance && request.hourlyRate != null && (
+          <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+            時間精算：時間単価¥{request.hourlyRate.toLocaleString("ja-JP")}・上限¥{(request.hourlyCap ?? 0).toLocaleString("ja-JP")}
           </div>
         )}
         {canSeeFinance && request.payMethod === "bank" && request.bankTransferInfo && (
@@ -273,6 +280,11 @@ export default function CaseDetail({
                   {busy ? "処理中…" : "着手する"}
                 </button>
               </>
+            )}
+            {request.paymentTiming === "balance" && (
+              <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
+                依頼主がチャージ残高から直接お支払いいただくと、自動で着手になります。
+              </div>
             )}
           </div>
         )}

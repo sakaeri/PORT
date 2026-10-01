@@ -213,14 +213,18 @@ export function RequestCard({
   msg,
   bundle,
   refundPolicies,
+  balance,
   onCancel,
+  onPay,
   onSubmitRating,
   onSkipRating,
 }: {
   msg: MessageWithExtras;
   bundle: RequestBundle;
   refundPolicies: RefundPolicyRow[];
+  balance: number;
   onCancel: (id: string) => void;
+  onPay: (id: string) => Promise<void>;
   onSubmitRating: (id: string, stars: number, comment: string) => void;
   onSkipRating: (id: string) => void;
 }) {
@@ -228,6 +232,8 @@ export function RequestCard({
   const payload = msg.payload as { title?: string; note?: string; due?: string };
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
 
   const showProgress = !["quoted", "declined"].includes(r.phase);
   const showReport = r.phase === "completed" && !!report?.sent_at;
@@ -235,6 +241,19 @@ export function RequestCard({
   const refund = computeRefund(r, refundPolicies);
   const started = !!r.started_at;
   const canCancel = ["preparing", "started"].includes(r.phase);
+
+  async function handlePay() {
+    if (paying) return;
+    setPaying(true);
+    setPayError("");
+    try {
+      await onPay(r.id);
+    } catch (e) {
+      setPayError(errorMessage(e, "お支払いできませんでした"));
+    } finally {
+      setPaying(false);
+    }
+  }
 
   return (
     <div style={{ ...bubbleShell, alignSelf: "flex-start" }}>
@@ -263,8 +282,13 @@ export function RequestCard({
           )}
           <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 8 }}>
             <span style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--font-heading)" }}>{yen(r.amount)}</span>
-            <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>（税込）</span>
+            <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>（{r.hourly_rate != null ? "上限・税込" : "税込"}）</span>
           </div>
+          {r.hourly_rate != null && (
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6, marginTop: 2 }}>
+              時間精算（時間単価{yen(r.hourly_rate)}）です。実際にかかった時間に応じて、上限額を超えない範囲で請求されます。
+            </div>
+          )}
           {payload.due && (
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6, fontSize: 12.5 }}>
               <span style={{ color: "var(--color-neutral-500)" }}>対応の目安</span>
@@ -279,11 +303,42 @@ export function RequestCard({
             ) : (
               <div style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-neutral-300)", padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 4 }}>
                 <div style={kicker}>お支払いについて</div>
-                <div>
-                  {PAYMENT_TIMING_LABEL[r.payment_timing]}
-                  {r.payment_timing === "deposit" && r.deposit_amount != null && `・予約金 ${yen(r.deposit_amount)}`}
-                </div>
-                <div style={{ color: "var(--color-neutral-500)" }}>{paymentTimingNote(r)}</div>
+                {r.payment_timing === "balance" ? (
+                  <>
+                    <div>残高：{yen(balance)}</div>
+                    {balance < r.amount && (
+                      <div style={{ color: "var(--color-accent-200)" }}>残高が不足しています。マイページからチャージしてください。</div>
+                    )}
+                    {payError && <div style={{ color: "var(--color-accent-200)" }}>{payError}</div>}
+                    <button
+                      onClick={handlePay}
+                      disabled={paying || balance < r.amount}
+                      style={{
+                        alignSelf: "flex-start",
+                        marginTop: 4,
+                        height: 34,
+                        padding: "0 14px",
+                        cursor: balance < r.amount ? "not-allowed" : "pointer",
+                        fontSize: 12.5,
+                        color: "var(--color-accent-100)",
+                        background: "var(--color-accent-900)",
+                        border: "1px solid var(--color-accent)",
+                        borderRadius: "var(--radius-md)",
+                        opacity: paying || balance < r.amount ? 0.6 : 1,
+                      }}
+                    >
+                      {paying ? "処理中…" : `残高から支払う（${yen(r.amount)}）`}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      {PAYMENT_TIMING_LABEL[r.payment_timing]}
+                      {r.payment_timing === "deposit" && r.deposit_amount != null && `・予約金 ${yen(r.deposit_amount)}`}
+                    </div>
+                    <div style={{ color: "var(--color-neutral-500)" }}>{paymentTimingNote(r)}</div>
+                  </>
+                )}
                 {r.payment_timing === "deposit" && r.deposit_paid_at && (
                   <div style={{ color: "var(--color-accent-300)" }}>
                     予約金は入金済みです。{r.pay_method === "bank" && "残金は対応完了後にご案内します。"}
