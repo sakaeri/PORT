@@ -265,7 +265,7 @@ export async function payFromBalance(requestId: string) {
   const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
   if (caseThread) {
     const now = new Date().toISOString();
-    await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body: "残高からお支払いいただきました" });
+    await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body: "依頼を確定し、残高からお支払いいただきました" });
     await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
   }
 }

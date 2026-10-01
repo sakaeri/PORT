@@ -302,7 +302,7 @@ export function RequestCard({
               </span>
             ) : (
               <div style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.6, color: "var(--color-neutral-300)", padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 4 }}>
-                <div style={kicker}>お支払いについて</div>
+                <div style={kicker}>{r.payment_timing === "balance" ? "依頼の確定について" : "お支払いについて"}</div>
                 {r.payment_timing === "balance" ? (
                   <>
                     <div>残高：{yen(balance)}</div>
@@ -327,7 +327,7 @@ export function RequestCard({
                         opacity: paying || balance < r.amount ? 0.6 : 1,
                       }}
                     >
-                      {paying ? "処理中…" : `残高から支払う（${yen(r.amount)}）`}
+                      {paying ? "処理中…" : `依頼を確定する（${yen(r.amount)}）`}
                     </button>
                   </>
                 ) : (
