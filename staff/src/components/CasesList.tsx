@@ -16,6 +16,9 @@ export interface CaseRow {
   dueAt: string | null;
   overdue: boolean;
   dueSoon: boolean;
+  // 着手済み（started）で、スタッフが完了報告を提出済みだが、まだマネージャー・
+  // 本部メンバーが依頼主に送っていない状態（＝報告済み・承認待ち）。
+  reportPending: boolean;
   cancelRequested: boolean;
   customerName: string;
   threadId: string | null;
@@ -23,7 +26,7 @@ export interface CaseRow {
   lastMessagePreview: string | null;
 }
 
-type Filter = "all" | "preparing" | "dueSoon" | "cancelRequested";
+type Filter = "all" | "preparing" | "awaitingReport" | "reportPending" | "completed" | "declined";
 
 export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }: { rows: CaseRow[]; canDelete: boolean; canSeeAmount: boolean }) {
   const [rows, setRows] = useState(initialRows);
@@ -32,16 +35,23 @@ export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }
   const [busyId, setBusyId] = useState<string | null>(null);
   const active = rows.filter((r) => !r.archived);
   const archivedCount = rows.filter((r) => r.archived).length;
+  // 「見送り」は件数が増えると埋もれて邪魔になるだけなので、「すべて」には
+  // 出さず、専用のチップでだけ見られるようにする。
+  const allCount = active.filter((r) => r.phase !== "declined").length;
   const preparingCount = active.filter((r) => r.phase === "preparing").length;
-  const dueSoonCount = active.filter((r) => r.dueSoon).length;
-  const cancelRequestedCount = active.filter((r) => r.cancelRequested).length;
+  const awaitingReportCount = active.filter((r) => r.phase === "started" && !r.reportPending).length;
+  const reportPendingCount = active.filter((r) => r.reportPending).length;
+  const completedCount = active.filter((r) => r.phase === "completed").length;
+  const declinedCount = active.filter((r) => r.phase === "declined").length;
   const visible = rows
     .filter((r) => !r.archived || showArchived)
     .filter((r) => {
       if (filter === "preparing") return r.phase === "preparing";
-      if (filter === "dueSoon") return r.dueSoon;
-      if (filter === "cancelRequested") return r.cancelRequested;
-      return true;
+      if (filter === "awaitingReport") return r.phase === "started" && !r.reportPending;
+      if (filter === "reportPending") return r.reportPending;
+      if (filter === "completed") return r.phase === "completed";
+      if (filter === "declined") return r.phase === "declined";
+      return r.phase !== "declined";
     });
 
   async function toggleArchive(r: CaseRow) {
@@ -73,10 +83,12 @@ export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }
   }
 
   const chips: { key: Filter; label: string; count: number }[] = [
-    { key: "all", label: "すべて", count: active.length },
+    { key: "all", label: "すべて", count: allCount },
     { key: "preparing", label: "未着手", count: preparingCount },
-    { key: "dueSoon", label: "期限が近い", count: dueSoonCount },
-    { key: "cancelRequested", label: "キャンセル申請中", count: cancelRequestedCount },
+    { key: "awaitingReport", label: "報告前", count: awaitingReportCount },
+    { key: "reportPending", label: "報告済み", count: reportPendingCount },
+    { key: "completed", label: "完了", count: completedCount },
+    { key: "declined", label: "見送り", count: declinedCount },
   ];
 
   return (
@@ -148,7 +160,7 @@ export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }
               </div>
             )}
             <div style={{ flex: "none", fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)", whiteSpace: "nowrap" }}>
-              {PHASE_LABEL[r.phase]}
+              {r.reportPending ? "報告済み（承認待ち）" : PHASE_LABEL[r.phase]}
             </div>
             <RowKebabMenu
               archived={r.archived}

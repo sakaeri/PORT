@@ -432,7 +432,7 @@ function CompletionReportForm({ requestId, canSendDirectly }: { requestId: strin
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {!canSendDirectly && (
         <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-          提出するとマネージャー・オーナーの確認待ちになります。承認されるまで依頼主には送られません。
+          提出するとマネージャー・本部メンバーの確認待ちになります。承認されるまで依頼主には送られません。
         </div>
       )}
       <textarea

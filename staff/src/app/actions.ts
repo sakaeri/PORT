@@ -29,7 +29,7 @@ async function requireHq() {
 // 削除は案件自体の完全削除につながるため）。
 function requireDeletePermission(ctx: { role: string }) {
   if (ctx.role === "dept_leader") {
-    throw new Error("削除はスタッフには許可されていません。オーナーまたはマネージャーにご依頼ください。");
+    throw new Error("削除はスタッフには許可されていません。本部メンバーまたはマネージャーにご依頼ください。");
   }
 }
 
@@ -142,7 +142,7 @@ export async function updateOrgDisplayName(displayName: string) {
   const supabase = await createClient();
   const { data, error } = await supabase.from("organizations").update({ display_name: trimmed }).eq("id", ctx.orgId).select("id");
   if (error) throw error;
-  if (!data?.length) throw new Error("この変更はオーナーのみ行えます");
+  if (!data?.length) throw new Error("この変更は本部メンバーのみ行えます");
 }
 
 // 受付メニューはFC展開時のブランド・料金統一のため本部限定。イレギュラーな
@@ -454,7 +454,7 @@ export async function convertCustomerToOrg(customerId: string, fields: OrgAccoun
 // する（reception が勝手に窓口を増やせると困るため）。
 export async function createOrgForCurrentUser(fields: OrgFields) {
   const ctx = await requireContext();
-  if (ctx.role !== "owner") throw new Error("この操作はオーナーのみ行えます");
+  if (ctx.role !== "owner") throw new Error("この操作は本部メンバーのみ行えます");
 
   const admin = createServiceRoleClient();
   const result = await createOrgRow(fields, admin);
@@ -981,7 +981,7 @@ export async function submitCaseReport(
 // 依頼主に送る。
 export async function approveCaseReport(requestId: string) {
   const ctx = await requireContext();
-  if (ctx.role !== "owner" && ctx.role !== "dept_manager") throw new Error("この操作はオーナー・マネージャーのみ行えます");
+  if (ctx.role !== "owner" && ctx.role !== "dept_manager") throw new Error("この操作は本部メンバー・マネージャーのみ行えます");
   const supabase = await createClient();
 
   const { data: request } = await supabase.from("requests").select("id, phase, customer_id").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();

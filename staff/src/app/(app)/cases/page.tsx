@@ -10,7 +10,7 @@ export default async function CasesPage() {
   if (!ctx) return null;
 
   const supabase = await createClient();
-  const [{ data: requests, error }, { data: caseThreads, error: threadsError }, { data: summaries, error: summariesError }] = await Promise.all([
+  const [{ data: requests, error }, { data: caseThreads, error: threadsError }, { data: summaries, error: summariesError }, { data: unsentReports }] = await Promise.all([
     supabase
       .from("requests")
       .select("id, title, amount, phase, pay_status, due_at, cancel_requested_at, created_at, customers(name)")
@@ -18,6 +18,10 @@ export default async function CasesPage() {
       .order("created_at", { ascending: false }),
     supabase.from("threads").select("id, request_id, archived_at").eq("org_id", ctx.orgId).eq("kind", "case"),
     supabase.rpc("case_thread_summaries", { p_org_id: ctx.orgId }),
+    // 着手中（started）の案件のうち、スタッフが完了報告を提出済みだが、まだ
+    // マネージャー・本部メンバーが依頼主に送っていない（＝報告済み・承認待ち）
+    // ものを調べるため。
+    supabase.from("completion_reports").select("request_id").is("sent_at", null),
   ]);
   if (error) console.error("requests select failed:", error);
   if (threadsError) console.error("case threads select failed:", threadsError);
@@ -25,6 +29,7 @@ export default async function CasesPage() {
 
   const threadByRequestId = new Map((caseThreads ?? []).map((t) => [t.request_id, t]));
   const summaryByRequestId = new Map((summaries ?? []).map((s) => [s.request_id, s]));
+  const unsentReportRequestIds = new Set((unsentReports ?? []).map((r) => r.request_id));
   // 着手後、報告の目安時間（due_at）まで残り15分以内（経過済みも含む）か
   // どうかの判定に使う閾値。ナビの赤丸バッジ（Shell.tsx）と同じ基準。
   const soonThreshold = new Date(new Date().getTime() + 15 * 60 * 1000);
@@ -41,6 +46,7 @@ export default async function CasesPage() {
         : null;
     const overdue = r.due_at != null && ["preparing", "started"].includes(r.phase) && new Date(r.due_at) < new Date();
     const dueSoon = r.due_at != null && r.phase === "started" && new Date(r.due_at) <= soonThreshold;
+    const reportPending = r.phase === "started" && unsentReportRequestIds.has(r.id);
     return {
       id: r.id,
       title: r.title,
@@ -50,6 +56,7 @@ export default async function CasesPage() {
       dueAt: r.due_at,
       overdue,
       dueSoon,
+      reportPending,
       cancelRequested: r.cancel_requested_at != null,
       customerName: customer?.name ?? "—",
       threadId: thread?.id ?? null,

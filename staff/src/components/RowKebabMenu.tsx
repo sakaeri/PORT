@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { DotsThreeVertical, Archive, ArrowCounterClockwise, Trash } from "@phosphor-icons/react";
 
 const kebabBtn: React.CSSProperties = {
@@ -94,54 +95,61 @@ export default function RowKebabMenu({
       <button ref={btnRef} onClick={handleToggle} disabled={busy} aria-label="操作メニュー" style={kebabBtn}>
         <DotsThreeVertical size={15} />
       </button>
-      {open && pos && (
-        <>
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 59 }} />
-          <div
-            style={{
-              position: "fixed",
-              top: pos.top,
-              bottom: pos.bottom,
-              left: pos.left,
-              zIndex: 60,
-              width: MENU_WIDTH,
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-              padding: 6,
-              borderRadius: "var(--radius-md)",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-divider)",
-              boxShadow: "var(--shadow-md)",
-            }}
-          >
-            {onToggleArchive && (
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  onToggleArchive();
-                }}
-                style={menuItem}
-              >
-                {archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
-                {archived ? unarchiveLabel : archiveLabel}
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  onDelete();
-                }}
-                style={{ ...menuItem, color: "var(--color-accent-200)" }}
-              >
-                <Trash size={13} />
-                {deleteLabel}
-              </button>
-            )}
-          </div>
-        </>
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          // archived（非表示）行などで親に opacity が掛かっていると、position:
+          // fixed でも描画そのものは親の合成レイヤーに含まれてしまい、メニューが
+          // 透けて見えてしまう。document.body 直下に portal で出すことで、
+          // どんな行から開いても常に不透明に表示されるようにする。
+          <>
+            <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 59 }} />
+            <div
+              style={{
+                position: "fixed",
+                top: pos.top,
+                bottom: pos.bottom,
+                left: pos.left,
+                zIndex: 60,
+                width: MENU_WIDTH,
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                padding: 6,
+                borderRadius: "var(--radius-md)",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-divider)",
+                boxShadow: "var(--shadow-md)",
+              }}
+            >
+              {onToggleArchive && (
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    onToggleArchive();
+                  }}
+                  style={menuItem}
+                >
+                  {archived ? <ArrowCounterClockwise size={13} /> : <Archive size={13} />}
+                  {archived ? unarchiveLabel : archiveLabel}
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    onDelete();
+                  }}
+                  style={{ ...menuItem, color: "var(--color-accent-200)" }}
+                >
+                  <Trash size={13} />
+                  {deleteLabel}
+                </button>
+              )}
+            </div>
+          </>,
+          document.body,
+        )}
     </div>
   );
 }

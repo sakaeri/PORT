@@ -20,8 +20,8 @@ import type { StaffContext } from "@/lib/data";
 const NAV = [
   { href: "/customers", label: "依頼主", icon: Users, hideWhenStaff: true },
   { href: "/cases", label: "案件トーク", icon: ChatsCircle },
-  { href: "/stats", label: "売上・実績", icon: ChartBar, hideWhenStaff: true },
   { href: "/staff", label: "スタッフ", icon: UsersThree },
+  { href: "/stats", label: "売上・実績", icon: ChartBar, hideWhenStaff: true },
   { href: "/menu", label: "メニュー管理", icon: GearSix, hideWhenStaff: true },
   { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true },
 ];

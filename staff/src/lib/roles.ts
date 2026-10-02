@@ -5,7 +5,7 @@ import type { AppRole, StaffRole } from "@/lib/supabase/types";
 // 作業する役割）。窓口には所属しない — マネージャーが案件ごとに直接
 // 「＋スタッフ追加」するので、窓口の割り当ては不要。
 export const ROLE_LABEL: Record<StaffRole, string> = {
-  owner: "オーナー",
+  owner: "本部メンバー",
   dept_manager: "マネージャー",
   dept_leader: "スタッフ",
 };

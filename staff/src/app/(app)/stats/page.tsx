@@ -27,32 +27,8 @@ function monthKeyJST(iso: string): string {
   return `${parts.find((p) => p.type === "year")!.value}-${parts.find((p) => p.type === "month")!.value}`;
 }
 
-function parseMonthKey(key: string): { year: number; month: number } {
-  const [y, m] = key.split("-").map(Number);
-  return { year: y, month: m };
-}
-
 function monthKeyFromYM(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
-}
-
-function addMonths(year: number, month: number, delta: number): { year: number; month: number } {
-  const total = year * 12 + (month - 1) + delta;
-  return { year: Math.floor(total / 12), month: (((total % 12) + 12) % 12) + 1 };
-}
-
-// 実績のある最も古い月〜今月までを連続した一覧にする（データがなければ今月だけ）。
-function monthRange(oldestKey: string | null): { key: string; label: string }[] {
-  const { year, month } = nowJSTYearMonth();
-  const currentKey = monthKeyFromYM(year, month);
-  const start = oldestKey && oldestKey < currentKey ? parseMonthKey(oldestKey) : { year, month };
-  const out: { key: string; label: string }[] = [];
-  let { year: y, month: m } = start;
-  while (monthKeyFromYM(y, m) <= currentKey) {
-    out.push({ key: monthKeyFromYM(y, m), label: `${y}年${m}月` });
-    ({ year: y, month: m } = addMonths(y, m, 1));
-  }
-  return out;
 }
 
 export default async function StatsPage() {
@@ -134,44 +110,32 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
   const departmentIdByCustomer = new Map((customerThreads ?? []).map((t) => [t.customer_id, t.department_id]));
   const { year, month } = nowJSTYearMonth();
   const currentKey = monthKeyFromYM(year, month);
+  const currentLabel = `${year}年${month}月`;
 
   // 窓口（マネージャー）ごとに集計する。支払いは残高払いに一本化されているので、
   // pay_status='paid'かどうかだけで入金済みを判定する（見積もり金額ではなく、
-  // 実際に支払われた金額）。
+  // 実際に支払われた金額）。月をまたいだ履歴は持たず「今月」だけを見せる
+  // （過去分は累計の入金額タイルで足りるため、複雑にしない）。
   function buildStat(matchDeptId: string | null, id: string, name: string, royaltyPct: number | null): DepartmentStat {
     const deptRows = rows.filter((r) => (departmentIdByCustomer.get(r.customer_id) ?? null) === matchDeptId);
     const total = deptRows.reduce((s, r) => (r.pay_status === "paid" ? s + r.amount : s), 0);
     const quoted = deptRows.filter((r) => r.phase === "quoted").length;
     const completed = deptRows.filter((r) => r.phase === "completed").length;
 
-    // 支払い済みは、支払った月ごとに1件＝1行としてそのまま表示する（依頼主・見積もりタイトルつき）。
-    const confirmedRows: (MonthRow & { at: string })[] = [];
+    const paidThisMonth: MonthRow[] = [];
     let monthRevenue = 0;
     for (const r of deptRows) {
-      if (r.pay_status === "paid" && r.paid_at) {
-        confirmedRows.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid", at: r.paid_at });
-        if (monthKeyJST(r.paid_at) === currentKey) monthRevenue += r.amount;
+      if (r.pay_status === "paid" && r.paid_at && monthKeyJST(r.paid_at) === currentKey) {
+        paidThisMonth.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid" });
+        monthRevenue += r.amount;
       }
     }
-    const paidByMonth = new Map<string, MonthRow[]>();
-    for (const c of confirmedRows) {
-      const key = monthKeyJST(c.at);
-      const list = paidByMonth.get(key) ?? [];
-      list.push(c);
-      paidByMonth.set(key, list);
-    }
-
-    // 支払い待ち（未回収）は、過去の月ではなく今の状況として今月のところにだけ表示する。
     const pendingRows: MonthRow[] = deptRows
       .filter((r) => r.pay_status !== "paid" && !["draft", "cancelled", "declined"].includes(r.phase))
       .map((r) => ({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "pending" as const }))
       .filter((r) => r.amount > 0);
 
-    const oldestKey = confirmedRows.length ? confirmedRows.map((c) => monthKeyJST(c.at)).reduce((a, b) => (a < b ? a : b)) : null;
-    const months: MonthBreakdown[] = monthRange(oldestKey).map((m) => {
-      const paid = paidByMonth.get(m.key) ?? [];
-      return { key: m.key, label: m.label, rows: m.key === currentKey ? [...pendingRows, ...paid] : paid };
-    });
+    const months: MonthBreakdown[] = [{ key: currentKey, label: currentLabel, rows: [...pendingRows, ...paidThisMonth] }];
 
     return { id, name, royaltyPct, total, quoted, completed, monthRevenue, months };
   }
