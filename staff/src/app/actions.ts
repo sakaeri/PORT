@@ -1266,9 +1266,12 @@ export async function updateMenuDepartment(menuId: string, departmentId: string 
   if (error) throw error;
 }
 
+// dept_manager は窓口＝自分の担当範囲として必須（1つ以上）。dept_leader
+// （スタッフ）の窓口は「どのマネージャーに割り当てられているか」を表す
+// もので、必須ではない（本部が直接招待した直後などは未割り当てでもよい）。
 function normalizeStaffDepartments(role: StaffRole, departmentIds: string[]) {
-  if (role !== "dept_manager") return [];
-  if (departmentIds.length === 0) throw new Error("マネージャーは担当する窓口を1つ以上選んでください");
+  if (role === "owner") return [];
+  if (role === "dept_manager" && departmentIds.length === 0) throw new Error("マネージャーは担当する窓口を1つ以上選んでください");
   return departmentIds;
 }
 
@@ -1280,16 +1283,24 @@ async function replaceStaffDepartments(admin: ReturnType<typeof createServiceRol
   }
 }
 
-// メールアドレス・パスワードをこちらで発行する代わりに、招待リンクを発行する。役職・担当窓口は
+async function departmentIdsOf(admin: ReturnType<typeof createServiceRoleClient>, profileId: string) {
+  const { data } = await admin.from("staff_departments").select("department_id").eq("profile_id", profileId);
+  return (data ?? []).map((d) => d.department_id as string);
+}
+
+// メールアドレス・パスワードをこちらで発行する代わりに、招待リンクを発行する。役職は
 // ここでは決めず、参加後にチャット画面の歯車パネルから設定する（役職も
 // あとで変更できるので、招待の時点で決め切る意味がない）。招待は常に
-// 一番権限の小さいスタッフ（dept_leader）として作られる。
+// 一番権限の小さいスタッフ（dept_leader）として作られる。マネージャーが
+// 招待した場合は、そのまま自分の窓口のスタッフとして参加する（本部が
+// 招待した場合は窓口未設定のまま＝あとで本部がどこかの窓口に割り当てる）。
 export async function createStaffInvite() {
   const ctx = await requireManagerOrAbove();
   const admin = createServiceRoleClient();
+  const departmentIds = ctx.role === "dept_manager" ? await departmentIdsOf(admin, ctx.userId) : [];
   const { data, error } = await admin
     .from("staff_invites")
-    .insert({ org_id: ctx.orgId, role: "dept_leader", department_ids: [], created_by: ctx.userId })
+    .insert({ org_id: ctx.orgId, role: "dept_leader", department_ids: departmentIds, created_by: ctx.userId })
     .select("id")
     .single();
   if (error || !data) throw error ?? new Error("招待リンクを作成できませんでした");
@@ -1356,14 +1367,23 @@ export async function acceptStaffInvite(inviteId: string, fields: { email: strin
 // updateMyDisplayName経由でしか変更できない）は書き換えない — LINEの
 // ニックネームと同じ発想。役職の選択肢はUI（INVITE_ROLES）にも "owner" が
 // 無いが、直接このアクションを呼ばれた場合の昇格を防ぐため、ここでも
-// 明示的に弾く。
+// 明示的に弾く。マネージャーが操作できるのは「自分に割り当てられている
+// スタッフ」だけ（本部が割り当てたスタッフも含む）で、役職をスタッフ以外
+// に変更したり、自分以外の窓口に割り当てたりはできない。
 export async function updateStaffMember(profileId: string, role: StaffRole, departmentIds: string[], alias: string) {
   const ctx = await requireManagerOrAbove();
-  if (role === "owner" && ctx.role !== "owner") throw new Error("この役職には変更できません");
+  if (role !== "dept_leader" && ctx.role !== "owner") throw new Error("この役職には変更できません");
   const trimmedAlias = alias.trim();
   if (!trimmedAlias) throw new Error("表示名を入力してください");
-  const resolvedDepartmentIds = normalizeStaffDepartments(role, departmentIds);
   const admin = createServiceRoleClient();
+
+  if (ctx.role === "dept_manager") {
+    const [myDepartmentIds, targetDepartmentIds] = await Promise.all([departmentIdsOf(admin, ctx.userId), departmentIdsOf(admin, profileId)]);
+    if (!targetDepartmentIds.some((id) => myDepartmentIds.includes(id))) throw new Error("自分に割り当てられているスタッフのみ操作できます");
+    if (departmentIds.some((id) => !myDepartmentIds.includes(id))) throw new Error("自分の窓口以外には割り当てられません");
+  }
+
+  const resolvedDepartmentIds = normalizeStaffDepartments(role, departmentIds);
   const { error } = await admin.from("profiles").update({ role, staff_alias: trimmedAlias }).eq("id", profileId).eq("org_id", ctx.orgId);
   if (error) throw error;
   await replaceStaffDepartments(admin, profileId, resolvedDepartmentIds);
@@ -1375,6 +1395,10 @@ export async function removeStaffMember(profileId: string) {
   const admin = createServiceRoleClient();
   const { data: target } = await admin.from("profiles").select("role").eq("id", profileId).eq("org_id", ctx.orgId).maybeSingle();
   if (target?.role === "owner" && ctx.role !== "owner") throw new Error("この操作は本部のみ行えます");
+  if (ctx.role === "dept_manager") {
+    const [myDepartmentIds, targetDepartmentIds] = await Promise.all([departmentIdsOf(admin, ctx.userId), departmentIdsOf(admin, profileId)]);
+    if (!targetDepartmentIds.some((id) => myDepartmentIds.includes(id))) throw new Error("自分に割り当てられているスタッフのみ削除できます");
+  }
   const { error } = await admin.from("profiles").delete().eq("id", profileId).eq("org_id", ctx.orgId);
   if (error) throw error;
   await admin.auth.admin.deleteUser(profileId);

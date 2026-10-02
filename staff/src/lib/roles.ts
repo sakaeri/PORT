@@ -10,7 +10,10 @@ export const ROLE_LABEL: Record<StaffRole, string> = {
   dept_leader: "スタッフ",
 };
 export const INVITE_ROLES: StaffRole[] = ["dept_manager", "dept_leader"];
-export const isDeptScoped = (role: StaffRole) => role === "dept_manager";
+// マネージャーは窓口＝自分の担当範囲（必須）。スタッフの窓口は「どの
+// マネージャーに割り当てられているか」を表すタグ（任意・未設定可）。
+export const isDeptScoped = (role: StaffRole) => role === "dept_manager" || role === "dept_leader";
+export const isDeptRequired = (role: StaffRole) => role === "dept_manager";
 
 // スタッフ内トーク（案件トーク・スタッフ⇄本部トーク）で「誰が送ったか」を
 // 一覧・トーク双方で同じ表記に揃えるためのラベル。profilesとのjoinには

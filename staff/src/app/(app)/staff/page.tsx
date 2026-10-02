@@ -34,6 +34,7 @@ export default async function StaffPage() {
     list.push(row.department_id);
     departmentIdsByProfile.set(row.profile_id, list);
   }
+  const myDepartmentIds = departmentIdsByProfile.get(ctx.userId) ?? [];
 
   type Summary = NonNullable<typeof summaries>[number];
   const summaryByProfileId = new Map((summaries ?? []).map((s) => [s.staff_profile_id, s]));
@@ -47,7 +48,13 @@ export default async function StaffPage() {
       : null;
   }
 
-  const staff = (profiles ?? []).map((p) => {
+  // マネージャーの一覧には「自分に割り当てられているスタッフ」だけを出す
+  // （本部が割り当てたスタッフも含む・他のマネージャーのスタッフは含まない）。
+  const visibleProfiles = (profiles ?? []).filter(
+    (p) => ctx.role !== "dept_manager" || p.role !== "dept_leader" || (departmentIdsByProfile.get(p.id) ?? []).some((id) => myDepartmentIds.includes(id)),
+  );
+
+  const staff = visibleProfiles.map((p) => {
     const summary = summaryByProfileId.get(p.id) ?? null;
     return {
       id: p.id,
@@ -76,6 +83,7 @@ export default async function StaffPage() {
       staff={staff}
       selfEntry={selfEntry}
       departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
+      myDepartmentIds={myDepartmentIds}
     />
   );
 }

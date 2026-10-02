@@ -40,6 +40,7 @@ export default function StaffChat({
   staff: initialStaff,
   selfEntry,
   departments,
+  myDepartmentIds,
 }: {
   currentUserId: string;
   currentRole: StaffRole | "reception";
@@ -54,6 +55,9 @@ export default function StaffChat({
   // canAdmin がtrueの側には不要（自分宛のスレッドという概念がない）。
   selfEntry?: { lastMessagePreview: string | null; unread: boolean };
   departments: Department[];
+  // マネージャーが見ている場合、自分の窓口だけがスタッフ割り当て先の
+  // 選択肢になる（他窓口には割り当てられないため）。オーナーは全窓口。
+  myDepartmentIds: string[];
 }) {
   const router = useRouter();
   const [staff, setStaff] = useState(initialStaff);
@@ -176,7 +180,7 @@ export default function StaffChat({
                     displayName: selectedStaff.displayName,
                     role: selectedStaff.role,
                     departmentIds: selectedStaff.departmentIds,
-                    departments,
+                    departments: currentRole === "owner" ? departments : departments.filter((d) => myDepartmentIds.includes(d.id)),
                     canDelete: canAdmin && selectedStaff.role !== "owner",
                     canPromoteToOwner: currentRole === "owner",
                     onSaved: (patch) => setStaff((rows) => rows.map((r) => (r.id === selectedStaff.id ? { ...r, ...patch } : r))),

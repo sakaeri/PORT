@@ -15,10 +15,15 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   // （表示を隠すだけでなく、サーバー側で値そのものを送らないようにする）。
   const canSeeFinance = ctx.role === "owner" || ctx.role === "dept_manager";
 
+  // マネージャーが案件に割り当てられるのは「自分に割り当てられている
+  // スタッフ」だけ（他のマネージャーのスタッフは選べない）。オーナーは
+  // 全スタッフから選べる。
+  const isManagerAssigning = canAssignStaff && ctx.role === "dept_manager";
+
   // タップしてからこの画面が出るまでの体感速度のため、全クエリを並列で投げる
   // （案件トークのメッセージは threads.id が要るが、messages を threads の
   // embed として一緒に取ることで、往復を1回減らしている）。
-  const [{ data: request }, { data: refundPolicies }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }] = await Promise.all([
+  const [{ data: request }, { data: refundPolicies }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }, { data: staffDepartments }] = await Promise.all([
     supabase
       .from("requests")
       .select(
@@ -39,6 +44,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       .eq("request_id", id)
       .order("sent_at", { referencedTable: "messages", ascending: true })
       .maybeSingle(),
+    isManagerAssigning ? supabase.from("staff_departments").select("profile_id, department_id") : Promise.resolve({ data: [] }),
   ]);
   if (!request) notFound();
 
@@ -49,10 +55,19 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     const displayName = r.profile_id === ctx.userId ? (profile?.display_name ?? "") : (profile?.staff_alias ?? profile?.display_name ?? "");
     return { id: r.profile_id, displayName };
   });
-  const availableStaff = (staffPool ?? []).map((p) => ({
-    id: p.id,
-    displayName: p.id === ctx.userId ? p.display_name : (p.staff_alias ?? p.display_name),
-  }));
+  const myDepartmentIds = (staffDepartments ?? []).filter((d) => d.profile_id === ctx.userId).map((d) => d.department_id);
+  const departmentIdsByProfile = new Map<string, string[]>();
+  for (const row of staffDepartments ?? []) {
+    const list = departmentIdsByProfile.get(row.profile_id) ?? [];
+    list.push(row.department_id);
+    departmentIdsByProfile.set(row.profile_id, list);
+  }
+  const availableStaff = (staffPool ?? [])
+    .filter((p) => !isManagerAssigning || (departmentIdsByProfile.get(p.id) ?? []).some((id) => myDepartmentIds.includes(id)))
+    .map((p) => ({
+      id: p.id,
+      displayName: p.id === ctx.userId ? p.display_name : (p.staff_alias ?? p.display_name),
+    }));
 
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
