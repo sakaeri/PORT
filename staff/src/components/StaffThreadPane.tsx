@@ -19,6 +19,7 @@ interface EditableStaffProps {
   departmentIds: string[];
   departments: Department[];
   canDelete: boolean;
+  canPromoteToOwner: boolean;
   onSaved: (patch: { displayName: string; role: StaffRole; departmentIds: string[] }) => void;
   onRemoved: () => void;
 }
@@ -307,7 +308,7 @@ function StaffEditPanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 180px" }}>
           <span style={editLabel}>役職</span>
           <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={editInput}>
-            {INVITE_ROLES.map((r) => (
+            {(editable.canPromoteToOwner ? (["owner", ...INVITE_ROLES] as StaffRole[]) : INVITE_ROLES).map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r]}
               </option>

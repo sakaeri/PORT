@@ -178,6 +178,7 @@ export default function StaffChat({
                     departmentIds: selectedStaff.departmentIds,
                     departments,
                     canDelete: canAdmin && selectedStaff.role !== "owner",
+                    canPromoteToOwner: currentRole === "owner",
                     onSaved: (patch) => setStaff((rows) => rows.map((r) => (r.id === selectedStaff.id ? { ...r, ...patch } : r))),
                     onRemoved: () => {
                       setStaff((rows) => rows.filter((r) => r.id !== selectedStaff.id));
