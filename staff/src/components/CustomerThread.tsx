@@ -28,7 +28,8 @@ import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } f
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
-import { CADENCE_LABEL, PHASE_LABEL } from "@/lib/stage";
+import InfoTooltip from "@/components/InfoTooltip";
+import { PHASE_LABEL } from "@/lib/stage";
 import type { AppRole, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
 
 export interface ThreadAttachment {
@@ -1284,14 +1285,16 @@ function QuoteDialog({
               <input value={hourlyLabel} onChange={(e) => setHourlyLabel(e.target.value)} placeholder="例：資料のフォーマット整え" className="vid-input" style={inputStyle} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間（時間）</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間（時間）</span>
+                <InfoTooltip
+                  text={`時間単価は30分${HOURLY_BLOCK_RATE.toLocaleString("ja-JP")}円（時給${HOURLY_RATE_PER_HOUR.toLocaleString("ja-JP")}円）で固定です。目安時間から自動計算した上限額を依頼主に見積もりとして提示し、実際の請求額（着手〜完了報告の時間を30分単位で切り上げ・最低3,000円）がこれを超えることはありません。`}
+                />
+
+              </div>
               <input value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} type="number" min={0.5} step={0.5} placeholder="例：2" className="vid-input" style={{ ...inputStyle, maxWidth: 140 }} />
             </div>
-            <div style={{ fontSize: 11, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-              時間単価は30分{HOURLY_BLOCK_RATE.toLocaleString("ja-JP")}円（時給{HOURLY_RATE_PER_HOUR.toLocaleString("ja-JP")}円）で固定です。目安時間から自動計算した上限額
-              {hourlyCap > 0 && `（¥${hourlyCap.toLocaleString("ja-JP")}）`}
-              を依頼主に見積もりとして提示し、実際の請求額（着手〜完了報告の時間を30分単位で切り上げ・最低3,000円）がこれを超えることはありません。
-            </div>
+            {hourlyCap > 0 && <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>上限額：¥{hourlyCap.toLocaleString("ja-JP")}</div>}
           </div>
         ) : (
           <>
@@ -1377,7 +1380,10 @@ function QuoteDialog({
 
         {!isHourly && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
-            <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>頻度</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>頻度</span>
+              <InfoTooltip text="定期対応（毎週・毎月）はチャージ残高からのお支払いのみです。依頼主が初回を確定すると、以降は自動で案件が作られ、残高から引き落とされます（着手は毎回担当者が手動で行います）。" />
+            </div>
             <div style={{ display: "flex", gap: 6 }}>
               <button onClick={() => setCadence("")} style={pillStyle(cadence === "")}>
                 単発
@@ -1389,16 +1395,12 @@ function QuoteDialog({
                 毎月
               </button>
             </div>
-            {cadence && (
-              <div style={{ fontSize: 11, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-                定期対応はチャージ残高からのお支払いのみです。依頼主が初回を確定すると、以降は{CADENCE_LABEL[cadence]}自動で案件が作られ、残高から引き落とされます（着手は毎回担当者が手動で行います）。
-              </div>
-            )}
           </div>
         )}
 
-        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
-          依頼主が見積もりカードから直接「残高から支払う」ことで確定します。支払いが確定すると「着手前」になり、着手はこの後、担当者が案件詳細の「着手する」を押して行います。
+        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
+          <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払い：残高から依頼主が確定</span>
+          <InfoTooltip text="依頼主が見積もりカードから直接「残高から支払う」ことで確定します。支払いが確定すると「着手前」になり、着手はこの後、担当者が案件詳細の「着手する」を押して行います。" />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
