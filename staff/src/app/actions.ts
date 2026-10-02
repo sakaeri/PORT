@@ -173,8 +173,10 @@ export async function updateStaffMode(enabled: boolean) {
   if (!data?.length) throw new Error("この切り替えはオーナーのみ行えます");
 }
 
+// 受付メニューはFC展開時のブランド・料金統一のため本部限定。イレギュラーな
+// 依頼は時間精算（見積もり作成時の「時間精算」モード）で個別に対応できる。
 export async function createMenu(orgId: string) {
-  await requireContext();
+  await requireHqPrivileged();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("menus")
@@ -189,7 +191,7 @@ export async function updateMenu(
   id: string,
   fields: { label: string; note: string; price: number | null; lead_hours: number; active: boolean; icon: string | null },
 ) {
-  await requireContext();
+  await requireHqPrivileged();
   const supabase = await createClient();
   const { error } = await supabase
     .from("menus")
@@ -206,14 +208,14 @@ export async function updateMenu(
 }
 
 export async function deleteMenu(id: string) {
-  await requireContextWithDelete();
+  await requireHqPrivileged();
   const supabase = await createClient();
   const { error } = await supabase.from("menus").delete().eq("id", id);
   if (error) throw error;
 }
 
 export async function addMenuQuestion(menuId: string, label: string, sort: number) {
-  await requireContext();
+  await requireHqPrivileged();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("menu_questions")
@@ -225,14 +227,14 @@ export async function addMenuQuestion(menuId: string, label: string, sort: numbe
 }
 
 export async function updateMenuQuestion(id: string, label: string) {
-  await requireContext();
+  await requireHqPrivileged();
   const supabase = await createClient();
   const { error } = await supabase.from("menu_questions").update({ label: label.trim() }).eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteMenuQuestion(id: string) {
-  await requireContextWithDelete();
+  await requireHqPrivileged();
   const supabase = await createClient();
   const { error } = await supabase.from("menu_questions").delete().eq("id", id);
   if (error) throw error;

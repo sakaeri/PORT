@@ -343,7 +343,7 @@ export default function MenuSettings({
           <StaffModeCard initialSolo={initialSolo} canEdit={canEdit} />
         </>
       )}
-      {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} />}
+      {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
       {tab === "refund" && <RefundPolicyCard initialPolicy={initialRefundPolicy} />}
       {tab === "login" && <LoginInfoCard initialEmail={initialLoginEmail} />}
@@ -529,7 +529,7 @@ function Field({ label: l, value, onChange }: { label: string; value: string; on
   );
 }
 
-function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Menu[] }) {
+function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
   const [menus, setMenus] = useState(initialMenus);
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -557,13 +557,16 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>受付メニュー</div>
-        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの窓口が対応するかは「スタッフ」画面の窓口・スタッフ管理で設定します" />
+        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの窓口が対応するかは「スタッフ」画面の窓口・スタッフ管理で設定します。FC展開でのブランド・料金統一のため、編集は本部限定です" />
         <div style={{ flex: 1 }} />
-        <button onClick={handleAdd} style={smallBtn}>
-          <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-          メニューを追加
-        </button>
+        {canEdit && (
+          <button onClick={handleAdd} style={smallBtn}>
+            <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
+            メニューを追加
+          </button>
+        )}
       </div>
+      {!canEdit && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>メニューの編集は本部のみ行えます。</div>}
 
       {menus.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだメニューがありません。</div>}
 
@@ -588,7 +591,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       <span style={label}>メニュー名</span>
-                      <input value={m.label} onChange={(e) => patchLocal(m.id, { label: e.target.value })} onBlur={() => commit(m)} className="vid-input" style={input} />
+                      <input value={m.label} onChange={(e) => patchLocal(m.id, { label: e.target.value })} onBlur={() => commit(m)} disabled={!canEdit} className="vid-input" style={input} />
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       <span style={label}>請求金額（円・空欄なら相談項目として扱う）</span>
@@ -598,6 +601,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
                         placeholder="未設定"
                         onChange={(e) => patchLocal(m.id, { price: e.target.value === "" ? null : Number(e.target.value) })}
                         onBlur={() => commit(m)}
+                        disabled={!canEdit}
                         className="vid-input"
                         style={input}
                       />
@@ -609,6 +613,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
                         value={m.lead_hours}
                         onChange={(e) => patchLocal(m.id, { lead_hours: Number(e.target.value) })}
                         onBlur={() => commit(m)}
+                        disabled={!canEdit}
                         className="vid-input"
                         style={input}
                       />
@@ -616,78 +621,82 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={label}>詳細内容</span>
-                    <input value={m.note ?? ""} onChange={(e) => patchLocal(m.id, { note: e.target.value })} onBlur={() => commit(m)} className="vid-input" style={input} />
+                    <input value={m.note ?? ""} onChange={(e) => patchLocal(m.id, { note: e.target.value })} onBlur={() => commit(m)} disabled={!canEdit} className="vid-input" style={input} />
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <span style={label}>アイコン（依頼主のメニュー一覧に表示されます）</span>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          patchLocal(m.id, { icon: null });
-                          commit({ ...m, icon: null });
-                        }}
-                        title="アイコンなし"
-                        style={{
-                          width: 32,
-                          height: 32,
-                          display: "grid",
-                          placeItems: "center",
-                          cursor: "pointer",
-                          fontSize: 10,
-                          color: selectedIconName === null ? "var(--color-accent)" : "var(--color-neutral-500)",
-                          background: selectedIconName === null ? "var(--color-accent-900)" : "transparent",
-                          border: `1px solid ${selectedIconName === null ? "var(--color-accent)" : "var(--color-divider)"}`,
-                          borderRadius: "var(--radius-md)",
-                        }}
-                      >
-                        なし
-                      </button>
-                      {MENU_ICON_OPTIONS.map((opt) => {
-                        const OptIcon = MENU_ICON_COMPONENTS[opt.name];
-                        const on = selectedIconName === opt.name;
-                        return (
-                          <button
-                            key={opt.name}
-                            type="button"
-                            onClick={() => {
-                              const iconClass = menuIconClass(opt.name);
-                              patchLocal(m.id, { icon: iconClass });
-                              commit({ ...m, icon: iconClass });
-                            }}
-                            title={opt.label}
-                            style={{
-                              width: 32,
-                              height: 32,
-                              display: "grid",
-                              placeItems: "center",
-                              cursor: "pointer",
-                              color: on ? "var(--color-accent-100)" : "var(--color-neutral-500)",
-                              background: on ? "var(--color-accent-900)" : "transparent",
-                              border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
-                              borderRadius: "var(--radius-md)",
-                            }}
-                          >
-                            <OptIcon size={16} />
-                          </button>
-                        );
-                      })}
+                  {canEdit && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <span style={label}>アイコン（依頼主のメニュー一覧に表示されます）</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            patchLocal(m.id, { icon: null });
+                            commit({ ...m, icon: null });
+                          }}
+                          title="アイコンなし"
+                          style={{
+                            width: 32,
+                            height: 32,
+                            display: "grid",
+                            placeItems: "center",
+                            cursor: "pointer",
+                            fontSize: 10,
+                            color: selectedIconName === null ? "var(--color-accent)" : "var(--color-neutral-500)",
+                            background: selectedIconName === null ? "var(--color-accent-900)" : "transparent",
+                            border: `1px solid ${selectedIconName === null ? "var(--color-accent)" : "var(--color-divider)"}`,
+                            borderRadius: "var(--radius-md)",
+                          }}
+                        >
+                          なし
+                        </button>
+                        {MENU_ICON_OPTIONS.map((opt) => {
+                          const OptIcon = MENU_ICON_COMPONENTS[opt.name];
+                          const on = selectedIconName === opt.name;
+                          return (
+                            <button
+                              key={opt.name}
+                              type="button"
+                              onClick={() => {
+                                const iconClass = menuIconClass(opt.name);
+                                patchLocal(m.id, { icon: iconClass });
+                                commit({ ...m, icon: iconClass });
+                              }}
+                              title={opt.label}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                display: "grid",
+                                placeItems: "center",
+                                cursor: "pointer",
+                                color: on ? "var(--color-accent-100)" : "var(--color-neutral-500)",
+                                background: on ? "var(--color-accent-900)" : "transparent",
+                                border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
+                                borderRadius: "var(--radius-md)",
+                              }}
+                            >
+                              <OptIcon size={16} />
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} />
+                  <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} canEdit={canEdit} />
 
                   <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
-                      <input type="checkbox" checked={m.active} onChange={(e) => { patchLocal(m.id, { active: e.target.checked }); commit({ ...m, active: e.target.checked }); }} />
+                      <input type="checkbox" checked={m.active} onChange={(e) => { patchLocal(m.id, { active: e.target.checked }); commit({ ...m, active: e.target.checked }); }} disabled={!canEdit} />
                       表示する
                     </label>
                     <div style={{ flex: 1 }} />
-                    <button onClick={() => handleDelete(m.id)} style={{ ...smallBtn, color: "var(--color-accent-200)", borderColor: "var(--color-divider)" }}>
-                      <Trash size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-                      削除
-                    </button>
+                    {canEdit && (
+                      <button onClick={() => handleDelete(m.id)} style={{ ...smallBtn, color: "var(--color-accent-200)", borderColor: "var(--color-divider)" }}>
+                        <Trash size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
+                        削除
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -699,7 +708,7 @@ function MenuListCard({ orgId, initialMenus }: { orgId: string; initialMenus: Me
   );
 }
 
-function QuestionsEditor({ menuId, questions, onChange }: { menuId: string; questions: Question[]; onChange: (q: Question[]) => void }) {
+function QuestionsEditor({ menuId, questions, onChange, canEdit }: { menuId: string; questions: Question[]; onChange: (q: Question[]) => void; canEdit: boolean }) {
   async function add() {
     const id = await addMenuQuestion(menuId, "", questions.length);
     onChange([...questions, { id, menu_id: menuId, label: "", sort: questions.length }]);
@@ -724,17 +733,22 @@ function QuestionsEditor({ menuId, questions, onChange }: { menuId: string; ques
             value={q.label}
             onChange={(e) => patch(q.id, e.target.value)}
             onBlur={() => commit(q.id, q.label)}
+            disabled={!canEdit}
             className="vid-input"
             style={{ ...input, flex: 1, height: 32 }}
           />
-          <button onClick={() => remove(q.id)} aria-label="削除" style={{ flex: "none", width: 32, height: 32, cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-            <Trash size={13} />
-          </button>
+          {canEdit && (
+            <button onClick={() => remove(q.id)} aria-label="削除" style={{ flex: "none", width: 32, height: 32, cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+              <Trash size={13} />
+            </button>
+          )}
         </div>
       ))}
-      <button onClick={add} style={{ alignSelf: "flex-start", ...smallBtn, height: 30 }}>
-        ＋質問を追加
-      </button>
+      {canEdit && (
+        <button onClick={add} style={{ alignSelf: "flex-start", ...smallBtn, height: 30 }}>
+          ＋質問を追加
+        </button>
+      )}
     </div>
   );
 }
