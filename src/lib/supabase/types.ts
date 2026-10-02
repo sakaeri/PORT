@@ -5,7 +5,7 @@
 // once the schema is pushed to a real Supabase project, then diff against
 // this file before trusting the replacement.
 
-export type AppRole = "owner" | "reception" | "creator" | "client";
+export type AppRole = "owner" | "reception" | "creator" | "client" | "supervisor" | "dept_manager" | "dept_leader";
 
 export type RequestPhase =
   | "draft"

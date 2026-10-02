@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getCustomerContext, getRefundPolicies } from "@/lib/data";
 import { computeRefund } from "@/lib/refund";
-import { notifyNewInquiryIfFirst } from "@/lib/notify";
+import { notifyNewInquiryIfFirst, notifyStaffPaymentConfirmed } from "@/lib/notify";
 import { getStripe } from "@/lib/stripe";
 
 async function requireContext() {
@@ -256,10 +256,12 @@ export async function skipRating(requestId: string) {
 // チャージ残高からの支払い。二重消費を防ぐためのロック・検証はすべて
 // pay_request_from_balance（DB側のsecurity definer関数）の中で行う。
 export async function payFromBalance(requestId: string) {
-  await requireActiveContext();
+  const ctx = await requireActiveContext();
   const supabase = await createClient();
   const { error } = await supabase.rpc("pay_request_from_balance", { p_request_id: requestId });
   if (error) throw error;
+
+  await notifyStaffPaymentConfirmed(ctx.orgId, requestId);
 
   const admin = createServiceRoleClient();
   const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();

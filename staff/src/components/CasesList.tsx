@@ -15,6 +15,7 @@ export interface CaseRow {
   paid: boolean;
   dueAt: string | null;
   overdue: boolean;
+  dueSoon: boolean;
   cancelRequested: boolean;
   customerName: string;
   threadId: string | null;
@@ -22,12 +23,26 @@ export interface CaseRow {
   lastMessagePreview: string | null;
 }
 
+type Filter = "all" | "preparing" | "dueSoon" | "cancelRequested";
+
 export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }: { rows: CaseRow[]; canDelete: boolean; canSeeAmount: boolean }) {
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const visible = rows.filter((r) => !r.archived || showArchived);
+  const active = rows.filter((r) => !r.archived);
   const archivedCount = rows.filter((r) => r.archived).length;
+  const preparingCount = active.filter((r) => r.phase === "preparing").length;
+  const dueSoonCount = active.filter((r) => r.dueSoon).length;
+  const cancelRequestedCount = active.filter((r) => r.cancelRequested).length;
+  const visible = rows
+    .filter((r) => !r.archived || showArchived)
+    .filter((r) => {
+      if (filter === "preparing") return r.phase === "preparing";
+      if (filter === "dueSoon") return r.dueSoon;
+      if (filter === "cancelRequested") return r.cancelRequested;
+      return true;
+    });
 
   async function toggleArchive(r: CaseRow) {
     if (!r.threadId || busyId) return;
@@ -57,8 +72,45 @@ export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }
     }
   }
 
+  const chips: { key: Filter; label: string; count: number }[] = [
+    { key: "all", label: "すべて", count: active.length },
+    { key: "preparing", label: "未着手", count: preparingCount },
+    { key: "dueSoon", label: "期限が近い", count: dueSoonCount },
+    { key: "cancelRequested", label: "キャンセル申請中", count: cancelRequestedCount },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {chips.map((c) => {
+          const on = filter === c.key;
+          if (c.key !== "all" && c.count === 0) return null;
+          return (
+            <button
+              key={c.key}
+              onClick={() => setFilter(c.key)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                height: 28,
+                padding: "0 10px",
+                cursor: "pointer",
+                fontSize: 11.5,
+                whiteSpace: "nowrap",
+                color: on ? "var(--color-accent-100)" : "var(--color-neutral-400)",
+                background: on ? "var(--color-accent-900)" : "transparent",
+                border: `1px solid ${on ? "var(--color-accent)" : "var(--color-divider)"}`,
+                borderRadius: "var(--radius-md)",
+              }}
+            >
+              {c.label}
+              {c.key !== "all" && <span>（{c.count}）</span>}
+            </button>
+          );
+        })}
+      </div>
+
       {archivedCount > 0 && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />

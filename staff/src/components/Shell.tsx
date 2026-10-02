@@ -74,6 +74,36 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     // pathname included so navigating away from a thread (which marks it read) re-checks the count
   }, [ctx.orgId, ctx.orgs, pathname]);
 
+  // 「案件トーク」ナビの赤丸：未着手（支払い済み・未着手）／着手後で報告の
+  // 目安時間まで残り15分以内（経過済みも含む）／キャンセル申請中、のいずれか
+  // に当たる案件の件数。is_office()のRLS（case_visible）に任せているので、
+  // マネージャーは自分の窓口、スタッフは自分の担当案件だけの件数になる。
+  const [attentionCount, setAttentionCount] = useState(0);
+  useEffect(() => {
+    const supabase = createClient(ctx.orgId);
+    let cancelled = false;
+    async function refreshAttention() {
+      const soon = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      const { count } = await supabase
+        .from("requests")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", ctx.orgId)
+        .or(`phase.eq.preparing,cancel_requested_at.not.is.null,and(phase.eq.started,due_at.lte.${soon})`);
+      if (!cancelled) setAttentionCount(count ?? 0);
+    }
+    void refreshAttention();
+    const channel = supabase
+      .channel(`attention-${ctx.orgId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "requests", filter: `org_id=eq.${ctx.orgId}` }, refreshAttention)
+      .subscribe();
+    const interval = setInterval(refreshAttention, 60000);
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [ctx.orgId]);
+
   // ページ遷移したら開きっぱなしのドロワーを閉じる。
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting UI state on route change (external navigation event), not state derived from props/state
@@ -150,6 +180,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       {navItems.map((n) => {
         const active = pathname === n.href || pathname.startsWith(n.href + "/");
         const Icon = n.icon;
+        const badgeCount = n.href === "/customers" ? unreadCount : n.href === "/cases" ? attentionCount : 0;
         return (
           <Link
             key={n.href}
@@ -171,7 +202,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           >
             <Icon size={16} />
             {n.label}
-            {n.href === "/customers" && unreadCount > 0 && (
+            {badgeCount > 0 && (
               <span
                 style={{
                   marginLeft: "auto",
@@ -187,7 +218,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
                   borderRadius: 9,
                 }}
               >
-                {unreadCount > 99 ? "99+" : unreadCount}
+                {badgeCount > 99 ? "99+" : badgeCount}
               </span>
             )}
           </Link>

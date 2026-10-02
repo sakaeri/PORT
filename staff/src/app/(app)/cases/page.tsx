@@ -25,6 +25,9 @@ export default async function CasesPage() {
 
   const threadByRequestId = new Map((caseThreads ?? []).map((t) => [t.request_id, t]));
   const summaryByRequestId = new Map((summaries ?? []).map((s) => [s.request_id, s]));
+  // 着手後、報告の目安時間（due_at）まで残り15分以内（経過済みも含む）か
+  // どうかの判定に使う閾値。ナビの赤丸バッジ（Shell.tsx）と同じ基準。
+  const soonThreshold = new Date(new Date().getTime() + 15 * 60 * 1000);
   const rows: CaseRow[] = (requests ?? []).map((r) => {
     const customer = Array.isArray(r.customers) ? r.customers[0] : r.customers;
     const thread = threadByRequestId.get(r.id) ?? null;
@@ -37,6 +40,7 @@ export default async function CasesPage() {
           )
         : null;
     const overdue = r.due_at != null && ["preparing", "started"].includes(r.phase) && new Date(r.due_at) < new Date();
+    const dueSoon = r.due_at != null && r.phase === "started" && new Date(r.due_at) <= soonThreshold;
     return {
       id: r.id,
       title: r.title,
@@ -45,6 +49,7 @@ export default async function CasesPage() {
       paid: r.pay_status === "paid",
       dueAt: r.due_at,
       overdue,
+      dueSoon,
       cancelRequested: r.cancel_requested_at != null,
       customerName: customer?.name ?? "—",
       threadId: thread?.id ?? null,
