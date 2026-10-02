@@ -13,11 +13,11 @@ export interface StaffOrgOption {
 
 export interface StaffContext {
   userId: string;
+  email: string;
   orgId: string;
   orgDisplayName: string;
   role: StaffRole | "reception";
   displayName: string;
-  solo: boolean;
   isHq: boolean;
   orgs: StaffOrgOption[];
   planStatus: "trial" | "active" | "past_due" | "paused" | "cancelled";
@@ -66,11 +66,11 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
 
   return {
     userId: auth.user.id,
+    email: auth.user.email ?? "",
     orgId: ctx.org_id,
     orgDisplayName: ctx.org_display_name ?? "窓口",
     role: ctx.role as StaffRole | "reception",
     displayName: ctx.display_name ?? "スタッフ",
-    solo: ctx.solo ?? false,
     isHq,
     orgs: (orgs ?? []).map((o) => ({ orgId: o.org_id, displayName: o.display_name, role: o.role as "owner" | "reception", isPrimary: o.is_primary, slug: o.slug })),
     planStatus,

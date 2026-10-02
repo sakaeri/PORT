@@ -10,7 +10,7 @@ import { headingWeight } from "@/lib/style";
 import OrgSwitcher from "@/components/OrgSwitcher";
 import BillingModal from "@/components/BillingModal";
 import Modal from "@/components/Modal";
-import SelfNamePanel from "@/components/SelfNamePanel";
+import AccountSettingsPanel from "@/components/AccountSettingsPanel";
 import { signOutStaff } from "@/lib/signOutStaff";
 import type { StaffContext } from "@/lib/data";
 
@@ -21,7 +21,7 @@ const NAV = [
   { href: "/customers", label: "依頼主", icon: Users, hideWhenStaff: true },
   { href: "/cases", label: "案件トーク", icon: ChatsCircle },
   { href: "/stats", label: "売上・実績", icon: ChartBar, hideWhenStaff: true },
-  { href: "/staff", label: "スタッフ", icon: UsersThree, hideWhenSolo: true },
+  { href: "/staff", label: "スタッフ", icon: UsersThree },
   { href: "/menu", label: "メニュー管理", icon: GearSix, hideWhenStaff: true },
   { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true },
 ];
@@ -109,7 +109,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     router.refresh();
   }
 
-  const navItems = NAV.filter((n) => !(n.hideWhenSolo && ctx.solo) && !(n.hqOnly && !ctx.isHq) && !(n.hideWhenStaff && ctx.role === "dept_leader"));
+  const navItems = NAV.filter((n) => !(n.hqOnly && !ctx.isHq) && !(n.hideWhenStaff && ctx.role === "dept_leader"));
 
   // Date.now() はレンダー中に直接呼べない（純粋関数のルール）ため、
   // マウント後にeffectで計算する。初回描画では null のままバナーを出さない。
@@ -199,7 +199,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
         <button
           onClick={() => setShowMyName(true)}
-          aria-label="表示名を変更"
+          aria-label="アカウント設定"
           style={{
             display: "flex",
             alignItems: "center",
@@ -292,8 +292,15 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
         </main>
         {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
         {showMyName && (
-          <Modal onClose={() => setShowMyName(false)} maxWidth={380}>
-            <SelfNamePanel currentName={myName} onSaved={setMyName} onClose={() => setShowMyName(false)} />
+          <Modal onClose={() => setShowMyName(false)} maxWidth={440}>
+            <AccountSettingsPanel
+              currentName={myName}
+              orgDisplayName={ctx.orgDisplayName}
+              loginEmail={ctx.email}
+              isOwner={ctx.role === "owner"}
+              onNameSaved={setMyName}
+              onClose={() => setShowMyName(false)}
+            />
           </Modal>
         )}
       </div>
@@ -323,8 +330,15 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       </main>
       {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
       {showMyName && (
-        <Modal onClose={() => setShowMyName(false)} maxWidth={380}>
-          <SelfNamePanel currentName={myName} onSaved={setMyName} onClose={() => setShowMyName(false)} />
+        <Modal onClose={() => setShowMyName(false)} maxWidth={440}>
+          <AccountSettingsPanel
+            currentName={myName}
+            orgDisplayName={ctx.orgDisplayName}
+            loginEmail={ctx.email}
+            isOwner={ctx.role === "owner"}
+            onNameSaved={setMyName}
+            onClose={() => setShowMyName(false)}
+          />
         </Modal>
       )}
     </div>

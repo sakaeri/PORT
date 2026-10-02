@@ -103,7 +103,7 @@ export default async function CustomersPage() {
         rows={rows}
         isHq={ctx.isHq}
         orgId={ctx.orgId}
-        canManageDepartments={ctx.role === "owner" || (ctx.isHq && ctx.role === "dept_manager")}
+        canManageDepartments={ctx.role === "owner"}
         departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
         menus={(menus ?? []).map((m) => ({ id: m.id, label: m.label, departmentId: m.department_id }))}
       />

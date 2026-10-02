@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Trash,
   Plus,
@@ -45,20 +44,15 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
-import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
 import InfoTooltip from "@/components/InfoTooltip";
 import {
-  updateCompanyInfo,
-  updateStaffMode,
   createMenu,
   updateMenu,
   deleteMenu,
   addMenuQuestion,
   updateMenuQuestion,
   deleteMenuQuestion,
-  updateLoginEmail,
-  updateLoginPassword,
   createIntakeForm,
   updateIntakeForm,
   deleteIntakeForm,
@@ -66,16 +60,6 @@ import {
   updateIntakeField,
   deleteIntakeField,
 } from "@/app/actions";
-import type { RefundMode, RefundStage } from "@/lib/supabase/types";
-
-interface Company {
-  name: string;
-  display_name: string;
-  rep_name: string;
-  address: string;
-  tel: string;
-  email: string;
-}
 
 interface Question {
   id: string;
@@ -207,12 +191,6 @@ interface IntakeForm {
   intake_fields: IntakeField[];
 }
 
-interface RefundPolicyRow {
-  stage: RefundStage;
-  mode: RefundMode;
-  pct: number;
-}
-
 const input: React.CSSProperties = {
   width: "100%",
   height: 36,
@@ -249,29 +227,18 @@ const smallBtn: React.CSSProperties = {
 
 export default function MenuSettings({
   orgId,
-  initialCompany,
   initialMenus,
-  initialLoginEmail,
   initialTemplates,
-  initialRefundPolicy,
-  slug,
-  initialSolo,
   canEdit,
 }: {
   orgId: string;
-  initialCompany: Company;
   initialMenus: Menu[];
-  initialLoginEmail: string;
   initialTemplates: IntakeForm[];
-  initialRefundPolicy: RefundPolicyRow[];
-  initialSolo: boolean;
-  slug: string | null;
-  // 受付メニュー・返信テンプレはマネージャーも使うので常に編集可。それ以外
-  // （会社情報・返金ポリシー・スタッフ連携）は本部専用で、
-  // 本部以外のマネージャーには閲覧のみで見せる。
+  // 受付メニューはFC展開でのブランド・料金統一のため本部専用で、
+  // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレは常に編集可。
   canEdit: boolean;
 }) {
-  const [tab, setTab] = useState<TabKey>("company");
+  const [tab, setTab] = useState<TabKey>("menu");
   const isMobile = useIsMobile();
 
   return (
@@ -337,197 +304,18 @@ export default function MenuSettings({
         </div>
       )}
 
-      {tab === "company" && (
-        <>
-          <CompanyInfoCard initial={initialCompany} slug={slug} canEdit={canEdit} />
-          <StaffModeCard initialSolo={initialSolo} canEdit={canEdit} />
-        </>
-      )}
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
-      {tab === "refund" && <RefundPolicyCard initialPolicy={initialRefundPolicy} />}
-      {tab === "login" && <LoginInfoCard initialEmail={initialLoginEmail} />}
     </div>
   );
 }
 
-type TabKey = "company" | "menu" | "login" | "templates" | "refund";
+type TabKey = "menu" | "templates";
 
 const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
-  { key: "company", label: "会社情報", mobileLabel: "会社情報" },
   { key: "menu", label: "受付メニュー", mobileLabel: "メニュー" },
   { key: "templates", label: "返信テンプレ", mobileLabel: "テンプレ" },
-  { key: "refund", label: "キャンセル・返金ポリシー", mobileLabel: "返金ポリシー" },
-  { key: "login", label: "ログイン情報", mobileLabel: "ログイン設定" },
 ];
-
-function CardHeader({ title, info, editing, onEdit, canEdit = true }: { title: string; info?: string; editing: boolean; onEdit: () => void; canEdit?: boolean }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>{title}</div>
-      {info && <InfoTooltip text={info} />}
-      <div style={{ flex: 1 }} />
-      {!editing && canEdit && (
-        <button onClick={onEdit} style={{ ...smallBtn, height: 28 }}>
-          変更
-        </button>
-      )}
-    </div>
-  );
-}
-
-function InfoRow({ label: l, value, labelWidth = 90 }: { label: string; value: string; labelWidth?: number }) {
-  return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 12, fontSize: 12.5 }}>
-      <span style={{ width: labelWidth, flex: "none", color: "var(--color-neutral-500)", lineHeight: 1.5 }}>{l}</span>
-      <span style={{ minWidth: 0, flex: 1, color: value ? "inherit" : "var(--color-neutral-500)" }}>{value || "（未設定）"}</span>
-    </div>
-  );
-}
-
-function CompanyInfoCard({ initial, slug, canEdit }: { initial: Company; slug: string | null; canEdit: boolean }) {
-  const [saved, setSaved] = useState(initial);
-  const [form, setForm] = useState(initial);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  function set<K extends keyof Company>(key: K, value: Company[K]) {
-    setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  function startEdit() {
-    setForm(saved);
-    setError("");
-    setEditing(true);
-  }
-
-  async function save() {
-    if (saving) return;
-    setSaving(true);
-    setError("");
-    try {
-      await updateCompanyInfo(form);
-      setSaved(form);
-      setEditing(false);
-    } catch (e) {
-      setError(errorMessage(e, "保存できませんでした"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={card}>
-      <CardHeader title="会社情報" info="契約書の「甲」・依頼主への表示名・見積書と請求書に使います" editing={editing} onEdit={startEdit} canEdit={canEdit} />
-      {slug && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
-          <span>お問い合わせURL：</span>
-          <a href={`https://port.s-stylegolf.com/${slug}`} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
-            port.s-stylegolf.com/{slug}
-          </a>
-          <InfoTooltip text="このURLは共通のリンクですが、タップした方ごとに専用のお問い合わせ窓口になります。ホームページなどに載せてご利用ください。" />
-        </div>
-      )}
-      {!editing ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <InfoRow label="正式名称" value={saved.name} />
-          <InfoRow label="表示名" value={saved.display_name} />
-          <InfoRow label="代表者名" value={saved.rep_name} />
-          <InfoRow label="電話番号" value={saved.tel} />
-          <InfoRow label="メールアドレス" value={saved.email} />
-          <InfoRow label="住所" value={saved.address} />
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="正式名称" value={form.name} onChange={(v) => set("name", v)} />
-            <Field label="表示名（依頼主に見える）" value={form.display_name} onChange={(v) => set("display_name", v)} />
-            <Field label="代表者名" value={form.rep_name} onChange={(v) => set("rep_name", v)} />
-            <Field label="電話番号" value={form.tel} onChange={(v) => set("tel", v)} />
-            <Field label="メールアドレス" value={form.email} onChange={(v) => set("email", v)} />
-            <Field label="住所" value={form.address} onChange={(v) => set("address", v)} />
-          </div>
-          {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={save} disabled={saving} style={{ ...smallBtn, height: 36 }}>
-              {saving ? "保存中…" : "保存して閉じる"}
-            </button>
-            <button onClick={() => setEditing(false)} disabled={saving} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-              キャンセル
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function StaffModeCard({ initialSolo, canEdit }: { initialSolo: boolean; canEdit: boolean }) {
-  const router = useRouter();
-  const [enabled, setEnabled] = useState(!initialSolo);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  async function toggle() {
-    if (saving || !canEdit) return;
-    const next = !enabled;
-    setSaving(true);
-    setError("");
-    try {
-      await updateStaffMode(next);
-      setEnabled(next);
-      router.refresh();
-    } catch (e) {
-      setError(errorMessage(e, "切り替えできませんでした"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={card}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>スタッフ連携</div>
-        <InfoTooltip text="オンにすると、左メニューに「スタッフ」が表示され、窓口（部署）の作成や、追加のスタッフの招待・役職の割り当てができるようになります。オフのままなら、オーナー1人で全ての窓口に対応する運用になります。" />
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <button
-          onClick={toggle}
-          disabled={saving || !canEdit}
-          role="switch"
-          aria-checked={enabled}
-          style={{
-            width: 42,
-            height: 24,
-            padding: 2,
-            flex: "none",
-            cursor: canEdit ? "pointer" : "default",
-            opacity: canEdit ? 1 : 0.5,
-            display: "flex",
-            justifyContent: enabled ? "flex-end" : "flex-start",
-            background: enabled ? "var(--color-accent)" : "var(--color-neutral-800)",
-            border: "none",
-            borderRadius: 999,
-          }}
-        >
-          <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--color-surface)" }} />
-        </button>
-        <span style={{ fontSize: 12.5 }}>{enabled ? "スタッフ連携を使う" : "1人運用（スタッフ機能を隠す）"}</span>
-      </div>
-      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-    </div>
-  );
-}
-
-function Field({ label: l, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <span style={label}>{l}</span>
-      <input value={value} onChange={(e) => onChange(e.target.value)} className="vid-input" style={input} />
-    </div>
-  );
-}
 
 function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
   const [menus, setMenus] = useState(initialMenus);
@@ -753,122 +541,6 @@ function QuestionsEditor({ menuId, questions, onChange, canEdit }: { menuId: str
   );
 }
 
-function LoginInfoCard({ initialEmail }: { initialEmail: string }) {
-  const [email, setEmail] = useState(initialEmail);
-  const [editingEmail, setEditingEmail] = useState(false);
-  const [editingPw, setEditingPw] = useState(false);
-  const [nextEmail, setNextEmail] = useState(initialEmail);
-  const [curPw, setCurPw] = useState("");
-  const [nextPw, setNextPw] = useState("");
-  const [confirmPw, setConfirmPw] = useState("");
-  const [error, setError] = useState("");
-  const [done, setDone] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  async function saveEmail() {
-    if (saving) return;
-    setError("");
-    if (!nextEmail.trim()) return setError("メールアドレスを入力してください");
-    setSaving(true);
-    try {
-      await updateLoginEmail(nextEmail.trim());
-      setEmail(nextEmail.trim());
-      setEditingEmail(false);
-      setDone("確認メールを新しいアドレスに送信しました。リンクを開くと切り替わります。");
-    } catch (e) {
-      setError(errorMessage(e, "変更できませんでした"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function savePassword() {
-    if (saving) return;
-    setError("");
-    if (nextPw.length < 8) return setError("新しいパスワードは8文字以上にしてください");
-    if (nextPw !== confirmPw) return setError("新しいパスワードが一致しません");
-    setSaving(true);
-    try {
-      await updateLoginPassword(curPw, nextPw);
-      setEditingPw(false);
-      setCurPw("");
-      setNextPw("");
-      setConfirmPw("");
-      setDone("パスワードを変更しました。");
-    } catch (e) {
-      setError(errorMessage(e, "変更できませんでした"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={card}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>ログイン情報</div>
-        <InfoTooltip text="この管理画面に入るためのメールアドレスとパスワードです。書類には使いません。" />
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={label}>メールアドレス</span>
-            <span style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email}</span>
-          </div>
-          <button onClick={() => { setEditingEmail((v) => !v); setEditingPw(false); setError(""); setDone(""); }} style={smallBtn}>変更</button>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={label}>パスワード</span>
-            <span style={{ fontSize: 13, letterSpacing: "0.12em" }}>••••••••</span>
-          </div>
-          <button onClick={() => { setEditingPw((v) => !v); setEditingEmail(false); setError(""); setDone(""); }} style={smallBtn}>変更</button>
-        </div>
-      </div>
-
-      {editingEmail && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 13, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={label}>新しいメールアドレス</span>
-            <input value={nextEmail} onChange={(e) => setNextEmail(e.target.value)} className="vid-input" style={input} />
-          </div>
-          {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={saveEmail} disabled={saving} style={{ ...smallBtn, height: 34 }}>{saving ? "保存中…" : "変更を保存"}</button>
-            <button onClick={() => { setEditingEmail(false); setNextEmail(email); setError(""); }} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>キャンセル</button>
-          </div>
-        </div>
-      )}
-
-      {editingPw && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 13, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <span style={label}>現在のパスワード</span>
-              <input type="password" value={curPw} onChange={(e) => setCurPw(e.target.value)} className="vid-input" style={input} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <span style={label}>新しいパスワード</span>
-              <input type="password" value={nextPw} onChange={(e) => setNextPw(e.target.value)} placeholder="8文字以上" className="vid-input" style={input} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <span style={label}>確認のため再入力</span>
-              <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="vid-input" style={input} />
-            </div>
-          </div>
-          {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={savePassword} disabled={saving} style={{ ...smallBtn, height: 34 }}>{saving ? "保存中…" : "変更を保存"}</button>
-            <button onClick={() => { setEditingPw(false); setCurPw(""); setNextPw(""); setConfirmPw(""); setError(""); }} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>キャンセル</button>
-          </div>
-        </div>
-      )}
-
-      {done && !editingEmail && !editingPw && <span style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>{done}</span>}
-    </div>
-  );
-}
-
 function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemplates: IntakeForm[] }) {
   const [templates, setTemplates] = useState(initialTemplates);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -1015,47 +687,3 @@ function TemplateFieldsEditor({ formId, fields, onChange }: { formId: string; fi
   );
 }
 
-const REFUND_STAGES: { key: RefundStage; label: string; when: string }[] = [
-  { key: "prequote", label: "見積提示前のキャンセル", when: "見積を出す前の相談段階" },
-  { key: "accepted", label: "見積承諾後・着手前", when: "承諾はあったが、まだ「着手する」を押していない" },
-  { key: "started", label: "着手後のキャンセル", when: "「着手する」を押した後・完了報告の前" },
-  { key: "delivered", label: "完了後の返金", when: "完了報告のあと。品質不備などがあれば受付が判断" },
-  { key: "terminate", label: "大幅な遅延・担当終了", when: "対応の目安を過ぎても未完了の場合、依頼主を保護" },
-];
-
-const REFUND_MODES: { value: RefundMode; label: string }[] = [
-  { value: "nocharge", label: "請求なし" },
-  { value: "full", label: "全額返金" },
-  { value: "partial", label: "部分返金" },
-  { value: "none", label: "返金なし" },
-];
-
-function refundModeLabel(mode: RefundMode, pct: number): string {
-  const found = REFUND_MODES.find((m) => m.value === mode);
-  const base = found?.label ?? mode;
-  return mode === "partial" ? `${base}（${pct}%）` : base;
-}
-
-// キャンセル・返金は固定ルール（着手後は原則返金なし。例外は未着手と著しい
-// 遅延の2つだけ全額）になったため、事業者ごとに%を変更する画面はもう無い。
-// ここは今のルールを確認するための説明だけの表示。
-function RefundPolicyCard({ initialPolicy }: { initialPolicy: RefundPolicyRow[] }) {
-  const rows = REFUND_STAGES.map((s) => {
-    const found = initialPolicy.find((p) => p.stage === s.key);
-    return { ...s, mode: found?.mode ?? ("none" as RefundMode), pct: found?.pct ?? 0 };
-  });
-
-  return (
-    <div style={card}>
-      <CardHeader title="キャンセル・返金ポリシー" info="着手後は実働が発生しているため、原則返金しません。未着手のキャンセルと、著しい遅延など本部側の責任による場合だけ全額返金します。" editing={false} onEdit={() => {}} canEdit={false} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {rows.map((r) => (
-          <InfoRow key={r.key} label={r.label} value={refundModeLabel(r.mode, r.pct)} labelWidth={168} />
-        ))}
-      </div>
-      <div style={{ fontSize: 11, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        これ以外の個別の事情（本部側の不手際など）での返金は、キャンセル処理の画面から金額を手入力して個別に対応できます。
-      </div>
-    </div>
-  );
-}

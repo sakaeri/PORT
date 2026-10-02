@@ -133,44 +133,16 @@ export async function startSubscriptionSetup() {
 
 // org_write ポリシーは owner のみ更新可（reception は不可）。RLS は該当行が
 // なければ黙って0件更新で終わるため、更新後に選択して件数で判定する。
-export async function updateCompanyInfo(fields: {
-  name: string;
-  display_name: string;
-  rep_name: string;
-  address: string;
-  tel: string;
-  email: string;
-}) {
+// 依頼主に見える事業者名はこれだけ（正式名称・代表者名・住所・電話番号は
+// どこにも表示に使っていないため、編集画面ごと廃止した）。
+export async function updateOrgDisplayName(displayName: string) {
   const ctx = await requireContext();
+  const trimmed = displayName.trim();
+  if (!trimmed) throw new Error("表示名を入力してください");
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("organizations")
-    .update({
-      name: fields.name.trim(),
-      display_name: fields.display_name.trim(),
-      rep_name: fields.rep_name.trim() || null,
-      address: fields.address.trim() || null,
-      tel: fields.tel.trim() || null,
-      email: fields.email.trim() || null,
-    })
-    .eq("id", ctx.orgId)
-    .select("id");
+  const { data, error } = await supabase.from("organizations").update({ display_name: trimmed }).eq("id", ctx.orgId).select("id");
   if (error) throw error;
-  if (!data?.length) throw new Error("会社情報の変更はオーナーのみ行えます");
-}
-
-// solo=true が「1人運用（スタッフ機能を隠す）」。トグルのラベルは
-// 「スタッフ連携を使う」＝solo の反転で見せる。
-export async function updateStaffMode(enabled: boolean) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("organizations")
-    .update({ solo: !enabled })
-    .eq("id", ctx.orgId)
-    .select("id");
-  if (error) throw error;
-  if (!data?.length) throw new Error("この切り替えはオーナーのみ行えます");
+  if (!data?.length) throw new Error("この変更はオーナーのみ行えます");
 }
 
 // 受付メニューはFC展開時のブランド・料金統一のため本部限定。イレギュラーな
