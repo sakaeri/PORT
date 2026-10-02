@@ -1150,6 +1150,20 @@ function pillStyle(active: boolean): React.CSSProperties {
   };
 }
 
+// 時間精算の単価は30分3,000円（＝時給6,000円）で固定。見積もり時は
+// スタッフが目安時間を入れるだけで、上限額（これ以上は請求しない額）を
+// 自動計算する。実際の請求額の計算（30分単位切り上げ・最低3,000円）は
+// finalize_hourly_billing（DB関数）側で、ここと同じ単価を使って行う。
+const HOURLY_BLOCK_MINUTES = 30;
+const HOURLY_BLOCK_RATE = 3000;
+const HOURLY_RATE_PER_HOUR = HOURLY_BLOCK_RATE * (60 / HOURLY_BLOCK_MINUTES);
+
+function capFromEstimatedHours(hours: number): number {
+  if (!Number.isFinite(hours) || hours <= 0) return 0;
+  const blocks = Math.ceil((hours * 60) / HOURLY_BLOCK_MINUTES);
+  return blocks * HOURLY_BLOCK_RATE;
+}
+
 
 function QuoteDialog({
   threadId,
@@ -1175,8 +1189,7 @@ function QuoteDialog({
   const [saveAsMenu, setSaveAsMenu] = useState(false);
   const [isHourly, setIsHourly] = useState(false);
   const [cadence, setCadence] = useState<SubscriptionCadence | "">("");
-  const [hourlyRate, setHourlyRate] = useState("");
-  const [hourlyCap, setHourlyCap] = useState("");
+  const [estimatedHours, setEstimatedHours] = useState("");
   const [hourlyLabel, setHourlyLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -1209,12 +1222,13 @@ function QuoteDialog({
     ...customItems.map((c) => ({ menuId: null as string | null, label: c.label, price: c.price, payout: 0, qty: c.qty, leadHours: c.leadHours })),
   ];
   const itemsTotal = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
-  const total = isHourly ? Number(hourlyCap) || 0 : itemsTotal;
+  const hourlyCap = capFromEstimatedHours(Number(estimatedHours));
+  const total = isHourly ? hourlyCap : itemsTotal;
   // 同じ項目を複数個頼むと、その分準備に時間がかかる想定で数量に比例させる
   // （項目ごとの目安時間 × 数量）。違う項目同士は並行して進む前提でmaxを取る。
   const knownLeadHours = allItems.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
   const due = knownLeadHours.length > 0 ? hoursToDueLabel(Math.max(...knownLeadHours)) : "";
-  const canSubmit = isHourly ? Number(hourlyRate) > 0 && Number(hourlyCap) > 0 : allItems.length > 0;
+  const canSubmit = isHourly ? hourlyCap > 0 : allItems.length > 0;
 
   async function submit() {
     if (saving || !canSubmit) return;
@@ -1226,7 +1240,7 @@ function QuoteDialog({
         note,
         due,
         saveAsMenu,
-        hourly: isHourly ? { rate: Number(hourlyRate), cap: Number(hourlyCap), label: hourlyLabel } : undefined,
+        hourly: isHourly ? { rate: HOURLY_RATE_PER_HOUR, cap: hourlyCap, label: hourlyLabel } : undefined,
         cadence: !isHourly && cadence ? cadence : undefined,
       });
       onCreated(requestId);
@@ -1269,18 +1283,14 @@ function QuoteDialog({
               <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>件名</span>
               <input value={hourlyLabel} onChange={(e) => setHourlyLabel(e.target.value)} placeholder="例：資料のフォーマット整え" className="vid-input" style={inputStyle} />
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
-                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>時間単価（円/時間）</span>
-                <input value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} type="number" min={0} className="vid-input" style={inputStyle} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
-                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>上限額（円）</span>
-                <input value={hourlyCap} onChange={(e) => setHourlyCap(e.target.value)} type="number" min={0} className="vid-input" style={inputStyle} />
-              </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間（時間）</span>
+              <input value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} type="number" min={0.5} step={0.5} placeholder="例：2" className="vid-input" style={{ ...inputStyle, maxWidth: 140 }} />
             </div>
             <div style={{ fontSize: 11, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-              実際の請求額は「着手〜完了報告の時間（30分単位で切り上げ・最低3,000円）×時間単価」で、上限額を超えることはありません。依頼主にはこの上限額を見積もりとして提示します。
+              時間単価は30分{HOURLY_BLOCK_RATE.toLocaleString("ja-JP")}円（時給{HOURLY_RATE_PER_HOUR.toLocaleString("ja-JP")}円）で固定です。目安時間から自動計算した上限額
+              {hourlyCap > 0 && `（¥${hourlyCap.toLocaleString("ja-JP")}）`}
+              を依頼主に見積もりとして提示し、実際の請求額（着手〜完了報告の時間を30分単位で切り上げ・最低3,000円）がこれを超えることはありません。
             </div>
           </div>
         ) : (
