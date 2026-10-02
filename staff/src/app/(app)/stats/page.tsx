@@ -115,7 +115,7 @@ async function OrgStats({ orgId }: { orgId: string }) {
   const supabase = await createClient();
   const { data: requests, error } = await supabase
     .from("requests")
-    .select("id, title, phase, amount, pay_status, deposit_amount, paid_at, deposit_paid_at, customers(name)")
+    .select("id, title, phase, amount, pay_status, paid_at, customers(name)")
     .eq("org_id", orgId);
 
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
@@ -126,23 +126,17 @@ async function OrgStats({ orgId }: { orgId: string }) {
     return c?.name ?? "—";
   }
 
-  // 実際に着金確認できた金額だけを合計する（見積もり金額ではない）。
-  // pay_status='paid'なら全額、'processing'（予約金のみ確認済み）ならdeposit_amountの分だけ数える。
-  const total = rows.reduce((s, r) => {
-    if (r.pay_status === "paid") return s + r.amount;
-    if (r.pay_status === "processing") return s + (r.deposit_amount ?? 0);
-    return s;
-  }, 0);
+  // 支払いは残高払いに一本化されているので、pay_status='paid'かどうかだけで
+  // 入金済みを判定する（見積もり金額ではなく、実際に支払われた金額）。
+  const total = rows.reduce((s, r) => (r.pay_status === "paid" ? s + r.amount : s), 0);
   const quoted = rows.filter((r) => r.phase === "quoted").length;
   const completed = rows.filter((r) => r.phase === "completed").length;
 
-  // 確認できた入金は、確認した月ごとに1件＝1行としてそのまま表示する（依頼主・見積もりタイトルつき）。
+  // 支払い済みは、支払った月ごとに1件＝1行としてそのまま表示する（依頼主・見積もりタイトルつき）。
   const confirmedRows: (MonthRow & { at: string })[] = [];
   for (const r of rows) {
     if (r.pay_status === "paid" && r.paid_at) {
       confirmedRows.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid", at: r.paid_at });
-    } else if (r.pay_status === "processing" && r.deposit_paid_at) {
-      confirmedRows.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.deposit_amount ?? 0, status: "paid", at: r.deposit_paid_at });
     }
   }
   const paidByMonth = new Map<string, MonthRow[]>();
@@ -153,14 +147,14 @@ async function OrgStats({ orgId }: { orgId: string }) {
     paidByMonth.set(key, list);
   }
 
-  // 入金待ち（未回収）は、過去の月ではなく今の状況として今月のところにだけ表示する。
+  // 支払い待ち（未回収）は、過去の月ではなく今の状況として今月のところにだけ表示する。
   const pendingRows: MonthRow[] = rows
     .filter((r) => r.pay_status !== "paid" && !["draft", "cancelled", "declined"].includes(r.phase))
     .map((r) => ({
       requestId: r.id,
       customerName: customerNameOf(r),
       title: r.title,
-      amount: r.pay_status === "processing" ? r.amount - (r.deposit_amount ?? 0) : r.amount,
+      amount: r.amount,
       status: "pending" as const,
     }))
     .filter((r) => r.amount > 0);
@@ -185,7 +179,7 @@ async function OrgStats({ orgId }: { orgId: string }) {
       <MonthlyMenuBreakdown months={months} />
 
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        入金額は受付が「入金を確認した」を押した分だけ反映されます。行をタップするとその案件トークに移動します。
+        入金額は、依頼主が「依頼を確定する」を押して残高から支払いが完了した分を反映しています。行をタップするとその案件トークに移動します。
       </div>
     </>
   );
