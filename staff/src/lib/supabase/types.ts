@@ -111,6 +111,7 @@ export interface Database {
           id: string;
           org_id: string;
           name: string;
+          royalty_pct: number | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["departments"]["Row"]> & { org_id: string; name: string };

@@ -1238,6 +1238,17 @@ export async function updateMenuDepartment(menuId: string, departmentId: string 
   if (error) throw error;
 }
 
+// 本部が窓口（マネージャー）から取るロイヤリティの率。nullなら対象外
+// （本部直轄の窓口など）。旧 setOrgRoyaltyPct は「事業者（organizations）」
+// 単位だった頃の名残で、今は窓口単位のこちらに置き換わっている。
+export async function setDepartmentRoyaltyPct(departmentId: string, pct: number | null) {
+  const ctx = await requireHqPrivileged();
+  if (pct != null && (pct < 0 || pct > 100)) throw new Error("0〜100の範囲で入力してください");
+  const supabase = await createClient();
+  const { error } = await supabase.from("departments").update({ royalty_pct: pct }).eq("id", departmentId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
 // dept_manager は窓口＝自分の担当範囲として必須（1つ以上）。dept_leader
 // （スタッフ）の窓口は「どのマネージャーに割り当てられているか」を表す
 // もので、必須ではない（本部が直接招待した直後などは未割り当てでもよい）。

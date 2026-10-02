@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { headingWeight } from "@/lib/style";
-import MonthlyMenuBreakdown, { type MonthBreakdown, type MonthRow } from "@/components/MonthlyMenuBreakdown";
+import type { MonthBreakdown, MonthRow } from "@/components/MonthlyMenuBreakdown";
+import DepartmentStatsList, { type DepartmentStat } from "@/components/DepartmentStatsList";
+import type { StaffRole } from "@/lib/supabase/types";
 
 const PLAN_LABEL: Record<string, string> = {
   trial: "トライアル中",
@@ -63,7 +65,7 @@ export default async function StatsPage() {
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>売上・実績</div>
-      {ctx.isHq ? <HqStats /> : <OrgStats orgId={ctx.orgId} />}
+      {ctx.isHq ? <HqStats /> : <OrgStats orgId={ctx.orgId} viewerRole={ctx.role} viewerUserId={ctx.userId} />}
     </div>
   );
 }
@@ -111,12 +113,16 @@ async function HqStats() {
   );
 }
 
-async function OrgStats({ orgId }: { orgId: string }) {
+async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; viewerRole: StaffRole | "reception"; viewerUserId: string }) {
   const supabase = await createClient();
-  const { data: requests, error } = await supabase
-    .from("requests")
-    .select("id, title, phase, amount, pay_status, paid_at, customers(name)")
-    .eq("org_id", orgId);
+  const [{ data: requests, error }, { data: departmentRows }, { data: customerThreads }, { data: myDepartmentRows }] = await Promise.all([
+    supabase.from("requests").select("id, title, phase, amount, pay_status, paid_at, customer_id, customers(name)").eq("org_id", orgId),
+    supabase.from("departments").select("id, name, royalty_pct").eq("org_id", orgId).order("created_at", { ascending: true }),
+    // 依頼主の窓口は、その依頼主の「customerトーク」が持つ department_id で決まる
+    // （customersテーブル自体には窓口の列がない）。
+    supabase.from("threads").select("customer_id, department_id").eq("org_id", orgId).eq("kind", "customer"),
+    viewerRole === "dept_manager" ? supabase.from("staff_departments").select("department_id").eq("profile_id", viewerUserId) : Promise.resolve({ data: [] as { department_id: string }[] }),
+  ]);
 
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
 
@@ -125,68 +131,83 @@ async function OrgStats({ orgId }: { orgId: string }) {
     const c = Array.isArray(r.customers) ? r.customers[0] : r.customers;
     return c?.name ?? "—";
   }
-
-  // 支払いは残高払いに一本化されているので、pay_status='paid'かどうかだけで
-  // 入金済みを判定する（見積もり金額ではなく、実際に支払われた金額）。
-  const total = rows.reduce((s, r) => (r.pay_status === "paid" ? s + r.amount : s), 0);
-  const quoted = rows.filter((r) => r.phase === "quoted").length;
-  const completed = rows.filter((r) => r.phase === "completed").length;
-
-  // 支払い済みは、支払った月ごとに1件＝1行としてそのまま表示する（依頼主・見積もりタイトルつき）。
-  const confirmedRows: (MonthRow & { at: string })[] = [];
-  for (const r of rows) {
-    if (r.pay_status === "paid" && r.paid_at) {
-      confirmedRows.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid", at: r.paid_at });
-    }
-  }
-  const paidByMonth = new Map<string, MonthRow[]>();
-  for (const c of confirmedRows) {
-    const key = monthKeyJST(c.at);
-    const list = paidByMonth.get(key) ?? [];
-    list.push(c);
-    paidByMonth.set(key, list);
-  }
-
-  // 支払い待ち（未回収）は、過去の月ではなく今の状況として今月のところにだけ表示する。
-  const pendingRows: MonthRow[] = rows
-    .filter((r) => r.pay_status !== "paid" && !["draft", "cancelled", "declined"].includes(r.phase))
-    .map((r) => ({
-      requestId: r.id,
-      customerName: customerNameOf(r),
-      title: r.title,
-      amount: r.amount,
-      status: "pending" as const,
-    }))
-    .filter((r) => r.amount > 0);
-
-  const oldestKey = confirmedRows.length ? confirmedRows.map((c) => monthKeyJST(c.at)).reduce((a, b) => (a < b ? a : b)) : null;
+  const departmentIdByCustomer = new Map((customerThreads ?? []).map((t) => [t.customer_id, t.department_id]));
   const { year, month } = nowJSTYearMonth();
   const currentKey = monthKeyFromYM(year, month);
-  const months: MonthBreakdown[] = monthRange(oldestKey).map((m) => {
-    const paid = paidByMonth.get(m.key) ?? [];
-    return { key: m.key, label: m.label, rows: m.key === currentKey ? [...pendingRows, ...paid] : paid };
-  });
+
+  // 窓口（マネージャー）ごとに集計する。支払いは残高払いに一本化されているので、
+  // pay_status='paid'かどうかだけで入金済みを判定する（見積もり金額ではなく、
+  // 実際に支払われた金額）。
+  function buildStat(matchDeptId: string | null, id: string, name: string, royaltyPct: number | null): DepartmentStat {
+    const deptRows = rows.filter((r) => (departmentIdByCustomer.get(r.customer_id) ?? null) === matchDeptId);
+    const total = deptRows.reduce((s, r) => (r.pay_status === "paid" ? s + r.amount : s), 0);
+    const quoted = deptRows.filter((r) => r.phase === "quoted").length;
+    const completed = deptRows.filter((r) => r.phase === "completed").length;
+
+    // 支払い済みは、支払った月ごとに1件＝1行としてそのまま表示する（依頼主・見積もりタイトルつき）。
+    const confirmedRows: (MonthRow & { at: string })[] = [];
+    let monthRevenue = 0;
+    for (const r of deptRows) {
+      if (r.pay_status === "paid" && r.paid_at) {
+        confirmedRows.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid", at: r.paid_at });
+        if (monthKeyJST(r.paid_at) === currentKey) monthRevenue += r.amount;
+      }
+    }
+    const paidByMonth = new Map<string, MonthRow[]>();
+    for (const c of confirmedRows) {
+      const key = monthKeyJST(c.at);
+      const list = paidByMonth.get(key) ?? [];
+      list.push(c);
+      paidByMonth.set(key, list);
+    }
+
+    // 支払い待ち（未回収）は、過去の月ではなく今の状況として今月のところにだけ表示する。
+    const pendingRows: MonthRow[] = deptRows
+      .filter((r) => r.pay_status !== "paid" && !["draft", "cancelled", "declined"].includes(r.phase))
+      .map((r) => ({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "pending" as const }))
+      .filter((r) => r.amount > 0);
+
+    const oldestKey = confirmedRows.length ? confirmedRows.map((c) => monthKeyJST(c.at)).reduce((a, b) => (a < b ? a : b)) : null;
+    const months: MonthBreakdown[] = monthRange(oldestKey).map((m) => {
+      const paid = paidByMonth.get(m.key) ?? [];
+      return { key: m.key, label: m.label, rows: m.key === currentKey ? [...pendingRows, ...paid] : paid };
+    });
+
+    return { id, name, royaltyPct, total, quoted, completed, monthRevenue, months };
+  }
+
+  // マネージャーは自分の窓口だけ、オーナーは全窓口（＋窓口未設定分、
+  // 実績がある時だけ）を見る。
+  const myDepartmentIds = new Set((myDepartmentRows ?? []).map((d) => d.department_id));
+  const visibleDepartments = viewerRole === "dept_manager" ? (departmentRows ?? []).filter((d) => myDepartmentIds.has(d.id)) : (departmentRows ?? []);
+  const stats: DepartmentStat[] = visibleDepartments.map((d) => buildStat(d.id, d.id, d.name, d.royalty_pct));
+
+  if (viewerRole !== "dept_manager") {
+    const unassigned = buildStat(null, "unassigned", "窓口未設定", null);
+    if (unassigned.total > 0 || unassigned.quoted > 0 || unassigned.completed > 0 || unassigned.months.some((m) => m.rows.length > 0)) {
+      stats.push(unassigned);
+    }
+  }
+
+  const grandTotal = stats.reduce((s, d) => s + d.total, 0);
+  const grandQuoted = stats.reduce((s, d) => s + d.quoted, 0);
+  const grandCompleted = stats.reduce((s, d) => s + d.completed, 0);
 
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-        <StatTile label="累計入金額（確認済み）" value={yen(total)} />
-        <StatTile label="完了件数" value={`${completed}件`} />
-        <StatTile label="見積もり回答待ち" value={`${quoted}件`} />
+        <StatTile label="累計入金額（確認済み）" value={yen(grandTotal)} />
+        <StatTile label="完了件数" value={`${grandCompleted}件`} />
+        <StatTile label="見積もり回答待ち" value={`${grandQuoted}件`} />
       </div>
 
-      <SectionTitle>月別の入金状況</SectionTitle>
-      <MonthlyMenuBreakdown months={months} />
+      <DepartmentStatsList departments={stats} canEditRoyalty={viewerRole === "owner"} />
 
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
         入金額は、依頼主が「依頼を確定する」を押して残高から支払いが完了した分を反映しています。行をタップするとその案件トークに移動します。
       </div>
     </>
   );
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-neutral-400)", marginTop: 4 }}>{children}</div>;
 }
 
 function StatTile({ label, value }: { label: string; value: string }) {
