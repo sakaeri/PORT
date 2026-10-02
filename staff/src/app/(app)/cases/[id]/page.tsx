@@ -22,7 +22,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_percent, deposit_amount, deposit_paid_at, pay_method, pay_status, bank_transfer_info, card_payment_link, final_card_payment_link, hourly_rate, hourly_cap, customers(id, name), completion_reports(*), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name), completion_reports(*), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -75,14 +75,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         cancelRequestedAt: request.cancel_requested_at,
         paidAt: canSeeFinance ? request.paid_at : null,
         paymentTiming: request.payment_timing,
-        depositPercent: canSeeFinance ? request.deposit_percent : null,
         depositAmount: canSeeFinance ? request.deposit_amount : null,
         depositPaidAt: canSeeFinance ? request.deposit_paid_at : null,
-        payMethod: canSeeFinance ? request.pay_method : null,
         payStatus: canSeeFinance ? request.pay_status : "",
-        bankTransferInfo: canSeeFinance ? request.bank_transfer_info : null,
-        cardPaymentLink: canSeeFinance ? request.card_payment_link : null,
-        finalCardPaymentLink: canSeeFinance ? request.final_card_payment_link : null,
         hourlyRate: canSeeFinance ? request.hourly_rate : null,
         hourlyCap: canSeeFinance ? request.hourly_cap : null,
       }}

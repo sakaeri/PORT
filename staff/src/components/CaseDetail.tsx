@@ -9,22 +9,18 @@ import { errorMessage } from "@/lib/errors";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
 import {
-  confirmPayment,
-  confirmDeposit,
-  confirmFinalPayment,
   startCaseRequest,
   submitCaseReport,
   approveCaseReport,
   declineQuote,
   confirmCancellation,
-  setFinalPaymentLink,
   archiveCaseThread,
   unarchiveCaseThread,
   assignCaseStaff,
   unassignCaseStaff,
   cancelSubscription,
 } from "@/app/actions";
-import type { BankTransferInfo, Database, PaymentMethod, PaymentTiming, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
+import type { Database, PaymentTiming, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
 
 type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
@@ -88,14 +84,9 @@ export default function CaseDetail({
     cancelRequestedAt: string | null;
     paidAt: string | null;
     paymentTiming: PaymentTiming;
-    depositPercent: number | null;
     depositAmount: number | null;
     depositPaidAt: string | null;
-    payMethod: PaymentMethod | null;
     payStatus: string;
-    bankTransferInfo: BankTransferInfo | null;
-    cardPaymentLink: string | null;
-    finalCardPaymentLink: string | null;
     hourlyRate: number | null;
     hourlyCap: number | null;
   };
@@ -134,14 +125,7 @@ export default function CaseDetail({
     }
   }
 
-  const handleStart = () =>
-    runAction(
-      () => startCaseRequest(request.id),
-      request.phase === "quoted" ? "入金なしでこの案件に着手します。よろしいですか？" : undefined,
-    );
-  const handleConfirmPayment = () => runAction(() => confirmPayment(request.id), "入金を確認しましたか？この操作で着手も行われます。");
-  const handleConfirmDeposit = () => runAction(() => confirmDeposit(request.id), "予約金の入金を確認しましたか？この操作で着手も行われます。");
-  const handleConfirmFinal = () => runAction(() => confirmFinalPayment(request.id), request.paymentTiming === "deposit" ? "残金の入金を確認しましたか？" : "入金を確認しましたか？");
+  const handleStart = () => runAction(() => startCaseRequest(request.id));
   const handleApproveReport = () => runAction(() => approveCaseReport(request.id), "この内容で依頼主に完了報告を送信します。よろしいですか？");
   const handleToggleArchive = () =>
     runAction(() => (caseThread?.archived ? unarchiveCaseThread(caseThread.id) : archiveCaseThread(caseThread!.id)));
@@ -236,11 +220,7 @@ export default function CaseDetail({
         )}
 
         {canSeeFinance && (
-          <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-            支払い：{PAYMENT_TIMING_LABEL[request.paymentTiming]}
-            {request.paymentTiming === "deposit" && request.depositAmount != null && `（予約金 ¥${request.depositAmount.toLocaleString("ja-JP")}・${request.depositPercent}%）`}
-            {request.payMethod && `・${request.payMethod === "card" ? "カード決済" : "銀行振込"}`}
-          </div>
+          <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>支払い：{PAYMENT_TIMING_LABEL[request.paymentTiming]}</div>
         )}
         {canSeeFinance && request.hourlyRate != null && (
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
@@ -264,51 +244,11 @@ export default function CaseDetail({
             )}
           </div>
         )}
-        {canSeeFinance && request.payMethod === "bank" && request.bankTransferInfo && (
-          <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.7 }}>
-            {request.bankTransferInfo.bankName} {request.bankTransferInfo.branchName}　{request.bankTransferInfo.accountType} {request.bankTransferInfo.accountNumber}　{request.bankTransferInfo.holder}
-          </div>
-        )}
-        {canSeeFinance && request.payMethod === "card" && request.cardPaymentLink && (
-          <div style={{ fontSize: 11.5, lineHeight: 1.7 }}>
-            <a href={request.cardPaymentLink} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
-              {request.cardPaymentLink}
-            </a>
-          </div>
-        )}
         {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
 
         {request.phase === "quoted" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {canSeeFinance && request.paymentTiming === "prepay_full" && (
-              <>
-                <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金待ちです。チャットで送った決済案内の着金を確認したら押してください（入金確認と同時に着手します）。</div>
-                <button onClick={handleConfirmPayment} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
-                  {busy ? "処理中…" : "入金を確認して着手する"}
-                </button>
-              </>
-            )}
-            {canSeeFinance && request.paymentTiming === "deposit" && (
-              <>
-                <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>予約金の入金待ちです。着金を確認したら押してください（入金確認と同時に着手します）。</div>
-                <button onClick={handleConfirmDeposit} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
-                  {busy ? "処理中…" : "予約金の入金を確認して着手する"}
-                </button>
-              </>
-            )}
-            {(request.paymentTiming === "before_shipping" || request.paymentTiming === "postpay") && (
-              <>
-                <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金なしで着手できます。</div>
-                <button onClick={handleStart} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
-                  {busy ? "処理中…" : "着手する"}
-                </button>
-              </>
-            )}
-            {request.paymentTiming === "balance" && (
-              <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
-                依頼主がチャージ残高から直接お支払いいただくと、着手待ち（準備中）になります。着手はこの後、担当者が「着手する」を押して開始してください。
-              </div>
-            )}
+          <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
+            依頼主がチャージ残高から直接お支払いいただくと、着手待ち（準備中）になります。着手はこの後、担当者が「着手する」を押して開始してください。
           </div>
         )}
 
@@ -343,34 +283,8 @@ export default function CaseDetail({
           </div>
         )}
 
-        {canSeeFinance && request.payStatus === "paid" ? (
-          request.phase !== "quoted" && <div style={{ fontSize: 12, color: "var(--color-accent-300)" }}>入金確認済み（¥{request.amount.toLocaleString("ja-JP")}）</div>
-        ) : (
-          canSeeFinance && (
-            <>
-              {request.paymentTiming === "deposit" && request.payStatus === "processing" && ["started", "completed"].includes(request.phase) && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>残金 ¥{(request.amount - (request.depositAmount ?? 0)).toLocaleString("ja-JP")} は未確認です</span>
-                    <button onClick={handleConfirmFinal} disabled={busy} style={{ ...btn, height: 32 }}>
-                      {busy ? "処理中…" : "残金の入金を確認した"}
-                    </button>
-                  </div>
-                  {request.payMethod === "card" && (
-                    <FinalPaymentLinkForm requestId={request.id} currentLink={request.finalCardPaymentLink} />
-                  )}
-                </div>
-              )}
-              {(request.paymentTiming === "before_shipping" || request.paymentTiming === "postpay") && request.phase === "completed" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>入金は未確認です</span>
-                  <button onClick={handleConfirmFinal} disabled={busy} style={{ ...btn, height: 32 }}>
-                    {busy ? "処理中…" : "入金を確認した"}
-                  </button>
-                </div>
-              )}
-            </>
-          )
+        {canSeeFinance && request.payStatus === "paid" && request.phase !== "quoted" && (
+          <div style={{ fontSize: 12, color: "var(--color-accent-300)" }}>入金確認済み（¥{request.amount.toLocaleString("ja-JP")}）</div>
         )}
 
         {canCancel && request.phase === "quoted" && (
@@ -545,76 +459,6 @@ function CompletionReportForm({ requestId, canSendDirectly }: { requestId: strin
           {saving ? "送信中…" : canSendDirectly ? "この内容で完了報告する" : "この内容で提出する"}
         </button>
         <button onClick={() => setOpen(false)} style={{ ...btn, color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
-          キャンセル
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// 予約金＋カード決済のとき、残金用の決済リンクを登録して依頼主トークに送る。
-// 最初のカード決済リンクは予約金専用の金額で固定されているため、残金分は
-// 別のリンクとして案内する必要がある。
-function FinalPaymentLinkForm({ requestId, currentLink }: { requestId: string; currentLink: string | null }) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [url, setUrl] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  async function submit() {
-    if (saving || !url.trim()) return;
-    setError("");
-    setSaving(true);
-    try {
-      await setFinalPaymentLink(requestId, url);
-      setOpen(false);
-      setUrl("");
-      router.refresh();
-    } catch (e) {
-      setError(errorMessage(e, "送信できませんでした"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (currentLink && !open) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
-        <span style={{ color: "var(--color-neutral-500)" }}>残金の決済リンク送信済み：</span>
-        <a href={currentLink} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {currentLink}
-        </a>
-        <button onClick={() => setOpen(true)} style={{ flex: "none", cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-500)", background: "transparent", border: "none", textDecoration: "underline" }}>
-          作り直す
-        </button>
-      </div>
-    );
-  }
-
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} style={{ ...btn, height: 32, alignSelf: "flex-start" }}>
-        残金の決済リンクを送る
-      </button>
-    );
-  }
-
-  return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      <input
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        placeholder="残金分のカード決済リンク（URL）"
-        className="vid-input"
-        style={{ ...inputStyle, flex: 1, minWidth: 200 }}
-      />
-      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={submit} disabled={saving || !url.trim()} style={{ ...btn, height: 36 }}>
-          {saving ? "送信中…" : "このリンクを送る"}
-        </button>
-        <button onClick={() => setOpen(false)} style={{ ...btn, height: 36, color: "var(--color-neutral-400)", background: "transparent", borderColor: "var(--color-divider)" }}>
           キャンセル
         </button>
       </div>

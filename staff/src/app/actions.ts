@@ -4,8 +4,8 @@ import { cookies } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
-import { notifyCustomerCompletionReport, notifyCustomerPaymentConfirmed, notifyCustomerQuoteCreated } from "@/lib/notify";
-import type { BankTransferInfo, PaymentMethod, PaymentTiming, RefundMode, RefundStage, StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
+import { notifyCustomerCompletionReport, notifyCustomerQuoteCreated } from "@/lib/notify";
+import type { RefundMode, RefundStage, StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
 // （キャンセル処理や、支払い設定そのものなど）用。既定はロック中なら弾く。
@@ -157,38 +157,6 @@ export async function updateCompanyInfo(fields: {
     .select("id");
   if (error) throw error;
   if (!data?.length) throw new Error("会社情報の変更はオーナーのみ行えます");
-}
-
-// org_write ポリシーは owner のみ更新可（reception は不可）。
-export async function updatePaymentSettings(fields: { cardPaymentEnabled: boolean; bankInfo: BankTransferInfo }) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("organizations")
-    .update({ card_payment_enabled: fields.cardPaymentEnabled, bank_transfer_info: fields.bankInfo })
-    .eq("id", ctx.orgId)
-    .select("id");
-  if (error) throw error;
-  if (!data?.length) throw new Error("決済設定の変更はオーナーのみ行えます");
-}
-
-// カード決済のリンクは見積作成のたびに入力する運用にし、使ったリンクだけ一覧に残す
-// （URLは事後編集不可・タイトル変更と削除のみ）。card_payment_links_write は is_office() なので
-// 受付でも操作できる（決済ON/OFF・銀行口座はオーナー限定だが、こちらは日常運用寄りのため）。
-export async function renameCardPaymentLink(id: string, title: string) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const trimmed = title.trim();
-  if (!trimmed) throw new Error("タイトルを入力してください");
-  const { error } = await supabase.from("card_payment_links").update({ title: trimmed }).eq("id", id).eq("org_id", ctx.orgId);
-  if (error) throw error;
-}
-
-export async function deleteCardPaymentLink(id: string) {
-  const ctx = await requireContextWithDelete();
-  const supabase = await createClient();
-  const { error } = await supabase.from("card_payment_links").delete().eq("id", id).eq("org_id", ctx.orgId);
-  if (error) throw error;
 }
 
 // solo=true が「1人運用（スタッフ機能を隠す）」。トグルのラベルは
@@ -802,20 +770,11 @@ export async function createCaseRequest(
     note: string;
     due: string;
     saveAsMenu?: boolean;
-    paymentTiming: PaymentTiming;
-    depositPercent?: number;
-    payMethod: PaymentMethod;
-    bankInfo?: BankTransferInfo;
-    cardPaymentLink?: string;
-    saveCardPaymentLink?: { title: string; url: string };
-    // メニューに無い依頼を時間精算にする場合。設定すると items は無視し、
-    // payment_timing は強制的に "balance" にする（時間単価の請求は
-    // チャージ残高からの支払い以外あり得ないため）。
+    // メニューに無い依頼を時間精算にする場合。設定すると items は無視する。
     hourly?: { rate: number; cap: number; label: string };
-    // 定期対応（毎週・毎月）にする場合。hourly とは併用不可。設定すると
-    // payment_timing は強制的に "balance" にする（定期の自動引き落としは
-    // チャージ残高以外あり得ないため）。初回の支払いが確定するまでは
-    // 定期対応としては動き出さない（pay_request_from_balance 側で有効化する）。
+    // 定期対応（毎週・毎月）にする場合。hourly とは併用不可。初回の支払いが
+    // 確定するまでは定期対応としては動き出さない
+    // （pay_request_from_balance 側で有効化する）。
     cadence?: SubscriptionCadence;
   },
 ) {
@@ -838,11 +797,6 @@ export async function createCaseRequest(
   const knownLeadHours = items.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
   const leadHoursTotal = isHourly || input.cadence ? null : knownLeadHours.length > 0 ? Math.max(...knownLeadHours) : null;
 
-  const paymentTiming: PaymentTiming = isHourly || input.cadence ? "balance" : input.paymentTiming;
-  const depositPercent = paymentTiming === "deposit" ? Math.min(100, Math.max(1, Math.round(input.depositPercent ?? 0))) : null;
-  if (paymentTiming === "deposit" && !depositPercent) throw new Error("予約金の割合を入力してください");
-  const depositAmount = depositPercent ? Math.round((amount * depositPercent) / 100) : null;
-
   if (!isHourly && input.saveAsMenu) {
     const customItems = items.filter((it) => !it.menuId);
     if (customItems.length > 0) {
@@ -851,13 +805,6 @@ export async function createCaseRequest(
         .insert(customItems.map((it) => ({ org_id: ctx.orgId, label: it.label, price: it.price, payout: it.payout, lead_hours: it.leadHours ?? 24 })));
       if (menuError) throw menuError;
     }
-  }
-
-  if (!isHourly && input.payMethod === "card" && input.saveCardPaymentLink?.url.trim()) {
-    const { error: linkError } = await supabase
-      .from("card_payment_links")
-      .insert({ org_id: ctx.orgId, title: input.saveCardPaymentLink.title.trim() || "決済リンク", url: input.saveCardPaymentLink.url.trim() });
-    if (linkError) throw linkError;
   }
 
   const { data: request, error: reqError } = await supabase
@@ -871,12 +818,7 @@ export async function createCaseRequest(
       phase: "quoted",
       quoted_at: new Date().toISOString(),
       lead_hours: leadHoursTotal,
-      payment_timing: paymentTiming,
-      deposit_percent: depositPercent,
-      deposit_amount: depositAmount,
-      pay_method: paymentTiming === "balance" ? null : input.payMethod,
-      bank_transfer_info: !isHourly && input.payMethod === "bank" ? (input.bankInfo ?? {}) : null,
-      card_payment_link: !isHourly && input.payMethod === "card" ? (input.cardPaymentLink?.trim() || null) : null,
+      payment_timing: "balance",
       hourly_rate: isHourly ? input.hourly!.rate : null,
       hourly_cap: isHourly ? input.hourly!.cap : null,
       cadence: input.cadence ?? null,
@@ -979,135 +921,35 @@ async function postCaseNotice(supabase: Awaited<ReturnType<typeof createClient>>
   await admin.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", caseThreadId);
 }
 
-// 発送前入金・後払いなら、入金確認なしで quoted から直接着手できる。
-// 「preparing」はこの変更以降は作られないが、過去に入金確認だけ済んで
-// preparing のまま止まっている案件を後方互換として着手できるようにしておく。
+// 残高払いで支払いが確定すると "preparing"（着手前）になる。そこから
+// 実際に手を動かし始めるタイミングはここで担当者が決める。
 export async function startCaseRequest(requestId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const { data: current, error: fetchError } = await supabase
     .from("requests")
-    .select("phase, payment_timing, lead_hours")
+    .select("phase, lead_hours")
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
+    .eq("phase", "preparing")
     .maybeSingle();
   if (fetchError) throw fetchError;
-  const canStartFromQuoted =
-    current?.phase === "quoted" && (current.payment_timing === "before_shipping" || current.payment_timing === "postpay");
-  const canStartFromPreparing = current?.phase === "preparing";
-  if (!canStartFromQuoted && !canStartFromPreparing) throw new Error("着手できる状態ではありません");
-  const fromPhase = canStartFromQuoted ? "quoted" : "preparing";
+  if (!current) throw new Error("着手できる状態ではありません");
 
   const now = new Date().toISOString();
   // 着手した瞬間を起点に、社内タスク管理用の納期目安（due_at）を計算する。
   // 依頼主の入金待ちなどの時間は含めない（本人の対応が遅れないよう）。
-  const dueAt = current?.lead_hours != null ? new Date(Date.now() + current.lead_hours * 3600 * 1000).toISOString() : null;
+  const dueAt = current.lead_hours != null ? new Date(Date.now() + current.lead_hours * 3600 * 1000).toISOString() : null;
   const { data, error } = await supabase
     .from("requests")
-    .update(canStartFromQuoted ? { phase: "started", started_at: now, accepted_at: now, due_at: dueAt } : { phase: "started", started_at: now, due_at: dueAt })
+    .update({ phase: "started", started_at: now, due_at: dueAt })
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
-    .eq("phase", fromPhase)
+    .eq("phase", "preparing")
     .select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("着手できる状態ではありません");
   await postCaseNotice(supabase, requestId, "着手しました");
-}
-
-// 先払い：入金確認と同時に着手する（間に準備中フェーズを挟まない。分けると
-// 着手ボタンの押し忘れが起き、その間 due_at が設定されず納期管理が働かない）。
-export async function confirmPayment(requestId: string) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const { data: current, error: fetchError } = await supabase
-    .from("requests")
-    .select("lead_hours")
-    .eq("id", requestId)
-    .eq("org_id", ctx.orgId)
-    .eq("phase", "quoted")
-    .eq("payment_timing", "prepay_full")
-    .maybeSingle();
-  if (fetchError) throw fetchError;
-  if (!current) throw new Error("入金確認できる状態ではありません");
-
-  const now = new Date().toISOString();
-  const dueAt = current.lead_hours != null ? new Date(Date.now() + current.lead_hours * 3600 * 1000).toISOString() : null;
-  const { data, error } = await supabase
-    .from("requests")
-    .update({
-      phase: "started",
-      started_at: now,
-      accepted_at: now,
-      due_at: dueAt,
-      pay_status: "paid",
-      paid_at: now,
-      paid_marked_by: ctx.userId,
-    })
-    .eq("id", requestId)
-    .eq("org_id", ctx.orgId)
-    .eq("phase", "quoted")
-    .select("id, customer_id");
-  if (error) throw error;
-  if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
-  await postCaseNotice(supabase, requestId, "入金を確認し、着手しました");
-  await notifyCustomerPaymentConfirmed(createServiceRoleClient(), ctx.orgId, data[0].customer_id, "ご入金");
-}
-
-// 予約金：予約金分だけの入金確認と同時に着手する（同上の理由でpreparingを挟まない）。pay_statusはprocessing止まり。
-export async function confirmDeposit(requestId: string) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const { data: current, error: fetchError } = await supabase
-    .from("requests")
-    .select("lead_hours")
-    .eq("id", requestId)
-    .eq("org_id", ctx.orgId)
-    .eq("phase", "quoted")
-    .eq("payment_timing", "deposit")
-    .maybeSingle();
-  if (fetchError) throw fetchError;
-  if (!current) throw new Error("入金確認できる状態ではありません");
-
-  const now = new Date().toISOString();
-  const dueAt = current.lead_hours != null ? new Date(Date.now() + current.lead_hours * 3600 * 1000).toISOString() : null;
-  const { data, error } = await supabase
-    .from("requests")
-    .update({
-      phase: "started",
-      started_at: now,
-      accepted_at: now,
-      due_at: dueAt,
-      pay_status: "processing",
-      deposit_paid_at: now,
-      deposit_paid_marked_by: ctx.userId,
-    })
-    .eq("id", requestId)
-    .eq("org_id", ctx.orgId)
-    .eq("phase", "quoted")
-    .select("id, customer_id");
-  if (error) throw error;
-  if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
-  await postCaseNotice(supabase, requestId, "予約金の入金を確認し、着手しました");
-  await notifyCustomerPaymentConfirmed(createServiceRoleClient(), ctx.orgId, data[0].customer_id, "予約金のご入金");
-}
-
-// 残金（予約金の場合）・全額（発送前入金・後払いの場合）の入金確認。フェーズは変えない。
-export async function confirmFinalPayment(requestId: string) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("requests")
-    .update({ pay_status: "paid", paid_at: now, paid_marked_by: ctx.userId })
-    .eq("id", requestId)
-    .eq("org_id", ctx.orgId)
-    .neq("pay_status", "paid")
-    .select("id, payment_timing, customer_id");
-  if (error) throw error;
-  if (!data || data.length === 0) throw new Error("入金確認できる状態ではありません");
-  const label = data[0].payment_timing === "deposit" ? "残金のご入金" : "ご入金";
-  await postCaseNotice(supabase, requestId, data[0].payment_timing === "deposit" ? "残金の入金を確認しました" : "入金を確認しました");
-  await notifyCustomerPaymentConfirmed(createServiceRoleClient(), ctx.orgId, data[0].customer_id, label);
 }
 
 // スタッフ（dept_leader）が提出した完了報告は、そのまま依頼主に送らず
@@ -1187,42 +1029,6 @@ export async function approveCaseReport(requestId: string) {
   await supabase.rpc("finalize_hourly_billing", { p_request_id: requestId });
   await postCaseNotice(supabase, requestId, "完了報告を確認し、依頼主に送信しました");
   await notifyCustomerCompletionReport(createServiceRoleClient(), ctx.orgId, request.customer_id);
-}
-
-// 予約金＋カード決済のとき、残金用の決済リンクを新しく発行して依頼主トークに
-// 案内する（最初のカード決済リンクは予約金専用の金額で固定されているため、
-// 残金分は別リンクとして登録し直す必要がある）。
-export async function setFinalPaymentLink(requestId: string, url: string) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const trimmed = url.trim();
-  if (!trimmed) throw new Error("URLを入力してください");
-
-  const { data: request } = await supabase.from("requests").select("customer_id").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
-  if (!request) throw new Error("案件が見つかりません");
-
-  const { error } = await supabase.from("requests").update({ final_card_payment_link: trimmed }).eq("id", requestId).eq("org_id", ctx.orgId);
-  if (error) throw error;
-
-  const { data: customerThread } = await supabase
-    .from("threads")
-    .select("id")
-    .eq("kind", "customer")
-    .eq("org_id", ctx.orgId)
-    .eq("customer_id", request.customer_id)
-    .maybeSingle();
-  if (customerThread) {
-    const { error: msgError } = await supabase.from("messages").insert({
-      thread_id: customerThread.id,
-      sender_id: ctx.userId,
-      sender_role: ctx.role,
-      kind: "text",
-      body: `残金のお支払いはこちらから進めてください：${trimmed}`,
-    });
-    if (msgError) throw msgError;
-    await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", customerThread.id);
-  }
-  await postCaseNotice(supabase, requestId, "残金の決済リンクを送信しました");
 }
 
 // 見積もり段階（まだ入金前）の見送り。費用が発生していないので即確定でよい。

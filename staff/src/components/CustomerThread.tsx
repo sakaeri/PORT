@@ -29,7 +29,7 @@ import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
 import { CADENCE_LABEL, PHASE_LABEL } from "@/lib/stage";
-import type { AppRole, BankTransferInfo, PaymentMethod, PaymentTiming, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
+import type { AppRole, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
 
 export interface ThreadAttachment {
   id: string;
@@ -485,9 +485,6 @@ export default function CustomerThread({
   memos,
   ratings,
   latestRequest,
-  cardPaymentEnabled,
-  defaultBankInfo,
-  cardPaymentLinks,
   initialHasMoreOlder,
 }: {
   customer: { id: string; name: string; memberNo: string | null; balance: number };
@@ -504,9 +501,6 @@ export default function CustomerThread({
   memos: WorkMemo[];
   ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
-  cardPaymentEnabled: boolean;
-  defaultBankInfo: BankTransferInfo;
-  cardPaymentLinks: CardPaymentLink[];
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -892,15 +886,7 @@ export default function CustomerThread({
           {!isHq && <RatingsSummary ratings={ratings} />}
           <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
           {!isHq && (
-            <CaseSummarySection
-              thread={thread}
-              customerId={customer.id}
-              menus={menus}
-              latestRequest={latestRequest}
-              cardPaymentEnabled={cardPaymentEnabled}
-              defaultBankInfo={defaultBankInfo}
-              cardPaymentLinks={cardPaymentLinks}
-            />
+            <CaseSummarySection thread={thread} customerId={customer.id} menus={menus} latestRequest={latestRequest} />
           )}
         </div>
       </>
@@ -943,17 +929,11 @@ function CaseSummarySection({
   customerId,
   menus,
   latestRequest,
-  cardPaymentEnabled,
-  defaultBankInfo,
-  cardPaymentLinks,
 }: {
   thread: { id: string; archived: boolean } | null;
   customerId: string;
   menus: MenuOption[];
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
-  cardPaymentEnabled: boolean;
-  defaultBankInfo: BankTransferInfo;
-  cardPaymentLinks: CardPaymentLink[];
 }) {
   const router = useRouter();
   const [showDialog, setShowDialog] = useState(false);
@@ -976,9 +956,6 @@ function CaseSummarySection({
           threadId={thread.id}
           customerId={customerId}
           menus={menus}
-          cardPaymentEnabled={cardPaymentEnabled}
-          defaultBankInfo={defaultBankInfo}
-          cardPaymentLinks={cardPaymentLinks}
           onClose={() => setShowDialog(false)}
           onCreated={(requestId) => {
             setShowDialog(false);
@@ -1153,24 +1130,10 @@ interface CustomItem {
   leadHours: number | null;
 }
 
-interface CardPaymentLink {
-  id: string;
-  title: string;
-  url: string;
-}
-
 function hoursToDueLabel(hours: number): string {
   if (hours <= 24) return "24時間以内";
   return `${Math.ceil(hours / 24)}日後`;
 }
-
-const PAYMENT_TIMING_OPTIONS: { value: PaymentTiming; label: string }[] = [
-  { value: "balance", label: "チャージ残高から" },
-  { value: "prepay_full", label: "先払い" },
-  { value: "deposit", label: "予約金の先払い" },
-  { value: "before_shipping", label: "発送前入金" },
-  { value: "postpay", label: "後払い" },
-];
 
 function pillStyle(active: boolean): React.CSSProperties {
   return {
@@ -1192,18 +1155,12 @@ function QuoteDialog({
   threadId,
   customerId,
   menus,
-  cardPaymentEnabled,
-  defaultBankInfo,
-  cardPaymentLinks,
   onClose,
   onCreated,
 }: {
   threadId: string;
   customerId: string;
   menus: MenuOption[];
-  cardPaymentEnabled: boolean;
-  defaultBankInfo: BankTransferInfo;
-  cardPaymentLinks: CardPaymentLink[];
   onClose: () => void;
   onCreated: (requestId: string) => void;
 }) {
@@ -1216,28 +1173,13 @@ function QuoteDialog({
   const [customLeadHours, setCustomLeadHours] = useState("");
   const [note, setNote] = useState("");
   const [saveAsMenu, setSaveAsMenu] = useState(false);
-  const [paymentTiming, setPaymentTiming] = useState<PaymentTiming>("balance");
   const [isHourly, setIsHourly] = useState(false);
   const [cadence, setCadence] = useState<SubscriptionCadence | "">("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [hourlyCap, setHourlyCap] = useState("");
   const [hourlyLabel, setHourlyLabel] = useState("");
-  const [depositPercent, setDepositPercent] = useState("30");
-  const [payMethod, setPayMethod] = useState<PaymentMethod>("bank");
-  const [bankInfo, setBankInfo] = useState<BankTransferInfo>(defaultBankInfo);
-  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(cardPaymentLinks[0]?.id ?? null);
-  const [newLinkMode, setNewLinkMode] = useState(cardPaymentLinks.length === 0);
-  const [newLinkTitle, setNewLinkTitle] = useState("");
-  const [newLinkUrl, setNewLinkUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const selectedLink = cardPaymentLinks.find((l) => l.id === selectedLinkId) ?? null;
-  const resolvedCardPaymentLink = newLinkMode ? newLinkUrl.trim() : selectedLink?.url ?? "";
-
-  function setBankField<K extends keyof BankTransferInfo>(key: K, value: string) {
-    setBankInfo((b) => ({ ...b, [key]: value }));
-  }
 
   function bump(menuId: string, delta: number) {
     setQty((q) => ({ ...q, [menuId]: Math.max(0, (q[menuId] ?? 0) + delta) }));
@@ -1268,7 +1210,6 @@ function QuoteDialog({
   ];
   const itemsTotal = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
   const total = isHourly ? Number(hourlyCap) || 0 : itemsTotal;
-  const depositAmount = paymentTiming === "deposit" ? Math.round((total * (Number(depositPercent) || 0)) / 100) : null;
   // 同じ項目を複数個頼むと、その分準備に時間がかかる想定で数量に比例させる
   // （項目ごとの目安時間 × 数量）。違う項目同士は並行して進む前提でmaxを取る。
   const knownLeadHours = allItems.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
@@ -1277,10 +1218,6 @@ function QuoteDialog({
 
   async function submit() {
     if (saving || !canSubmit) return;
-    if (!isHourly && paymentTiming !== "balance" && payMethod === "card" && !resolvedCardPaymentLink) {
-      setError("カード決済のリンクを選ぶか入力してください");
-      return;
-    }
     setError("");
     setSaving(true);
     try {
@@ -1289,12 +1226,6 @@ function QuoteDialog({
         note,
         due,
         saveAsMenu,
-        paymentTiming,
-        depositPercent: paymentTiming === "deposit" ? Number(depositPercent) || 0 : undefined,
-        payMethod,
-        bankInfo: payMethod === "bank" ? bankInfo : undefined,
-        cardPaymentLink: payMethod === "card" ? resolvedCardPaymentLink : undefined,
-        saveCardPaymentLink: payMethod === "card" && newLinkMode ? { title: newLinkTitle, url: newLinkUrl } : undefined,
         hourly: isHourly ? { rate: Number(hourlyRate), cap: Number(hourlyCap), label: hourlyLabel } : undefined,
         cadence: !isHourly && cadence ? cadence : undefined,
       });
@@ -1324,7 +1255,6 @@ function QuoteDialog({
           <button
             onClick={() => {
               setIsHourly(true);
-              setPaymentTiming("balance");
               setCadence("");
             }}
             style={pillStyle(isHourly)}
@@ -1442,22 +1372,10 @@ function QuoteDialog({
               <button onClick={() => setCadence("")} style={pillStyle(cadence === "")}>
                 単発
               </button>
-              <button
-                onClick={() => {
-                  setCadence("weekly");
-                  setPaymentTiming("balance");
-                }}
-                style={pillStyle(cadence === "weekly")}
-              >
+              <button onClick={() => setCadence("weekly")} style={pillStyle(cadence === "weekly")}>
                 毎週
               </button>
-              <button
-                onClick={() => {
-                  setCadence("monthly");
-                  setPaymentTiming("balance");
-                }}
-                style={pillStyle(cadence === "monthly")}
-              >
+              <button onClick={() => setCadence("monthly")} style={pillStyle(cadence === "monthly")}>
                 毎月
               </button>
             </div>
@@ -1469,112 +1387,9 @@ function QuoteDialog({
           </div>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
-          <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払いタイミング</span>
-          {isHourly || cadence ? (
-            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-              {isHourly ? "時間精算はチャージ残高からのお支払いのみです。" : "定期対応はチャージ残高からのお支払いのみです。"}
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {PAYMENT_TIMING_OPTIONS.map((opt) => (
-                <button key={opt.value} onClick={() => setPaymentTiming(opt.value)} style={pillStyle(paymentTiming === opt.value)}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-          {paymentTiming === "balance" && (
-            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-              依頼主が見積もりカードから直接お支払いいただきます。支払いが確定すると「着手前」になり、着手はこの後、担当者が案件詳細の「着手する」を押して行います。
-            </div>
-          )}
-          {paymentTiming === "deposit" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12.5 }}>予約金</span>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={depositPercent}
-                onChange={(e) => setDepositPercent(e.target.value)}
-                className="vid-input"
-                style={{ ...inputStyle, width: 64 }}
-              />
-              <span style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>%（¥{(depositAmount ?? 0).toLocaleString("ja-JP")}）・残金は完了後にご案内します</span>
-            </div>
-          )}
-          {(paymentTiming === "before_shipping" || paymentTiming === "postpay") && (
-            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-              入金確認なしで着手できます。{paymentTiming === "before_shipping" ? "発送前" : "対応完了後"}に入金をご案内ください。
-            </div>
-          )}
+        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
+          依頼主が見積もりカードから直接「残高から支払う」ことで確定します。支払いが確定すると「着手前」になり、着手はこの後、担当者が案件詳細の「着手する」を押して行います。
         </div>
-
-        {paymentTiming !== "balance" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>支払い方法</span>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setPayMethod("bank")} style={pillStyle(payMethod === "bank")}>
-                銀行振込
-              </button>
-              {cardPaymentEnabled && (
-                <button onClick={() => setPayMethod("card")} style={pillStyle(payMethod === "card")}>
-                  カード決済
-                </button>
-              )}
-            </div>
-            {payMethod === "bank" ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <input value={bankInfo.holder ?? ""} onChange={(e) => setBankField("holder", e.target.value)} placeholder="口座名義" className="vid-input" style={inputStyle} />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                  <input value={bankInfo.bankName ?? ""} onChange={(e) => setBankField("bankName", e.target.value)} placeholder="銀行名" className="vid-input" style={inputStyle} />
-                  <input value={bankInfo.branchName ?? ""} onChange={(e) => setBankField("branchName", e.target.value)} placeholder="支店名" className="vid-input" style={inputStyle} />
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                  <input value={bankInfo.accountType ?? ""} onChange={(e) => setBankField("accountType", e.target.value)} placeholder="口座種別（普通・当座）" className="vid-input" style={inputStyle} />
-                  <input value={bankInfo.accountNumber ?? ""} onChange={(e) => setBankField("accountNumber", e.target.value)} placeholder="口座番号" className="vid-input" style={inputStyle} />
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {cardPaymentLinks.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {cardPaymentLinks.map((l) => (
-                      <button
-                        key={l.id}
-                        onClick={() => {
-                          setSelectedLinkId(l.id);
-                          setNewLinkMode(false);
-                        }}
-                        style={pillStyle(!newLinkMode && selectedLinkId === l.id)}
-                      >
-                        {l.title}
-                      </button>
-                    ))}
-                    <button onClick={() => setNewLinkMode(true)} style={pillStyle(newLinkMode)}>
-                      ＋新しいリンク
-                    </button>
-                  </div>
-                )}
-                {newLinkMode ? (
-                  <>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                      <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>リンクのタイトル（一覧での表示名）</span>
-                      <input value={newLinkTitle} onChange={(e) => setNewLinkTitle(e.target.value)} placeholder="例：Stripe決済リンクA" className="vid-input" style={inputStyle} />
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                      <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>決済リンクのURL（依頼主に直接表示されます）</span>
-                      <input value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} placeholder="https://..." className="vid-input" style={inputStyle} />
-                    </div>
-                  </>
-                ) : (
-                  selectedLink && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedLink.url}</div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
           {due && (

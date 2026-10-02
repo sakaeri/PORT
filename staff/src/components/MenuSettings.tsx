@@ -51,9 +51,6 @@ import InfoTooltip from "@/components/InfoTooltip";
 import {
   updateCompanyInfo,
   updateStaffMode,
-  updatePaymentSettings,
-  renameCardPaymentLink,
-  deleteCardPaymentLink,
   createMenu,
   updateMenu,
   deleteMenu,
@@ -69,7 +66,7 @@ import {
   updateIntakeField,
   deleteIntakeField,
 } from "@/app/actions";
-import type { BankTransferInfo, RefundMode, RefundStage } from "@/lib/supabase/types";
+import type { RefundMode, RefundStage } from "@/lib/supabase/types";
 
 interface Company {
   name: string;
@@ -216,12 +213,6 @@ interface RefundPolicyRow {
   pct: number;
 }
 
-interface CardPaymentLink {
-  id: string;
-  title: string;
-  url: string;
-}
-
 const input: React.CSSProperties = {
   width: "100%",
   height: 36,
@@ -264,9 +255,6 @@ export default function MenuSettings({
   initialTemplates,
   initialRefundPolicy,
   slug,
-  initialCardPaymentEnabled,
-  initialBankInfo,
-  initialCardPaymentLinks,
   initialSolo,
   canEdit,
 }: {
@@ -278,11 +266,8 @@ export default function MenuSettings({
   initialRefundPolicy: RefundPolicyRow[];
   initialSolo: boolean;
   slug: string | null;
-  initialCardPaymentEnabled: boolean;
-  initialBankInfo: BankTransferInfo;
-  initialCardPaymentLinks: CardPaymentLink[];
   // 受付メニュー・返信テンプレはマネージャーも使うので常に編集可。それ以外
-  // （会社情報・決済設定・返金ポリシー・スタッフ連携）は本部専用で、
+  // （会社情報・返金ポリシー・スタッフ連携）は本部専用で、
   // 本部以外のマネージャーには閲覧のみで見せる。
   canEdit: boolean;
 }) {
@@ -355,8 +340,6 @@ export default function MenuSettings({
       {tab === "company" && (
         <>
           <CompanyInfoCard initial={initialCompany} slug={slug} canEdit={canEdit} />
-          <PaymentSettingsCard initialCardPaymentEnabled={initialCardPaymentEnabled} initialBankInfo={initialBankInfo} canEdit={canEdit} />
-          <CardPaymentLinksCard initialLinks={initialCardPaymentLinks} />
           <StaffModeCard initialSolo={initialSolo} canEdit={canEdit} />
         </>
       )}
@@ -476,217 +459,6 @@ function CompanyInfoCard({ initial, slug, canEdit }: { initial: Company; slug: s
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function PaymentSettingsCard({
-  initialCardPaymentEnabled,
-  initialBankInfo,
-  canEdit,
-}: {
-  initialCardPaymentEnabled: boolean;
-  initialBankInfo: BankTransferInfo;
-  canEdit: boolean;
-}) {
-  const savedInitial = { cardEnabled: initialCardPaymentEnabled, bankInfo: initialBankInfo };
-  const [saved, setSaved] = useState(savedInitial);
-  const [cardEnabled, setCardEnabled] = useState(saved.cardEnabled);
-  const [bankInfo, setBankInfo] = useState(saved.bankInfo);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  function setBankField<K extends keyof BankTransferInfo>(key: K, value: string) {
-    setBankInfo((b) => ({ ...b, [key]: value }));
-  }
-
-  function startEdit() {
-    setCardEnabled(saved.cardEnabled);
-    setBankInfo(saved.bankInfo);
-    setError("");
-    setEditing(true);
-  }
-
-  async function save() {
-    if (saving) return;
-    setSaving(true);
-    setError("");
-    try {
-      await updatePaymentSettings({ cardPaymentEnabled: cardEnabled, bankInfo });
-      setSaved({ cardEnabled, bankInfo });
-      setEditing(false);
-    } catch (e) {
-      setError(errorMessage(e, "保存できませんでした"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={card}>
-      <CardHeader
-        title="決済設定"
-        info="見積もり作成時に選べる支払い方法と、銀行振込のデフォルトの振込先です（見積もりごとにその場で変更もできます）。カード決済のリンクは見積もり作成のたびに入力します。"
-        editing={editing}
-        onEdit={startEdit}
-        canEdit={canEdit}
-      />
-      {!editing ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <InfoRow label="カード決済" value={saved.cardEnabled ? "使う" : "使わない"} />
-          <InfoRow label="口座名義" value={saved.bankInfo.holder ?? ""} />
-          <InfoRow label="銀行・支店" value={[saved.bankInfo.bankName, saved.bankInfo.branchName].filter(Boolean).join(" ")} />
-          <InfoRow label="口座番号" value={[saved.bankInfo.accountType, saved.bankInfo.accountNumber].filter(Boolean).join(" ")} />
-        </div>
-      ) : (
-        <>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
-            <input type="checkbox" checked={cardEnabled} onChange={(e) => setCardEnabled(e.target.checked)} />
-            カード決済を見積もりで選べるようにする
-          </label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={label}>銀行振込のデフォルト振込先</span>
-            <Field label="口座名義" value={bankInfo.holder ?? ""} onChange={(v) => setBankField("holder", v)} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Field label="銀行名" value={bankInfo.bankName ?? ""} onChange={(v) => setBankField("bankName", v)} />
-              <Field label="支店名" value={bankInfo.branchName ?? ""} onChange={(v) => setBankField("branchName", v)} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Field label="口座種別（普通・当座）" value={bankInfo.accountType ?? ""} onChange={(v) => setBankField("accountType", v)} />
-              <Field label="口座番号" value={bankInfo.accountNumber ?? ""} onChange={(v) => setBankField("accountNumber", v)} />
-            </div>
-          </div>
-          {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={save} disabled={saving} style={{ ...smallBtn, height: 36 }}>
-              {saving ? "保存中…" : "保存して閉じる"}
-            </button>
-            <button onClick={() => setEditing(false)} disabled={saving} style={{ ...smallBtn, height: 36, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-              キャンセル
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function CardPaymentLinksCard({ initialLinks }: { initialLinks: CardPaymentLink[] }) {
-  const [links, setLinks] = useState(initialLinks);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [titleDraft, setTitleDraft] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const isMobile = useIsMobile();
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  function startRename(l: CardPaymentLink) {
-    setEditingId(l.id);
-    setTitleDraft(l.title);
-    setError("");
-  }
-
-  async function saveRename(id: string) {
-    if (busyId) return;
-    setBusyId(id);
-    setError("");
-    try {
-      await renameCardPaymentLink(id, titleDraft);
-      setLinks((rows) => rows.map((r) => (r.id === id ? { ...r, title: titleDraft.trim() } : r)));
-      setEditingId(null);
-    } catch (e) {
-      setError(errorMessage(e, "変更できませんでした"));
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function remove(id: string) {
-    if (busyId || !confirm("この決済リンクを削除しますか？")) return;
-    setBusyId(id);
-    setError("");
-    try {
-      await deleteCardPaymentLink(id);
-      setLinks((rows) => rows.filter((r) => r.id !== id));
-    } catch (e) {
-      setError(errorMessage(e, "削除できませんでした"));
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  return (
-    <div style={card}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>カード決済のリンク一覧</div>
-        <InfoTooltip text="見積もり作成時に入力したリンクがここに並びます。URLは変更できません（タイトルの変更・削除のみ）。" />
-      </div>
-      {links.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだリンクはありません。</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {links.map((l) =>
-            isMobile ? (
-              <div key={l.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
-                <button
-                  onClick={() => setExpandedId((v) => (v === l.id ? null : l.id))}
-                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
-                >
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</span>
-                  {expandedId === l.id ? <CaretDown size={13} /> : <CaretRight size={13} />}
-                </button>
-                {expandedId === l.id && (
-                  <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", overflowWrap: "anywhere" }}>{l.url}</div>
-                    {editingId === l.id ? (
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="vid-input" style={{ ...input, height: 32, minWidth: 0, flex: 1 }} />
-                        <button onClick={() => saveRename(l.id)} disabled={busyId === l.id} style={{ ...smallBtn, height: 32 }}>
-                          保存
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={() => startRename(l)} style={{ ...smallBtn, height: 30, flex: 1 }}>
-                          タイトル変更
-                        </button>
-                        <button onClick={() => remove(l.id)} disabled={busyId === l.id} style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                          <Trash size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div key={l.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-                {editingId === l.id ? (
-                  <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="vid-input" style={{ ...input, height: 32, minWidth: 0, flex: "1 1 140px" }} />
-                ) : (
-                  <span style={{ minWidth: 0, flex: "1 1 140px", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</span>
-                )}
-                <span style={{ minWidth: 0, flex: "2 1 160px", fontSize: 11.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.url}</span>
-                <div style={{ display: "flex", flex: "none", gap: 8, marginLeft: "auto" }}>
-                  {editingId === l.id ? (
-                    <button onClick={() => saveRename(l.id)} disabled={busyId === l.id} style={{ ...smallBtn, height: 30 }}>
-                      保存
-                    </button>
-                  ) : (
-                    <button onClick={() => startRename(l)} style={{ ...smallBtn, height: 30 }}>
-                      タイトル変更
-                    </button>
-                  )}
-                  <button onClick={() => remove(l.id)} disabled={busyId === l.id} style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                    <Trash size={13} />
-                  </button>
-                </div>
-              </div>
-            ),
-          )}
-        </div>
-      )}
-      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
     </div>
   );
 }

@@ -47,8 +47,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: memoRows },
     { data: ratingRows },
     { data: latestRequestRow },
-    { data: orgPayment },
-    { data: cardPaymentLinks },
     { data: departmentRows },
   ] = await Promise.all([
     supabase
@@ -79,8 +77,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase.from("organizations").select("card_payment_enabled, bank_transfer_info").eq("id", ctx.orgId).single(),
-    supabase.from("card_payment_links").select("id, title, url").eq("org_id", ctx.orgId).order("created_at", { ascending: false }),
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
   ]);
 
@@ -135,9 +131,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       memos={memos}
       ratings={ratings}
       latestRequest={latestRequest}
-      cardPaymentEnabled={orgPayment?.card_payment_enabled ?? false}
-      defaultBankInfo={orgPayment?.bank_transfer_info ?? {}}
-      cardPaymentLinks={cardPaymentLinks ?? []}
     />
   );
 }

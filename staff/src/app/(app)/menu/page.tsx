@@ -10,10 +10,10 @@ export default async function MenuSettingsPage() {
   if (ctx.role === "dept_leader") return null;
 
   const supabase = await createClient();
-  const [{ data: org }, { data: menus }, { data: templates }, { data: policy }, { data: userData }, { data: cardPaymentLinks }] = await Promise.all([
+  const [{ data: org }, { data: menus }, { data: templates }, { data: policy }, { data: userData }] = await Promise.all([
     supabase
       .from("organizations")
-      .select("name, display_name, rep_name, address, tel, email, slug, card_payment_enabled, bank_transfer_info")
+      .select("name, display_name, rep_name, address, tel, email, slug")
       .eq("id", ctx.orgId)
       .single(),
     supabase
@@ -28,7 +28,6 @@ export default async function MenuSettingsPage() {
       .order("sort", { ascending: true }),
     supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId),
     supabase.auth.getUser(),
-    supabase.from("card_payment_links").select("id, title, url").eq("org_id", ctx.orgId).order("created_at", { ascending: false }),
   ]);
 
   return (
@@ -48,9 +47,6 @@ export default async function MenuSettingsPage() {
       initialRefundPolicy={policy ?? []}
       initialSolo={ctx.solo}
       slug={org?.slug ?? null}
-      initialCardPaymentEnabled={org?.card_payment_enabled ?? false}
-      initialBankInfo={org?.bank_transfer_info ?? {}}
-      initialCardPaymentLinks={cardPaymentLinks ?? []}
       canEdit={ctx.role === "owner" || (ctx.isHq && ctx.role === "dept_manager")}
     />
   );

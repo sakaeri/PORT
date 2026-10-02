@@ -91,8 +91,6 @@ export interface Database {
           domain: string | null;
           slug: string | null;
           is_hq: boolean;
-          card_payment_enabled: boolean;
-          bank_transfer_info: BankTransferInfo;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["organizations"]["Row"]>;

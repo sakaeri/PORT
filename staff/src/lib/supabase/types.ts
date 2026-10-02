@@ -99,8 +99,6 @@ export interface Database {
           domain: string | null;
           slug: string | null;
           is_hq: boolean;
-          card_payment_enabled: boolean;
-          bank_transfer_info: BankTransferInfo;
           royalty_pct: number | null;
           created_at: string;
         };
@@ -239,12 +237,6 @@ export interface Database {
         Row: { org_id: string; stage: RefundStage; mode: RefundMode; pct: number };
         Insert: Partial<Database["public"]["Tables"]["refund_policies"]["Row"]> & { org_id: string; stage: RefundStage; mode: RefundMode };
         Update: Partial<Database["public"]["Tables"]["refund_policies"]["Row"]>;
-        Relationships: [];
-      };
-      card_payment_links: {
-        Row: { id: string; org_id: string; title: string; url: string; created_at: string };
-        Insert: Partial<Database["public"]["Tables"]["card_payment_links"]["Row"]> & { org_id: string; title: string; url: string };
-        Update: Partial<Database["public"]["Tables"]["card_payment_links"]["Row"]>;
         Relationships: [];
       };
       intake_forms: {

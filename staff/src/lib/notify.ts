@@ -58,21 +58,6 @@ export async function notifyCustomerQuoteCreated(admin: Admin, orgId: string, cu
   }
 }
 
-export async function notifyCustomerPaymentConfirmed(admin: Admin, orgId: string, customerId: string, label: string) {
-  try {
-    const email = await getCustomerEmail(admin, customerId);
-    if (!email) return;
-    const { displayName, slug } = await getOrgSlug(admin, orgId);
-    await sendEmail(
-      email,
-      `【${displayName}】${label}を確認しました`,
-      `<p>${displayName}にて、${label}を確認しました。</p><p><a href="${customerChatUrl(slug)}">トーク画面を開いて確認する</a></p>`,
-    );
-  } catch (e) {
-    console.error("notifyCustomerPaymentConfirmed failed", e);
-  }
-}
-
 export async function notifyCustomerCompletionReport(admin: Admin, orgId: string, customerId: string) {
   try {
     const email = await getCustomerEmail(admin, customerId);

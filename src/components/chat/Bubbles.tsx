@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
-import type { AttachmentRow, MessageWithExtras, RequestBundle, RequestRow } from "@/lib/chat-types";
+import type { AttachmentRow, MessageWithExtras, RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
 import { computeRefund } from "@/lib/refund";
@@ -195,18 +195,6 @@ export function MenuPickBubble({ msg }: { msg: MessageWithExtras }) {
 
 const kicker: React.CSSProperties = { fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-accent)" };
 
-function paymentTimingNote(r: RequestRow): string {
-  switch (r.payment_timing) {
-    case "deposit":
-      return "着手前に予約金をお支払いください（残金は完了後にご案内します）。";
-    case "before_shipping":
-      return "対応完了後、発送前にお支払いください。";
-    case "postpay":
-      return "対応完了後にお支払いください。";
-    default:
-      return "着手前にお支払いください。";
-  }
-}
 const outlineBtn: React.CSSProperties = { height: 40, cursor: "pointer", fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 14, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
 
 export function RequestCard({
@@ -341,52 +329,7 @@ export function RequestCard({
                     </button>
                   </>
                 ) : (
-                  <>
-                    <div>
-                      {PAYMENT_TIMING_LABEL[r.payment_timing]}
-                      {r.payment_timing === "deposit" && r.deposit_amount != null && `・予約金 ${yen(r.deposit_amount)}`}
-                    </div>
-                    <div style={{ color: "var(--color-neutral-500)" }}>{paymentTimingNote(r)}</div>
-                  </>
-                )}
-                {r.payment_timing === "deposit" && r.deposit_paid_at && (
-                  <div style={{ color: "var(--color-accent-300)" }}>
-                    予約金は入金済みです。{r.pay_method === "bank" && "残金は対応完了後にご案内します。"}
-                  </div>
-                )}
-                {r.pay_method === "bank" && r.bank_transfer_info && (
-                  <div style={{ marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 2 }}>
-                    {(r.bank_transfer_info.bankName || r.bank_transfer_info.branchName) && (
-                      <div>
-                        {r.bank_transfer_info.bankName} {r.bank_transfer_info.branchName}
-                      </div>
-                    )}
-                    {(r.bank_transfer_info.accountType || r.bank_transfer_info.accountNumber) && (
-                      <div>
-                        {r.bank_transfer_info.accountType} {r.bank_transfer_info.accountNumber}
-                      </div>
-                    )}
-                    {r.bank_transfer_info.holder && <div>{r.bank_transfer_info.holder}</div>}
-                  </div>
-                )}
-                {r.pay_method === "card" && (
-                  <div style={{ marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
-                    {r.payment_timing === "deposit" && r.deposit_paid_at ? (
-                      r.final_card_payment_link ? (
-                        <a href={r.final_card_payment_link} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
-                          残金のお支払いはこちらから
-                        </a>
-                      ) : (
-                        "残金の決済リンクは、このトークで追ってお送りします。"
-                      )
-                    ) : r.card_payment_link ? (
-                      <a href={r.card_payment_link} target="_blank" rel="noreferrer" style={{ color: "var(--color-accent-300)" }}>
-                        こちらからカード決済へ進む
-                      </a>
-                    ) : (
-                      "カード決済のリンクは、このトークで追ってお送りします。"
-                    )}
-                  </div>
+                  <div>{PAYMENT_TIMING_LABEL[r.payment_timing]}</div>
                 )}
               </div>
             )
