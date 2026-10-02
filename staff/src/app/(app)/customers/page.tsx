@@ -19,7 +19,7 @@ export default async function CustomersPage() {
   const supabase = await createClient();
   // 依存のないクエリは並列で投げる。依頼主一覧に必要な「各依頼主の最新メッセージ・未読」は、
   // 案件トークまで巻き込む二重ネストの embed ではなく、確実に正しい専用RPCでまとめて取る。
-  const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }, { data: requests }, { data: menus }] = await Promise.all([
+  const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }, { data: requests }] = await Promise.all([
     supabase
       .from("customers")
       .select("id, name, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
@@ -32,7 +32,6 @@ export default async function CustomersPage() {
       .select("id, customer_id, title, amount, phase, created_at")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
-    supabase.from("menus").select("id, label, department_id").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
   ]);
   if (error) console.error("customers select failed:", error);
   if (summariesError) console.error("customer_thread_summaries failed:", summariesError);
@@ -103,9 +102,7 @@ export default async function CustomersPage() {
         rows={rows}
         isHq={ctx.isHq}
         orgId={ctx.orgId}
-        canManageDepartments={ctx.role === "owner"}
         departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
-        menus={(menus ?? []).map((m) => ({ id: m.id, label: m.label, departmentId: m.department_id }))}
       />
     </div>
   );

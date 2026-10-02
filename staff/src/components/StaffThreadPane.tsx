@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ensureStaffThread, sendInternalMessage, deleteMessage, markThreadRead, updateStaffMember, removeStaffMember } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
-import { ROLE_LABEL, INVITE_ROLES, isDeptScoped, isDeptRequired, staffSenderLabel } from "@/lib/roles";
+import { ROLE_LABEL, INVITE_ROLES, isDeptScoped, staffSenderLabel } from "@/lib/roles";
 import RoleTags from "@/components/RoleTags";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
@@ -265,10 +265,6 @@ function StaffEditPanel({
       setError("表示名を入力してください");
       return;
     }
-    if (isDeptRequired(role) && departmentIds.length === 0) {
-      setError("担当する窓口を1つ以上選んでください");
-      return;
-    }
     setSaving(true);
     setError("");
     try {
@@ -315,9 +311,17 @@ function StaffEditPanel({
             ))}
           </select>
         </div>
+        {role === "dept_manager" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, justifyContent: "flex-end" }}>
+            <span style={editLabel}>窓口（自動）</span>
+            <span style={{ fontSize: 13, height: 36, display: "flex", alignItems: "center" }}>
+              {editable.departments.find((d) => departmentIds.includes(d.id))?.name ?? "保存時に自動で作成されます"}
+            </span>
+          </div>
+        )}
         {isDeptScoped(role) && (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={editLabel}>{role === "dept_manager" ? "担当窓口（複数選択可）" : "所属窓口（複数選択可・未設定も可）"}</span>
+            <span style={editLabel}>所属窓口（複数選択可・未設定も可）</span>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 320, maxHeight: 92, overflowY: "auto", paddingRight: 2 }}>
               {editable.departments.map((d) => {
                 const on = departmentIds.includes(d.id);

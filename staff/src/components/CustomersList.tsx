@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowSquareOut, Buildings, CaretDown, Gear } from "@phosphor-icons/react";
+import { ArrowSquareOut, Buildings, CaretDown } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { archiveThread, unarchiveThread, deleteCustomer } from "@/app/actions";
-import { DepartmentAdmin, type Department, type MenuOption } from "@/components/StaffAdmin";
-import Modal from "@/components/Modal";
+import type { Department } from "@/components/StaffAdmin";
 import RowKebabMenu from "@/components/RowKebabMenu";
 
 interface CustomerRow {
@@ -31,26 +30,20 @@ export default function CustomersList({
   rows: initialRows,
   isHq,
   orgId,
-  canManageDepartments,
   departments: initialDepartments,
-  menus: initialMenus,
 }: {
   rows: CustomerRow[];
   isHq: boolean;
   orgId: string;
-  canManageDepartments: boolean;
   departments: Department[];
-  menus: MenuOption[];
 }) {
   const router = useRouter();
   const [departments, setDepartments] = useState(initialDepartments);
-  const [menus, setMenus] = useState(initialMenus);
   const departmentById = new Map(departments.map((d) => [d.id, d.name]));
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [showDepartmentAdmin, setShowDepartmentAdmin] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const visible = rows
     .filter((c) => c.active || showArchived)
@@ -62,8 +55,7 @@ export default function CustomersList({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a server-refetched prop (router.refresh()), not state derived from other client state
     setDepartments(initialDepartments);
-    setMenus(initialMenus);
-  }, [initialDepartments, initialMenus]);
+  }, [initialDepartments]);
 
   // サーバーから渡された最新の行を反映する（下のポーリング/リアルタイムが
   // router.refresh() でこのページを再取得するたびに initialRows が更新される）。
@@ -181,40 +173,10 @@ export default function CustomersList({
                   {d.name}
                 </button>
               ))}
-              <div style={{ height: 1, background: "var(--color-divider)", margin: "3px 2px" }} />
-              <button
-                onClick={() => {
-                  setFilterOpen(false);
-                  setShowDepartmentAdmin(true);
-                }}
-                style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 10px", cursor: "pointer", textAlign: "left", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", borderRadius: "var(--radius-sm)" }}
-              >
-                <Gear size={13} />
-                窓口を管理
-              </button>
             </div>
           </>
         )}
       </div>
-      {showDepartmentAdmin && (
-        <Modal
-          onClose={() => {
-            setShowDepartmentAdmin(false);
-            router.refresh();
-          }}
-          maxWidth={640}
-        >
-          <DepartmentAdmin
-            canManage={canManageDepartments}
-            departments={departments}
-            menus={menus}
-            onClose={() => {
-              setShowDepartmentAdmin(false);
-              router.refresh();
-            }}
-          />
-        </Modal>
-      )}
       {archivedCount > 0 && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />

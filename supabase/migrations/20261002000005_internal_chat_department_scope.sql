@@ -1,0 +1,90 @@
+-- 本部⇔スタッフの内部スレッド（kind='internal'）が、どのマネージャーからも
+-- 読み書きできてしまっていたのを、「自分の窓口のスタッフだけ」に絞る
+-- （マネージャーは自分が招待した／本部が割り当てたスタッフしか管理できない、
+-- という方針に合わせる）。オーナーは引き続き全スタッフと話せる。
+
+create or replace function staff_internal_visible(p_staff_profile_id uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select
+    p_staff_profile_id = auth.uid()
+    or auth_role() = 'owner'
+    or (auth_role() = 'dept_manager' and exists (
+      select 1 from staff_departments mine
+      join staff_departments theirs on theirs.department_id = mine.department_id
+      where mine.profile_id = auth.uid() and theirs.profile_id = p_staff_profile_id
+    ))
+$$;
+
+drop policy if exists threads_read on threads;
+create policy threads_read on threads for select using (
+  (is_staff_of(org_id) and (
+    (kind = 'customer' and department_visible(department_id))
+    or (kind = 'case' and case_visible(customer_id, request_id))
+    or (kind = 'internal' and staff_internal_visible(staff_profile_id))
+  ))
+  or (org_id = auth_org() and (
+    (kind = 'customer' and customer_id = my_customer_id())
+    or (kind = 'case' and (
+         creator_id = my_creator_id()
+         or exists (select 1 from requests r where r.id = threads.request_id and r.creator_id = my_creator_id())))
+  ))
+);
+
+drop policy if exists threads_office_write on threads;
+create policy threads_office_write on threads for all using (
+  org_id = auth_org() and (
+    (kind = 'customer' and is_office() and department_visible(department_id))
+    or (kind = 'case' and is_office() and case_visible(customer_id, request_id))
+    or (kind = 'internal' and is_office() and staff_internal_visible(staff_profile_id))
+  )
+) with check (
+  org_id = auth_org() and (
+    (kind = 'customer' and is_office())
+    or (kind = 'case' and is_office() and case_visible(customer_id, request_id))
+    or (kind = 'internal' and is_office() and staff_internal_visible(staff_profile_id))
+  )
+);
+
+drop policy if exists messages_read on messages;
+create policy messages_read on messages for select using (
+  exists (
+    select 1 from threads t
+    where t.id = messages.thread_id
+      and (
+        (is_staff_of(t.org_id) and (
+          (t.kind = 'customer' and department_visible(t.department_id))
+          or (t.kind = 'case' and case_visible(t.customer_id, t.request_id))
+          or (t.kind = 'internal' and staff_internal_visible(t.staff_profile_id))
+        ))
+        or (t.org_id = auth_org() and (
+          (t.kind = 'customer' and t.customer_id = my_customer_id())
+          or (t.kind = 'case' and (
+                t.creator_id = my_creator_id()
+                or exists (select 1 from requests r where r.id = t.request_id and r.creator_id = my_creator_id())
+          ))
+        ))
+      )
+  )
+);
+
+drop policy if exists messages_send on messages;
+create policy messages_send on messages for insert with check (
+  sender_id = auth.uid()
+  and exists (
+    select 1 from threads t
+    where t.id = messages.thread_id
+      and t.org_id = auth_org()
+      and (
+        (t.kind = 'customer' and (
+              (is_office() and department_visible(t.department_id))
+              or t.customer_id = my_customer_id()
+        ))
+        or (t.kind = 'case' and (
+              (is_office() and case_visible(t.customer_id, t.request_id))
+              or t.creator_id = my_creator_id()
+              or exists (select 1 from requests r where r.id = t.request_id and r.creator_id = my_creator_id())
+        ))
+        or (t.kind = 'internal' and is_office() and staff_internal_visible(t.staff_profile_id))
+      )
+  )
+);
