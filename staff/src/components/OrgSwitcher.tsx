@@ -69,12 +69,12 @@ export default function OrgSwitcher({
           fontFamily: "var(--font-heading)",
           fontWeight: headingWeight,
           fontSize: 15,
-          color: "var(--color-text)",
+          color: "var(--color-nav-text)",
         }}
       >
         <span style={{ minWidth: 0, flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{orgDisplayName}</span>
         {hasOtherUnread && <span aria-label="他の窓口に未読あり" style={{ flex: "none", width: 7, height: 7, borderRadius: "50%", background: "var(--stb-seal-ink)" }} />}
-        {hasMenu && <CaretDown size={12} color="var(--color-neutral-500)" style={{ flex: "none" }} />}
+        {hasMenu && <CaretDown size={12} color="var(--color-nav-text-muted)" style={{ flex: "none" }} />}
       </button>
 
       {open && (

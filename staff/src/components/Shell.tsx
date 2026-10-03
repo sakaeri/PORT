@@ -197,8 +197,8 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   const sidebarBody = (
     <>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "6px 4px 4px" }}>
-        <div style={{ width: 30, height: 30, flex: "none", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", border: "1px solid var(--color-accent)" }}>
-          <Headset size={16} color="var(--color-accent)" />
+        <div style={{ width: 30, height: 30, flex: "none", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", border: "1px solid var(--color-nav-accent)" }}>
+          <Headset size={16} color="var(--color-nav-accent)" />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <OrgSwitcher orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} role={ctx.role} orgs={ctx.orgs} unreadCounts={orgUnreadCounts} />
@@ -220,12 +220,12 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
               height: 38,
               padding: "0 10px",
               borderRadius: "var(--radius-md)",
-              borderLeft: active ? "3px solid var(--color-accent)" : "3px solid transparent",
+              borderLeft: active ? "3px solid var(--color-nav-accent)" : "3px solid transparent",
               fontSize: 13.5,
               fontWeight: active ? 600 : 400,
               textDecoration: "none",
-              color: active ? "var(--color-accent)" : "var(--color-text)",
-              background: active ? "color-mix(in srgb, var(--color-accent) 14%, transparent)" : "transparent",
+              color: active ? "var(--color-nav-accent)" : "var(--color-nav-text)",
+              background: active ? "var(--color-nav-active-bg)" : "transparent",
             }}
           >
             <Icon size={16} />
@@ -241,8 +241,8 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
                   placeItems: "center",
                   fontSize: 10.5,
                   fontWeight: 700,
-                  color: "var(--color-bg)",
-                  background: "var(--color-accent-200)",
+                  color: "var(--color-nav-bg)",
+                  background: "var(--color-nav-accent)",
                   borderRadius: 9,
                 }}
               >
@@ -255,7 +255,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
 
       <div style={{ flex: 1 }} />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 10, borderTop: "1px solid var(--color-nav-border)" }}>
         <button
           onClick={() => setShowMyName(true)}
           aria-label="アカウント設定"
@@ -266,7 +266,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
             padding: "4px 4px 8px",
             cursor: "pointer",
             fontSize: 11.5,
-            color: "var(--color-neutral-500)",
+            color: "var(--color-nav-text-muted)",
             background: "transparent",
             border: "none",
           }}
@@ -276,14 +276,14 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
         </button>
         <button
           onClick={toggleTheme}
-          style={{ display: "flex", alignItems: "center", gap: 10, height: 34, padding: "0 10px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", borderRadius: "var(--radius-md)" }}
+          style={{ display: "flex", alignItems: "center", gap: 10, height: 34, padding: "0 10px", cursor: "pointer", fontSize: 12.5, color: "var(--color-nav-text-muted)", background: "transparent", border: "none", borderRadius: "var(--radius-md)" }}
         >
           {isDark ? <Sun size={15} /> : <MoonStars size={15} />}
           {isDark ? "ライトに切替" : "ダークに切替"}
         </button>
         <button
           onClick={handleSignOut}
-          style={{ display: "flex", alignItems: "center", gap: 10, height: 34, padding: "0 10px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", borderRadius: "var(--radius-md)" }}
+          style={{ display: "flex", alignItems: "center", gap: 10, height: 34, padding: "0 10px", cursor: "pointer", fontSize: 12.5, color: "var(--color-nav-text-muted)", background: "transparent", border: "none", borderRadius: "var(--radius-md)" }}
         >
           <SignOut size={15} />
           ログアウト
@@ -295,18 +295,18 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   if (isMobile) {
     return (
       <div style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)" }}>
-        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, height: 52, padding: "0 var(--space-4)", background: "var(--color-surface)", borderBottom: "1px solid var(--color-divider)" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, height: 52, padding: "0 var(--space-4)", background: "var(--color-nav-bg)", borderBottom: "1px solid var(--color-nav-border)" }}>
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="メニューを開く"
-            style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, cursor: "pointer", color: "var(--color-text)", background: "transparent", border: "none" }}
+            style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, cursor: "pointer", color: "var(--color-nav-text)", background: "transparent", border: "none" }}
           >
             <List size={22} />
           </button>
-          <div style={{ minWidth: 0, flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ctx.orgDisplayName}</div>
+          <div style={{ minWidth: 0, flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, color: "var(--color-nav-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ctx.orgDisplayName}</div>
           {unreadCount > 0 && (
             <span
-              style={{ flex: "none", height: 20, padding: "0 8px", display: "grid", placeItems: "center", fontSize: 10.5, fontWeight: 700, whiteSpace: "nowrap", color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: 10 }}
+              style={{ flex: "none", height: 20, padding: "0 8px", display: "grid", placeItems: "center", fontSize: 10.5, fontWeight: 700, whiteSpace: "nowrap", color: "var(--color-nav-bg)", background: "var(--color-nav-accent)", borderRadius: 10 }}
             >
               未読{unreadCount > 99 ? "99+" : unreadCount}件
             </span>
@@ -328,15 +328,15 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
                 flexDirection: "column",
                 gap: 4,
                 padding: "var(--space-4)",
-                background: "var(--color-surface)",
-                borderRight: "1px solid var(--color-divider)",
+                background: "var(--color-nav-bg)",
+                borderRight: "1px solid var(--color-nav-border)",
                 overflowY: "auto",
               }}
             >
               <button
                 onClick={() => setDrawerOpen(false)}
                 aria-label="閉じる"
-                style={{ alignSelf: "flex-end", display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none", padding: 4, marginBottom: 4 }}
+                style={{ alignSelf: "flex-end", display: "flex", cursor: "pointer", color: "var(--color-nav-text-muted)", background: "transparent", border: "none", padding: 4, marginBottom: 4 }}
               >
                 <X size={18} />
               </button>
@@ -376,8 +376,8 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           flexDirection: "column",
           gap: 4,
           padding: "var(--space-4)",
-          background: "var(--color-surface)",
-          borderRight: "1px solid var(--color-divider)",
+          background: "var(--color-nav-bg)",
+          borderRight: "1px solid var(--color-nav-border)",
         }}
       >
         {sidebarBody}
