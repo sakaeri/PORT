@@ -163,6 +163,7 @@ export interface Database {
           org_id: string;
           profile_id: string | null;
           name: string;
+          staff_label: string | null;
           member_no: string | null;
           creator_id: string | null;
           active: boolean;

@@ -27,7 +27,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name), completion_reports(*), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -97,7 +97,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         hourlyCap: canSeeFinance ? request.hourly_cap : null,
       }}
       refundPolicies={canSeeFinance ? (refundPolicies ?? []) : []}
-      customer={customer ? { id: customer.id, name: customer.name } : null}
+      customer={customer ? { id: customer.id, name: customer.staff_label ?? customer.name } : null}
       report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer, details: report.details ?? [], pending: reportPending } : null}
       rating={rating ? { stars: rating.stars, comment: rating.comment, skipped: rating.skipped } : null}
       caseThread={caseThread ? { id: caseThread.id, archived: !!caseThread.archived_at } : null}

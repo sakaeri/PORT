@@ -7,7 +7,7 @@ import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, Int
 import { ProgressPanel, CancelDialog, ReportsDialog } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
 import { createClient } from "@/lib/supabase/client";
-import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle, type VaultRow } from "@/lib/chat-types";
+import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle } from "@/lib/chat-types";
 import type { Database } from "@/lib/supabase/types";
 import {
   sendMessage as sendMessageAction,
@@ -24,8 +24,6 @@ interface Props {
   initialMessages: MessageWithExtras[];
   initialHasMoreOlder?: boolean;
   refundPolicies: RefundPolicyRow[];
-  initialVault: VaultRow[];
-  companies: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];
 }
 
 const ACKED_KEY = "VID_acked_reports";
@@ -46,13 +44,12 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, refundPolicies, initialVault, companies }: Props) {
+export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, refundPolicies }: Props) {
   const [messages, setMessages] = useState(initialMessages);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const skipAutoScrollRef = useRef(false);
-  const vault = initialVault;
   const [searchQuery, setSearchQuery] = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showReports, setShowReports] = useState(false);
@@ -302,13 +299,10 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
           memberNo={ctx.memberNo}
           customerName={ctx.customerName}
           currentEmail={ctx.email}
-          vault={vault}
           hasGuestActivity={messages.length > 0}
           isAnonymous={ctx.isAnonymous}
           avatarUrl={avatarUrl}
           onAvatarChange={setAvatarUrl}
-          orgId={ctx.orgId}
-          companies={companies}
           isDark={isDark}
           onToggleTheme={toggleTheme}
           onClose={() => setShowMyPage(false)}

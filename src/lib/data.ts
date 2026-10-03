@@ -141,18 +141,3 @@ export async function getRefundPolicies(orgId: string) {
   return data ?? [];
 }
 
-export async function getMyCompanies() {
-  const supabase = await createClient();
-  const { data } = await supabase.rpc("my_companies");
-  return data ?? [];
-}
-
-export async function getVaultItems(customerId: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("customer_vault_items")
-    .select("*")
-    .eq("customer_id", customerId)
-    .order("sort", { ascending: true });
-  return data ?? [];
-}

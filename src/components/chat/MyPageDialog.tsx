@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
-import type { VaultRow } from "@/lib/chat-types";
-import { saveVaultItem, deleteVaultItem, setInitialName, changeEmail, requestNameChange, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge } from "@/app/actions";
+import { updateCustomerName, changeEmail, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 import LoginPanel from "@/components/chat/LoginPanel";
 import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
@@ -30,7 +29,6 @@ const smallBtn: React.CSSProperties = { flex: "none", height: 36, padding: "0 12
 const input: React.CSSProperties = { width: "100%", height: 36, padding: "6px 10px", fontSize: 13.5, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" };
 
 const NAME_PLACEHOLDER = "未登録の依頼主";
-const NAME_REASONS = ["入力の誤り", "改姓・改名", "社名・屋号の変更"];
 
 function authTabBtn(active: boolean): React.CSSProperties {
   return {
@@ -50,13 +48,10 @@ export default function MyPageDialog({
   memberNo,
   customerName,
   currentEmail,
-  vault,
   hasGuestActivity,
   isAnonymous,
   avatarUrl,
   onAvatarChange,
-  orgId,
-  companies,
   isDark,
   onToggleTheme,
   onClose,
@@ -67,13 +62,10 @@ export default function MyPageDialog({
   memberNo: string | null;
   customerName: string;
   currentEmail: string | null;
-  vault: VaultRow[];
   hasGuestActivity: boolean;
   isAnonymous: boolean;
   avatarUrl: string | null;
   onAvatarChange: (url: string | null) => void;
-  orgId: string;
-  companies: { org_id: string; display_name: string; domain: string | null; slug: string | null }[];
   isDark: boolean;
   onToggleTheme: () => void;
   onClose: () => void;
@@ -83,12 +75,10 @@ export default function MyPageDialog({
   const [name, setName] = useState(customerName);
   const nameIsPlaceholder = name === NAME_PLACEHOLDER;
 
-  const [nameOpen, setNameOpen] = useState(false);
-  const [nameNext, setNameNext] = useState("");
-  const [nameReason, setNameReason] = useState<string | null>(null);
+  const [nameEditing, setNameEditing] = useState(false);
+  const [nameDraft, setNameDraft] = useState(nameIsPlaceholder ? "" : customerName);
   const [nameError, setNameError] = useState("");
-  const [namePending, setNamePending] = useState(false);
-  const [nameSelfSaving, setNameSelfSaving] = useState(false);
+  const [nameSaving, setNameSaving] = useState(false);
 
   const [email, setEmail] = useState(currentEmail ?? "");
   const [emOpen, setEmOpen] = useState(false);
@@ -97,8 +87,6 @@ export default function MyPageDialog({
   const [emError, setEmError] = useState("");
   const [emDone, setEmDone] = useState(false);
   const [emSaving, setEmSaving] = useState(false);
-
-  const [vaultRows, setVaultRows] = useState(vault.map((v) => ({ ...v })));
 
   const CHARGE_AMOUNTS = [10000, 30000, 50000, 100000];
   const [chargeOpen, setChargeOpen] = useState(false);
@@ -160,35 +148,21 @@ export default function MyPageDialog({
     }
   }
 
-
   const [authView, setAuthView] = useState<"none" | "login" | "create">("none");
 
-  async function saveSelfName() {
-    if (!name.trim() || nameSelfSaving) return;
-    setNameSelfSaving(true);
+  async function saveName() {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return setNameError("お名前をご入力ください");
+    setNameSaving(true);
+    setNameError("");
     try {
-      await setInitialName(name.trim());
-    } catch {
-      // 既に登録済みだった場合はそのまま「変更を依頼」フローに切り替える
-    } finally {
-      setNameSelfSaving(false);
-    }
-  }
-
-  async function sendNameChangeRequest() {
-    const next = nameNext.trim();
-    if (!next) return setNameError("新しいお名前を入力してください");
-    if (next === name) return setNameError("現在と同じお名前です");
-    if (!nameReason) return setNameError("変更の理由をお選びください");
-    setNamePending(true);
-    try {
-      await requestNameChange(next, nameReason);
-      setNameOpen(false);
-      setNameError("");
+      await updateCustomerName(trimmed);
+      setName(trimmed);
+      setNameEditing(false);
     } catch (e) {
-      setNameError(errorMessage(e, "送信できませんでした"));
+      setNameError(errorMessage(e, "保存できませんでした"));
     } finally {
-      setNamePending(false);
+      setNameSaving(false);
     }
   }
 
@@ -210,29 +184,6 @@ export default function MyPageDialog({
     }
   }
 
-  function updateVaultLocal(id: string, patch: Partial<VaultRow>) {
-    setVaultRows((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  }
-
-  async function commitVault(id: string) {
-    const row = vaultRows.find((r) => r.id === id);
-    if (!row || (!row.label.trim() && !row.value.trim())) return;
-    const savedId = await saveVaultItem(id, row.label, row.value);
-    if (savedId !== id) {
-      setVaultRows((rows) => rows.map((r) => (r.id === id ? { ...r, id: savedId } : r)));
-    }
-  }
-
-  async function addVaultRow() {
-    const tempId = `temp-${Date.now()}`;
-    setVaultRows((rows) => [...rows, { id: tempId, customer_id: "", label: "", value: "", sort: rows.length, updated_at: new Date().toISOString() }]);
-  }
-
-  async function removeVaultRow(id: string) {
-    setVaultRows((rows) => rows.filter((r) => r.id !== id));
-    await deleteVaultItem(id);
-  }
-
   return (
     <div style={{ ...scrim, display: "grid", placeItems: "center", padding: "var(--space-4)" }} onClick={onClose}>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={dialogBox}>
@@ -248,6 +199,105 @@ export default function MyPageDialog({
                 <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>{memberNo ?? "—"}</span>
               </div>
             )}
+
+            {isAnonymous ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setAuthView((v) => (v === "login" ? "none" : "login"))} style={authTabBtn(authView === "login")}>
+                    ログイン
+                  </button>
+                  <button onClick={() => setAuthView((v) => (v === "create" ? "none" : "create"))} style={authTabBtn(authView === "create")}>
+                    アカウント作成
+                  </button>
+                </div>
+                {authView === "login" && (
+                  <LoginPanel hasGuestActivity={hasGuestActivity} forceOpen onRequestClose={() => setAuthView("none")} />
+                )}
+                {authView === "create" && <AccountCreatePanel onRequestClose={() => setAuthView("none")} />}
+              </div>
+            ) : (
+              <>
+                {/* プロフィール画像＋お名前（いつでも自由に変更可） */}
+                <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <AvatarPicker userId={userId} customerName={customerName} avatarUrl={avatarUrl} onChange={onAvatarChange} />
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 7 }}>
+                    {nameEditing || nameIsPlaceholder ? (
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input value={nameDraft} placeholder="山田 太郎" onChange={(e) => setNameDraft(e.target.value)} className="vid-input" style={{ ...input, flex: 1 }} />
+                        <button onClick={saveName} disabled={nameSaving || !nameDraft.trim()} style={smallBtn}>
+                          {nameSaving ? "保存中…" : "保存"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={rowBox}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                        <button
+                          onClick={() => {
+                            setNameDraft(name);
+                            setNameError("");
+                            setNameEditing(true);
+                          }}
+                          style={{ ...smallBtn, color: "var(--color-neutral-300)", borderColor: "var(--color-divider)" }}
+                        >
+                          変更
+                        </button>
+                      </div>
+                    )}
+                    {nameError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{nameError}</span>}
+                  </div>
+                </div>
+
+                {/* メールアドレス */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div style={rowBox}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email || "未登録"}</span>
+                    <button onClick={() => setEmOpen((v) => !v)} style={smallBtn}>
+                      {email ? "変更" : "登録"}
+                    </button>
+                  </div>
+                  {emOpen && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>新しいメールアドレス</span>
+                        <input type="email" value={emNext} onChange={(e) => setEmNext(e.target.value)} placeholder="例）yamada.taro@example.jp" className="vid-input" style={input} />
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>確認のため再入力</span>
+                        <input type="email" value={emConf} onChange={(e) => setEmConf(e.target.value)} className="vid-input" style={input} />
+                      </div>
+                      {emError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{emError}</span>}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={saveEmail} disabled={emSaving} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+                          変更を保存
+                        </button>
+                        <button onClick={() => setEmOpen(false)} style={{ flex: "none", height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                          キャンセル
+                        </button>
+                      </div>
+                      <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>保存すると新しいアドレスに確認メールをお送りします。</span>
+                    </div>
+                  )}
+                  {emDone && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--color-accent-300)" }}>
+                      <CheckCircle size={13} />
+                      変更しました。確認メールをお送りしました
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* 画面の色合い */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ flex: 1, fontSize: 13.5 }}>画面の色合い</span>
+              <button
+                onClick={onToggleTheme}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", cursor: "pointer", fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+              >
+                {isDark ? <Sun size={14} /> : <MoonStars size={14} />}
+                {isDark ? "ライトに切替" : "ダークに切替"}
+              </button>
+            </div>
 
             {/* チャージ残高 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
@@ -346,211 +396,6 @@ export default function MyPageDialog({
                 </div>
               )}
             </div>
-
-            {/* 画面の色合い */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ flex: 1, fontSize: 13.5 }}>画面の色合い</span>
-              <button
-                onClick={onToggleTheme}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", cursor: "pointer", fontSize: 11.5, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
-              >
-                {isDark ? <Sun size={14} /> : <MoonStars size={14} />}
-                {isDark ? "ライトに切替" : "ダークに切替"}
-              </button>
-            </div>
-
-            {isAnonymous ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setAuthView((v) => (v === "login" ? "none" : "login"))} style={authTabBtn(authView === "login")}>
-                    ログイン
-                  </button>
-                  <button onClick={() => setAuthView((v) => (v === "create" ? "none" : "create"))} style={authTabBtn(authView === "create")}>
-                    アカウント作成
-                  </button>
-                </div>
-                {authView === "login" && (
-                  <LoginPanel hasGuestActivity={hasGuestActivity} forceOpen onRequestClose={() => setAuthView("none")} />
-                )}
-                {authView === "create" && <AccountCreatePanel onRequestClose={() => setAuthView("none")} />}
-              </div>
-            ) : (
-              <>
-            {/* プロフィール画像＋お名前 */}
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-              <AvatarPicker userId={userId} customerName={customerName} avatarUrl={avatarUrl} onChange={onAvatarChange} />
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 7 }}>
-                {nameIsPlaceholder ? (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input value={name === NAME_PLACEHOLDER ? "" : name} placeholder="山田 太郎" onChange={(e) => setName(e.target.value)} className="vid-input" style={{ ...input, flex: 1 }} />
-                    <button onClick={saveSelfName} disabled={nameSelfSaving || !name.trim()} style={smallBtn}>
-                      保存
-                    </button>
-                  </div>
-                ) : (
-                  <div style={rowBox}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-                    <button onClick={() => setNameOpen((v) => !v)} style={{ ...smallBtn, color: "var(--color-neutral-300)", borderColor: "var(--color-divider)" }}>
-                      変更を依頼
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            {nameOpen && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
-                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>契約書・見積書・請求書の宛名に使うため、受付が確認して変更します</span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>新しいお名前</span>
-                    <input value={nameNext} onChange={(e) => setNameNext(e.target.value)} placeholder="例）山田 太郎" className="vid-input" style={input} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>変更の理由</span>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {NAME_REASONS.map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => {
-                            setNameReason(r);
-                            setNameError("");
-                          }}
-                          style={{
-                            height: 29,
-                            padding: "0 11px",
-                            cursor: "pointer",
-                            fontSize: 11.5,
-                            whiteSpace: "nowrap",
-                            color: nameReason === r ? "var(--color-accent-100)" : "var(--color-neutral-400)",
-                            background: nameReason === r ? "var(--color-accent-900)" : "transparent",
-                            border: `1px solid ${nameReason === r ? "var(--color-accent)" : "var(--color-divider)"}`,
-                            borderRadius: 20,
-                          }}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {nameError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{nameError}</span>}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={sendNameChangeRequest} disabled={namePending} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-                      受付に変更を依頼
-                    </button>
-                    <button onClick={() => setNameOpen(false)} style={{ flex: "none", height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                      キャンセル
-                    </button>
-                  </div>
-                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>発行済みの書類は差し替えが必要な場合があります。受付が確認のうえご連絡します。</span>
-                </div>
-              )}
-
-            {/* メールアドレス */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              <div style={rowBox}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email || "未登録"}</span>
-                <button onClick={() => setEmOpen((v) => !v)} style={smallBtn}>
-                  {email ? "変更" : "登録"}
-                </button>
-              </div>
-              {emOpen && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>新しいメールアドレス</span>
-                    <input type="email" value={emNext} onChange={(e) => setEmNext(e.target.value)} placeholder="例）yamada.taro@example.jp" className="vid-input" style={input} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>確認のため再入力</span>
-                    <input type="email" value={emConf} onChange={(e) => setEmConf(e.target.value)} className="vid-input" style={input} />
-                  </div>
-                  {emError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{emError}</span>}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={saveEmail} disabled={emSaving} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-                      変更を保存
-                    </button>
-                    <button onClick={() => setEmOpen(false)} style={{ flex: "none", height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                      キャンセル
-                    </button>
-                  </div>
-                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>保存すると新しいアドレスに確認メールをお送りします。</span>
-                </div>
-              )}
-              {emDone && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--color-accent-300)" }}>
-                  <CheckCircle size={13} />
-                  変更しました。確認メールをお送りしました
-                </span>
-              )}
-            </div>
-
-            {/* よく使う情報（vault） */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 9, paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <div style={{ flex: 1, fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-accent)" }}>よく使う情報</div>
-                <button onClick={addVaultRow} style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, whiteSpace: "nowrap", color: "var(--color-neutral-300)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                  ＋ 項目を追加
-                </button>
-              </div>
-              <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>素材の置き場所や公開先など、毎回お伝えいただかずに済むものを登録できます。</div>
-              {vaultRows.map((v) => (
-                <div key={v.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <input
-                    value={v.label}
-                    onChange={(e) => updateVaultLocal(v.id, { label: e.target.value })}
-                    onBlur={() => commitVault(v.id)}
-                    placeholder="項目名"
-                    className="vid-input"
-                    style={{ flex: "none", width: 132, height: 32, padding: "5px 9px", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
-                  />
-                  <input
-                    value={v.value}
-                    onChange={(e) => updateVaultLocal(v.id, { value: e.target.value })}
-                    onBlur={() => commitVault(v.id)}
-                    placeholder="未登録"
-                    className="vid-input"
-                    style={{ minWidth: 0, flex: 1, height: 32, padding: "5px 9px", fontSize: 12.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
-                  />
-                  <button
-                    onClick={() => removeVaultRow(v.id)}
-                    aria-label="削除"
-                    style={{ flex: "none", width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* 会社の履歴（複数の窓口の顧客になっている場合だけ表示） */}
-            {companies.length > 1 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 9, paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>
-                <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-accent)" }}>ご利用中の窓口</div>
-                {companies.map((c) => {
-                  const isCurrent = c.org_id === orgId;
-                  const href = c.slug ? `/${c.slug}` : c.domain ? `https://${c.domain}` : null;
-                  const content = (
-                    <>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.display_name}</span>
-                      {isCurrent && <span style={{ flex: "none", fontSize: 10.5, color: "var(--color-neutral-600)" }}>閲覧中</span>}
-                    </>
-                  );
-                  return isCurrent || !href ? (
-                    <div key={c.org_id} style={{ ...rowBox, opacity: isCurrent ? 1 : 0.6 }}>
-                      {content}
-                    </div>
-                  ) : (
-                    <a
-                      key={c.org_id}
-                      href={href}
-                      style={{ ...rowBox, textDecoration: "none", color: "inherit", cursor: "pointer" }}
-                    >
-                      {content}
-                    </a>
-                  );
-                })}
-              </div>
-            )}
-              </>
-            )}
 
             {/* 担当マネージャーには見えない、本部との直接のやり取り */}
             <HqChatPanel />

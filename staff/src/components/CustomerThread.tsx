@@ -23,6 +23,7 @@ import {
   updateIntakeField,
   deleteIntakeField,
   adjustCustomerBalance,
+  updateCustomerStaffLabel,
 } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
@@ -488,7 +489,7 @@ export default function CustomerThread({
   latestRequest,
   initialHasMoreOlder,
 }: {
-  customer: { id: string; name: string; memberNo: string | null; balance: number };
+  customer: { id: string; name: string; staffLabel: string | null; memberNo: string | null; balance: number };
   thread: { id: string; archived: boolean; departmentId: string | null } | null;
   departments: { id: string; name: string }[];
   initialMessages: Message[];
@@ -522,6 +523,27 @@ export default function CustomerThread({
   const [adjustNote, setAdjustNote] = useState("");
   const [adjustSaving, setAdjustSaving] = useState(false);
   const [adjustError, setAdjustError] = useState("");
+
+  const [staffLabel, setStaffLabel] = useState(customer.staffLabel);
+  const [labelOpen, setLabelOpen] = useState(false);
+  const [labelDraft, setLabelDraft] = useState(customer.staffLabel ?? "");
+  const [labelSaving, setLabelSaving] = useState(false);
+  const [labelError, setLabelError] = useState("");
+
+  async function submitStaffLabel() {
+    if (labelSaving) return;
+    setLabelSaving(true);
+    setLabelError("");
+    try {
+      await updateCustomerStaffLabel(customer.id, labelDraft);
+      setStaffLabel(labelDraft.trim() || null);
+      setLabelOpen(false);
+    } catch (e) {
+      setLabelError(errorMessage(e, "変更できませんでした"));
+    } finally {
+      setLabelSaving(false);
+    }
+  }
 
   async function submitAdjustment() {
     if (adjustSaving) return;
@@ -692,9 +714,21 @@ export default function CustomerThread({
           <ArrowLeft size={17} />
         </Link>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{customer.name}</div>
-          <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{customer.memberNo ?? "—"}</div>
+          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{staffLabel ?? customer.name}</div>
+          <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {customer.memberNo ?? "—"}
+            {staffLabel && `・本人の登録名：${customer.name}`}
+          </div>
         </div>
+        <button
+          onClick={() => {
+            setLabelDraft(staffLabel ?? "");
+            setLabelOpen((v) => !v);
+          }}
+          style={{ flex: "none", fontSize: 11, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+        >
+          社内表示名
+        </button>
         {thread && departments.length > 0 && (
           <ThreadDepartmentControl threadId={thread.id} departments={departments} initialDepartmentId={thread.departmentId} />
         )}
@@ -708,6 +742,31 @@ export default function CustomerThread({
           </button>
         )}
       </div>
+
+      {labelOpen && (
+        <div style={{ margin: "14px 20px 0", display: "flex", flexDirection: "column", gap: 6, padding: 10, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+          <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>
+            本部・マネージャーが社内向けに付ける呼び方です。依頼主本人が登録した名前とは別に持てます（未入力に戻すと本人の登録名を表示します）。
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input
+              value={labelDraft}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              placeholder={customer.name}
+              style={{ flex: 1, minWidth: 160, height: 32, padding: "4px 8px", fontSize: 12.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
+            />
+          </div>
+          {labelError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{labelError}</span>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setLabelOpen(false)} style={{ height: 30, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+              閉じる
+            </button>
+            <button onClick={submitStaffLabel} disabled={labelSaving} style={{ height: 30, padding: "0 12px", cursor: "pointer", fontSize: 11.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+              {labelSaving ? "処理中…" : "保存する"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ padding: "14px 20px 0", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

@@ -12,11 +12,11 @@ export default async function HqMessagesPage() {
 
   const supabase = await createClient();
   const [{ data: customers }, { data: summaries }] = await Promise.all([
-    supabase.from("customers").select("id, name").eq("org_id", ctx.orgId),
+    supabase.from("customers").select("id, name, staff_label").eq("org_id", ctx.orgId),
     supabase.rpc("hq_thread_summaries", { p_org_id: ctx.orgId }),
   ]);
 
-  const customerNameById = new Map((customers ?? []).map((c) => [c.id, c.name]));
+  const customerNameById = new Map((customers ?? []).map((c) => [c.id, c.staff_label ?? c.name]));
   const rows = (summaries ?? [])
     .map((s) => ({
       customerId: s.customer_id,

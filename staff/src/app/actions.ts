@@ -596,6 +596,17 @@ export async function adjustCustomerBalance(customerId: string, amount: number, 
   }
 }
 
+// staff_alias（スタッフ）と同じ発想：依頼主本人が自由に変えられる name とは
+// 独立して、本部・マネージャーが社内向けに付ける呼び方。null に戻せば
+// 依頼主本人の登録名の表示に戻る。
+export async function updateCustomerStaffLabel(customerId: string, label: string) {
+  const ctx = await requireManagerOrAbove();
+  const admin = createServiceRoleClient();
+  const trimmed = label.trim();
+  const { error } = await admin.from("customers").update({ staff_label: trimmed || null }).eq("id", customerId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
 // 「自分のログインで追加した窓口」をセルフサービスで削除する。今のログイン
 // の本来の事業者（primary）は対象外（削除するとそのログイン自体が
 // プロフィールを失って詰む）。staff_org_links 経由で追加した分だけ許可。

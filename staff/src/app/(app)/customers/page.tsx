@@ -22,7 +22,7 @@ export default async function CustomersPage() {
   const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }, { data: requests }] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, name, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
+      .select("id, name, staff_label, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
     supabase.rpc("customer_thread_summaries", { p_org_id: ctx.orgId }),
@@ -70,7 +70,7 @@ export default async function CustomersPage() {
 
       return {
         id: c.id,
-        name: c.name,
+        name: c.staff_label ?? c.name,
         memberNo: c.member_no,
         active: c.active,
         convertedOrg: convertedOrg ? { displayName: convertedOrg.display_name, slug: convertedOrg.slug } : null,

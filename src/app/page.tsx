@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCustomerContext, getMyCompanies, getRefundPolicies, getThreadMessages, getVaultItems, hasAuthSession } from "@/lib/data";
+import { getCustomerContext, getRefundPolicies, getThreadMessages, hasAuthSession } from "@/lib/data";
 import ChatScreen from "@/components/chat/ChatScreen";
 import VerifyGate from "@/components/chat/VerifyGate";
 import AccountGate from "@/components/chat/AccountGate";
@@ -54,11 +54,9 @@ export default async function Home() {
     return <AccountGate orgDisplayName={ctx.orgDisplayName} />;
   }
 
-  const [{ messages, hasMoreOlder }, refundPolicies, vault, companies] = await Promise.all([
+  const [{ messages, hasMoreOlder }, refundPolicies] = await Promise.all([
     getThreadMessages(ctx.threadId),
     getRefundPolicies(ctx.orgId),
-    getVaultItems(ctx.customerId),
-    getMyCompanies(),
   ]);
 
   return (
@@ -67,8 +65,6 @@ export default async function Home() {
       initialMessages={messages}
       initialHasMoreOlder={hasMoreOlder}
       refundPolicies={refundPolicies}
-      initialVault={vault}
-      companies={companies}
     />
   );
 }

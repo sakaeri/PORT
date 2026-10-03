@@ -104,33 +104,6 @@ export async function sendMessage(text: string, attachments: { path: string; nam
   await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
 }
 
-// id が null（または DB にまだ存在しない一時ID）なら新規作成として扱い、
-// 実際の行IDを返す。呼び出し側はローカルの仮IDをこれで置き換える。
-export async function saveVaultItem(id: string | null, label: string, value: string): Promise<string> {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const isNew = !id || id.startsWith("temp-");
-  if (!isNew) {
-    await supabase.from("customer_vault_items").update({ label, value, updated_at: new Date().toISOString() }).eq("id", id);
-    return id as string;
-  }
-  const { data, error } = await supabase
-    .from("customer_vault_items")
-    .insert({ customer_id: ctx.customerId, label, value })
-    .select("id")
-    .single();
-  if (error || !data) throw error ?? new Error("保存できませんでした");
-  return data.id;
-}
-
-export async function deleteVaultItem(id: string) {
-  if (id.startsWith("temp-")) return; // まだDBに存在しない行はローカルで消すだけでよい
-  await requireContext();
-  const supabase = await createClient();
-  const { error } = await supabase.from("customer_vault_items").delete().eq("id", id);
-  if (error) throw error;
-}
-
 // 見積もりの「はじめの質問」（menu_pick）と同じく、その場のメッセージとしてのみ残す。
 // 依頼主ごとの永続データ（customer_vault_items＝マイページの「よく使う情報」）には繋げない
 // —— 確認事項テンプレはあくまで一回きりのやり取りとして扱う。
@@ -151,27 +124,18 @@ export async function submitInfoRequestAnswer(formLabel: string, fields: { label
   await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
 }
 
-// 受付への依頼として本人発言のまま投稿する（自動応答は作らない — 実際の返信は
-// 受付が対応してから届く。プロトタイプの「即座に受付が返信する」演出は本番では行わない）。
-export async function requestNameChange(newName: string, reason: string) {
-  const ctx = await requireActiveContext();
+// 依頼主本人の名前はいつでも自由に変更できる（customers_self_update ポリシー）。
+// 社内向け（書類の宛名など）の呼び方は、本人のこの変更とは独立した
+// customers.staff_label（本部・マネージャーが設定）を使う。
+export async function updateCustomerName(name: string) {
+  const ctx = await requireContext();
   const supabase = await createClient();
-  const trimmed = newName.trim();
-  if (!trimmed || !reason) throw new Error("入力内容をご確認ください");
-
-  const { error } = await supabase.from("messages").insert({
-    thread_id: ctx.threadId,
-    sender_id: ctx.userId,
-    sender_role: "client",
-    kind: "text",
-    body: `お名前の変更をお願いします。新しいお名前：${trimmed}／理由：${reason}`,
-  });
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("お名前をご入力ください");
+  const { error } = await supabase.from("customers").update({ name: trimmed }).eq("id", ctx.customerId);
   if (error) throw error;
-  await touchThread(ctx.threadId);
 }
 
-// 決済前の初回登録のみ。以降の変更は requestNameChange（受付経由）に切り替わる
-// （RLS の customers_self_set_name_once が2回目以降の自己更新を拒否する）。
 export async function setInitialProfile(name: string, email: string, phone: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
@@ -179,9 +143,7 @@ export async function setInitialProfile(name: string, email: string, phone: stri
   const trimmedEmail = email.trim();
   if (!trimmedName || !trimmedEmail) throw new Error("お名前とメールアドレスをご入力ください");
 
-  // 既に一度セルフ登録済みなら customers_self_set_name_once に弾かれて0件のまま
-  // 成功扱いになる。RLS ブロックとみなさず、既存の名前のまま先に進む（決済を止めない）。
-  await supabase.from("customers").update({ name: trimmedName }).eq("id", ctx.customerId).select("id");
+  await supabase.from("customers").update({ name: trimmedName }).eq("id", ctx.customerId);
 
   const { error: emailErr } = await supabase.auth.updateUser({ email: trimmedEmail });
   if (emailErr) {
@@ -203,18 +165,6 @@ export async function setInitialProfile(name: string, email: string, phone: stri
     if (existing) await supabase.from("customer_vault_items").update({ value: phone.trim() }).eq("id", existing.id);
     else await supabase.from("customer_vault_items").insert({ customer_id: ctx.customerId, label: "電話番号", value: phone.trim() });
   }
-}
-
-// マイページから名前だけ先に決めたい場合用（決済フローとは独立）。
-// customers_self_set_name_once ポリシーにより、プレースホルダーからの1回だけ通る。
-export async function setInitialName(name: string) {
-  const ctx = await requireContext();
-  const supabase = await createClient();
-  const trimmed = name.trim();
-  if (!trimmed) throw new Error("お名前をご入力ください");
-  // RLS が拒否すると対象行が0件のまま成功扱いになるため、更新後の行の有無で判定する。
-  const { data, error } = await supabase.from("customers").update({ name: trimmed }).eq("id", ctx.customerId).select("id");
-  if (error || !data?.length) throw new Error("お名前は既に登録済みです。変更は「変更を依頼」からお願いします。");
 }
 
 export async function updateAvatar(url: string) {
@@ -343,23 +293,31 @@ export async function startBalanceCharge(amountYen: number): Promise<string> {
   const origin = `${protocol}://${host}`;
 
   const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "jpy",
-          unit_amount: amountYen,
-          product_data: { name: "チャージ" },
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "jpy",
+            unit_amount: amountYen,
+            product_data: { name: "チャージ" },
+          },
+          quantity: 1,
         },
-        quantity: 1,
-      },
-    ],
-    metadata: { customer_id: ctx.customerId, org_id: ctx.orgId },
-    success_url: `${origin}/?charge=success`,
-    cancel_url: `${origin}/?charge=cancel`,
-  });
+      ],
+      metadata: { customer_id: ctx.customerId, org_id: ctx.orgId },
+      success_url: `${origin}/?charge=success`,
+      cancel_url: `${origin}/?charge=cancel`,
+    });
+  } catch (e) {
+    // Stripe側のエラー（無効なAPIキー等）はそのまま出すと英語になってしまうため、
+    // 原因調査用にサーバーログへ残した上で日本語の案内に差し替える。
+    console.error("startBalanceCharge: stripe.checkout.sessions.create failed:", e);
+    throw new Error("決済ページを作成できませんでした");
+  }
   if (!session.url) throw new Error("決済ページを作成できませんでした");
   return session.url;
 }
@@ -383,20 +341,26 @@ export async function startAutoRechargeSetup(thresholdYen: number, amountYen: nu
   const origin = `${protocol}://${host}`;
 
   const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "setup",
-    payment_method_types: ["card"],
-    customer: customer?.stripe_customer_id ?? undefined,
-    customer_creation: customer?.stripe_customer_id ? undefined : "always",
-    metadata: {
-      customer_id: ctx.customerId,
-      org_id: ctx.orgId,
-      auto_recharge_threshold: String(thresholdYen),
-      auto_recharge_amount: String(amountYen),
-    },
-    success_url: `${origin}/?autorecharge=success`,
-    cancel_url: `${origin}/?autorecharge=cancel`,
-  });
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: "setup",
+      payment_method_types: ["card"],
+      customer: customer?.stripe_customer_id ?? undefined,
+      customer_creation: customer?.stripe_customer_id ? undefined : "always",
+      metadata: {
+        customer_id: ctx.customerId,
+        org_id: ctx.orgId,
+        auto_recharge_threshold: String(thresholdYen),
+        auto_recharge_amount: String(amountYen),
+      },
+      success_url: `${origin}/?autorecharge=success`,
+      cancel_url: `${origin}/?autorecharge=cancel`,
+    });
+  } catch (e) {
+    console.error("startAutoRechargeSetup: stripe.checkout.sessions.create failed:", e);
+    throw new Error("設定ページを作成できませんでした");
+  }
   if (!session.url) throw new Error("設定ページを作成できませんでした");
   return session.url;
 }

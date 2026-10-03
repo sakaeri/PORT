@@ -51,7 +51,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, name, member_no, balance, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
+      .select("id, name, staff_label, member_no, balance, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
       .eq("id", id)
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
@@ -117,7 +117,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   return (
     <CustomerThread
-      customer={{ id: customer.id, name: customer.name, memberNo: customer.member_no, balance: customer.balance }}
+      customer={{ id: customer.id, name: customer.name, staffLabel: customer.staff_label, memberNo: customer.member_no, balance: customer.balance }}
       thread={thread ? { id: thread.id, archived: !!thread.archived_at, departmentId: thread.department_id } : null}
       departments={(departmentRows ?? []).map((d) => ({ id: d.id, name: d.name }))}
       initialMessages={initialMessages}
