@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Headset } from "@phosphor-icons/react";
 import { errorMessage } from "@/lib/errors";
+import { headingWeight } from "@/lib/style";
 import { setInitialProfile, requestMagicLink } from "@/app/actions";
 
 const input: React.CSSProperties = {
@@ -78,53 +80,96 @@ export default function AccountGate({ orgDisplayName }: { orgDisplayName: string
   }
 
   return (
-    <main style={{ height: "100vh", display: "grid", placeItems: "center", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)", padding: 24 }}>
-      <div style={{ width: "min(360px, 100%)", display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontSize: 19, textAlign: "center" }}>{orgDisplayName}</div>
+    <main
+      style={{
+        height: "100vh",
+        display: "grid",
+        placeItems: "center",
+        background: "radial-gradient(circle at 50% 0%, var(--color-section-glow) 0%, var(--color-bg) 62%)",
+        color: "var(--color-text)",
+        fontFamily: "var(--font-body)",
+        padding: 24,
+      }}
+    >
+      <div style={{ width: "min(380px, 100%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            display: "grid",
+            placeItems: "center",
+            borderRadius: "50%",
+            background: "var(--color-accent-900)",
+            border: "1px solid var(--color-accent-700)",
+            marginBottom: 4,
+          }}
+        >
+          <Headset size={26} color="var(--color-accent)" />
+        </div>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 21, textAlign: "center" }}>{orgDisplayName}</div>
+        <div style={{ fontSize: 13, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-400)", marginBottom: 10 }}>
+          ちょっとした頼みごとも、まずはこちらから。
+          <br />
+          あなたの人間秘書です。
+        </div>
 
-        {sentTo ? (
-          <div style={{ fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>
-            {sentTo} 宛にメールをお送りしました。メール内のリンクを開くとご利用いただけます。
-          </div>
-        ) : (
-          <>
-            <div style={{ fontSize: 12.5, lineHeight: 1.7, textAlign: "center", opacity: 0.75 }}>ご利用にはメールアドレスの確認が必要です。</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setMode("new")} style={tabBtn(mode === "new")}>
-                はじめてご利用の方
-              </button>
-              <button onClick={() => setMode("existing")} style={tabBtn(mode === "existing")}>
-                ご利用いただいたことがある方
-              </button>
-            </div>
-            {mode === "new" ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前" className="vid-input" style={input} />
-                <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="メールアドレス" className="vid-input" style={input} />
-                {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-                <button
-                  onClick={submitNew}
-                  disabled={sending}
-                  style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending ? 0.6 : 1 }}
-                >
-                  {sending ? "送信中…" : "はじめる"}
-                </button>
+        <div
+          style={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            padding: 22,
+            borderRadius: "var(--radius-lg)",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-divider)",
+            boxShadow: "var(--shadow-md)",
+          }}
+        >
+            {sentTo ? (
+              <div style={{ fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>
+                {sentTo} 宛にメールをお送りしました。メール内のリンクを開くとご利用いただけます。
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="登録済みのメールアドレス" className="vid-input" style={input} />
-                {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-                <button
-                  onClick={submitLogin}
-                  disabled={sending}
-                  style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending ? 0.6 : 1 }}
-                >
-                  {sending ? "送信中…" : "ログインリンクを送る"}
-                </button>
-              </div>
+              <>
+                <div style={{ fontSize: 12.5, lineHeight: 1.7, textAlign: "center", opacity: 0.75 }}>ご利用にはメールアドレスの確認が必要です。</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setMode("new")} style={tabBtn(mode === "new")}>
+                    はじめてご利用の方
+                  </button>
+                  <button onClick={() => setMode("existing")} style={tabBtn(mode === "existing")}>
+                    ご利用いただいたことがある方
+                  </button>
+                </div>
+                {mode === "new" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前" className="vid-input" style={input} />
+                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="メールアドレス" className="vid-input" style={input} />
+                    {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+                    <button
+                      onClick={submitNew}
+                      disabled={sending}
+                      style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending ? 0.6 : 1 }}
+                    >
+                      {sending ? "送信中…" : "はじめる"}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="登録済みのメールアドレス" className="vid-input" style={input} />
+                    {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+                    <button
+                      onClick={submitLogin}
+                      disabled={sending}
+                      style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending ? 0.6 : 1 }}
+                    >
+                      {sending ? "送信中…" : "ログインリンクを送る"}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+        </div>
       </div>
     </main>
   );
