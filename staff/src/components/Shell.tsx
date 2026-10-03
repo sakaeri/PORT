@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X, PencilSimple } from "@phosphor-icons/react";
+import { Headset, Users, ChatsCircle, ChatTeardropText, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X, PencilSimple } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { headingWeight } from "@/lib/style";
@@ -23,6 +23,8 @@ const NAV = [
   { href: "/staff", label: "スタッフ", icon: UsersThree },
   { href: "/stats", label: "売上・実績", icon: ChartBar, hideWhenStaff: true },
   { href: "/menu", label: "メニュー管理", icon: GearSix, hideWhenStaff: true },
+  // 依頼主→本部の直接のご意見・ご要望（担当マネージャーには見えない）。
+  { href: "/hq", label: "ご意見・ご要望", icon: ChatTeardropText, ownerOnly: true },
   { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true },
 ];
 
@@ -104,6 +106,30 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     };
   }, [ctx.orgId]);
 
+  // 「ご意見・ご要望」ナビの赤丸：依頼主からの未読件数（本部メンバーのみ）。
+  const [hqUnreadCount, setHqUnreadCount] = useState(0);
+  useEffect(() => {
+    if (ctx.role !== "owner") return;
+    const supabase = createClient(ctx.orgId);
+    let cancelled = false;
+    async function refreshHqUnread() {
+      const { data } = await supabase.rpc("hq_thread_summaries", { p_org_id: ctx.orgId });
+      if (!cancelled) setHqUnreadCount((data ?? []).filter((r: { unread: boolean }) => r.unread).length);
+    }
+    void refreshHqUnread();
+    const channel = supabase
+      .channel(`hq-unread-${ctx.orgId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, refreshHqUnread)
+      .on("postgres_changes", { event: "*", schema: "public", table: "threads" }, refreshHqUnread)
+      .subscribe();
+    const interval = setInterval(refreshHqUnread, 30000);
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [ctx.orgId, ctx.role]);
+
   // ページ遷移したら開きっぱなしのドロワーを閉じる。
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting UI state on route change (external navigation event), not state derived from props/state
@@ -139,7 +165,9 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     router.refresh();
   }
 
-  const navItems = NAV.filter((n) => !(n.hqOnly && !ctx.isHq) && !(n.hideWhenStaff && ctx.role === "dept_leader"));
+  const navItems = NAV.filter(
+    (n) => !(n.hqOnly && !ctx.isHq) && !(n.hideWhenStaff && ctx.role === "dept_leader") && !(n.ownerOnly && ctx.role !== "owner"),
+  );
 
   // Date.now() はレンダー中に直接呼べない（純粋関数のルール）ため、
   // マウント後にeffectで計算する。初回描画では null のままバナーを出さない。
@@ -180,7 +208,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       {navItems.map((n) => {
         const active = pathname === n.href || pathname.startsWith(n.href + "/");
         const Icon = n.icon;
-        const badgeCount = n.href === "/customers" ? unreadCount : n.href === "/cases" ? attentionCount : 0;
+        const badgeCount = n.href === "/customers" ? unreadCount : n.href === "/cases" ? attentionCount : n.href === "/hq" ? hqUnreadCount : 0;
         return (
           <Link
             key={n.href}

@@ -401,15 +401,54 @@ export async function disableAutoRecharge() {
   if (error) throw error;
 }
 
-// 担当マネージャーには見えない、本部直通の「ご意見・ご要望」。普段の
-// トークとは別のテーブル（hq_feedback）に入れるだけで、通常のスレッドには
-// 一切残さない。
-export async function sendHqFeedback(body: string) {
+// 担当マネージャーには見えない、本部（owner）直通の簡易チャット。
+// kind='hq' のスレッドを自分の customer_id で1つだけ使う（窓口は関係ない）。
+export async function getHqThread() {
   const ctx = await requireContext();
+  const supabase = await createClient();
+  const { data: thread } = await supabase
+    .from("threads")
+    .select("id")
+    .eq("org_id", ctx.orgId)
+    .eq("kind", "hq")
+    .eq("customer_id", ctx.customerId)
+    .maybeSingle();
+  if (!thread) return { messages: [] as { id: string; senderRole: string | null; body: string; sentAt: string }[] };
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("id, sender_role, body, sent_at, deleted_at")
+    .eq("thread_id", thread.id)
+    .order("sent_at", { ascending: true });
+  return {
+    messages: (messages ?? [])
+      .filter((m) => !m.deleted_at)
+      .map((m) => ({ id: m.id, senderRole: m.sender_role, body: m.body ?? "", sentAt: m.sent_at })),
+  };
+}
+
+export async function sendHqMessage(body: string) {
+  const ctx = await requireActiveContext();
   const trimmed = body.trim();
   if (!trimmed) throw new Error("内容を入力してください");
-  const supabase = await createClient();
-  const { error } = await supabase.from("hq_feedback").insert({ org_id: ctx.orgId, customer_id: ctx.customerId, body: trimmed });
-  if (error) throw error;
+  const admin = createServiceRoleClient();
+
+  const { data: existing } = await admin
+    .from("threads")
+    .select("id")
+    .eq("org_id", ctx.orgId)
+    .eq("kind", "hq")
+    .eq("customer_id", ctx.customerId)
+    .maybeSingle();
+  let threadId = existing?.id as string | undefined;
+  if (!threadId) {
+    const { data: created, error } = await admin.from("threads").insert({ org_id: ctx.orgId, kind: "hq", customer_id: ctx.customerId }).select("id").single();
+    if (error || !created) throw error ?? new Error("送信できませんでした");
+    threadId = created.id;
+  }
+
+  const now = new Date().toISOString();
+  const { error: msgError } = await admin.from("messages").insert({ thread_id: threadId, sender_id: ctx.userId, sender_role: "client", kind: "text", body: trimmed, sent_at: now });
+  if (msgError) throw msgError;
+  await admin.from("threads").update({ last_msg_at: now }).eq("id", threadId);
 }
 

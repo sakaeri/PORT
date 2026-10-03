@@ -29,7 +29,7 @@ export type MessageKind =
   | "menu_pick"
   | "intake_answer";
 
-export type ThreadKind = "customer" | "case" | "internal";
+export type ThreadKind = "customer" | "case" | "internal" | "hq";
 export type RefundStage = "prequote" | "accepted" | "started" | "delivered" | "terminate";
 export type RefundMode = "nocharge" | "full" | "partial" | "none";
 export type PaymentMethod = "card" | "bank";

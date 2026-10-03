@@ -32,7 +32,7 @@ export type MessageKind =
   | "menu_pick"
   | "intake_answer";
 
-export type ThreadKind = "customer" | "case" | "internal";
+export type ThreadKind = "customer" | "case" | "internal" | "hq";
 export type RefundStage = "prequote" | "accepted" | "started" | "delivered" | "terminate";
 export type RefundMode = "nocharge" | "full" | "partial" | "none";
 export type PaymentMethod = "card" | "bank";
@@ -641,6 +641,19 @@ export interface Database {
           staff_profile_id: string;
           thread_id: string;
           archived: boolean;
+          unread: boolean;
+          last_message_kind: MessageKind | null;
+          last_message_body: string | null;
+          last_message_payload: unknown;
+          last_message_deleted_at: string | null;
+          last_message_sender_role: AppRole | null;
+        }[];
+      };
+      hq_thread_summaries: {
+        Args: { p_org_id: string };
+        Returns: {
+          customer_id: string;
+          thread_id: string;
           unread: boolean;
           last_message_kind: MessageKind | null;
           last_message_body: string | null;
