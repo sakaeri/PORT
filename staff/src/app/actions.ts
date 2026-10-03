@@ -219,7 +219,12 @@ export async function updateLoginEmail(newEmail: string) {
   await requireContext();
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
-  if (error) throw error;
+  if (error) {
+    if (error.code === "email_exists" || error.code === "user_already_exists") {
+      throw new Error("このメールアドレスは既に登録されています。");
+    }
+    throw error;
+  }
 }
 
 export async function updateLoginPassword(currentPassword: string, newPassword: string) {

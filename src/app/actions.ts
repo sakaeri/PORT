@@ -185,7 +185,9 @@ export async function setInitialProfile(name: string, email: string, phone: stri
 
   const { error: emailErr } = await supabase.auth.updateUser({ email: trimmedEmail });
   if (emailErr) {
-    if (emailErr.code === "email_exists") {
+    // Supabaseのバージョンによって "email_exists" と "user_already_exists" の
+    // どちらで返ってくるかが変わるため、両方とも同じ案内文にする。
+    if (emailErr.code === "email_exists" || emailErr.code === "user_already_exists") {
       throw new Error("このメールアドレスは既に登録されています。すでにご利用の方は「ログイン」をお試しください。");
     }
     throw emailErr;
@@ -232,7 +234,12 @@ export async function removeAvatar() {
 export async function changeEmail(newEmail: string) {
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
-  if (error) throw error;
+  if (error) {
+    if (error.code === "email_exists" || error.code === "user_already_exists") {
+      throw new Error("このメールアドレスは既に登録されています。");
+    }
+    throw error;
+  }
 }
 
 export async function submitRating(requestId: string, stars: number, comment: string) {
