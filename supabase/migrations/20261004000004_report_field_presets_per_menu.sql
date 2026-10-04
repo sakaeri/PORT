@@ -16,11 +16,14 @@ where p.menu_id is null;
 
 delete from report_field_presets where menu_id is null;
 alter table report_field_presets alter column menu_id set not null;
+
+-- org_id を使う古いポリシーが残っていると列を削除できないため、先に消す。
+drop policy if exists report_field_presets_office on report_field_presets;
+
 alter table report_field_presets drop column org_id;
 
 create index on report_field_presets (menu_id, sort);
 
-drop policy if exists report_field_presets_office on report_field_presets;
 create policy report_field_presets_read on report_field_presets for select using (
   exists (select 1 from menus m where m.id = menu_id and m.org_id = auth_org())
 );
