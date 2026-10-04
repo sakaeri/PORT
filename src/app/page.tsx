@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCustomerContext, getRefundPolicies, getThreadMessages, hasAuthSession } from "@/lib/data";
+import { getCustomerContext, getThreadMessages, hasAuthSession } from "@/lib/data";
 import ChatScreen from "@/components/chat/ChatScreen";
 import VerifyGate from "@/components/chat/VerifyGate";
 import AccountGate from "@/components/chat/AccountGate";
@@ -54,17 +54,13 @@ export default async function Home() {
     return <AccountGate orgDisplayName={ctx.orgDisplayName} />;
   }
 
-  const [{ messages, hasMoreOlder }, refundPolicies] = await Promise.all([
-    getThreadMessages(ctx.threadId),
-    getRefundPolicies(ctx.orgId),
-  ]);
+  const { messages, hasMoreOlder } = await getThreadMessages(ctx.threadId);
 
   return (
     <ChatScreen
       ctx={ctx}
       initialMessages={messages}
       initialHasMoreOlder={hasMoreOlder}
-      refundPolicies={refundPolicies}
     />
   );
 }

@@ -4,11 +4,7 @@ import { X, Timer } from "@phosphor-icons/react";
 import type { RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { stageInfoFor, statusBadgeFor, STAGE_LABELS } from "@/lib/stage";
-import { computeRefund } from "@/lib/refund";
-import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
-
-type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 50 };
 const dialogBox: React.CSSProperties = {
@@ -41,12 +37,10 @@ function Centered({ onBackdrop, children }: { onBackdrop: () => void; children: 
 // ---------- 進捗状況パネル ----------
 export function ProgressPanel({
   bundles,
-  refundPolicies,
   onClose,
   onCancel,
 }: {
   bundles: RequestBundle[];
-  refundPolicies: RefundPolicyRow[];
   onClose: () => void;
   onCancel: (id: string) => void;
 }) {
@@ -56,8 +50,9 @@ export function ProgressPanel({
   const inProgress = active.filter((b) => b.request.phase === "started").length;
   const parts = [quoted && `見積もり待ち ${quoted}件`, preparing && `着手前 ${preparing}件`, inProgress && `対応中 ${inProgress}件`].filter(Boolean);
   const headline = (parts.length ? parts.join("／") + "　" : "") + "同時にお受けできるのは3件までです";
-  // 完了した依頼は「報告書一覧」で確認する運用のため、進捗状況からは消す。
-  const items = bundles.filter((b) => !["draft", "completed"].includes(b.request.phase)).slice().reverse();
+  // 完了した依頼は「報告書一覧」で、見送った依頼はここに出しても意味がない
+  // ため、進捗状況からは消す。
+  const items = bundles.filter((b) => !["draft", "completed", "declined"].includes(b.request.phase)).slice().reverse();
 
   return (
     <Centered onBackdrop={onClose}>
@@ -73,8 +68,7 @@ export function ProgressPanel({
           {items.map(({ request: r, items: lineItems }) => {
               const badge = statusBadgeFor(r);
               const stage = stageInfoFor(r);
-              const canCancel = !r.cancel_requested_at && (r.phase === "quoted" || ["preparing", "started"].includes(r.phase));
-              const refund = computeRefund(r, refundPolicies);
+              const canCancel = r.phase === "quoted";
               return (
                 <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 9, padding: 13, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -108,21 +102,13 @@ export function ProgressPanel({
                           ? "費用は発生していません"
                           : r.phase === "cancelled"
                             ? `${yen(r.refunded_amount)} 返金済み`
-                            : r.cancel_requested_at
-                              ? "キャンセルを申請中です（返金についてはご案内をお待ちください）"
-                              : lineItems[0]?.label ?? ""}
+                            : lineItems[0]?.label ?? ""}
                     </span>
                     <span style={{ flex: "none" }}>{yen(r.amount)}</span>
                   </div>
                   {canCancel && (
                     <button onClick={() => onCancel(r.id)} style={{ height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--color-text)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                      {r.phase === "quoted"
-                        ? "この見積もりを断る"
-                        : refund.mode === "full"
-                          ? "全額返金してキャンセル"
-                          : refund.mode === "none"
-                            ? "キャンセル（返金なし）"
-                            : `キャンセル（返金 ${yen(refund.amount)}）`}
+                      この見積もりを断る
                     </button>
                   )}
                 </div>
@@ -135,50 +121,25 @@ export function ProgressPanel({
 }
 
 // ---------- キャンセルダイアログ ----------
-// 見積もり段階（まだ入金前）はその場で断ってよいが、入金が発生している段階は
-// 金額をその場では確定させず「申請」に留める（事業主が内容を確認してから
-// 実際の返金額を確定する）。
-function cancelCopy(isQuoteStage: boolean): { reason: string; confirmLabel: string } {
-  if (isQuoteStage) return { reason: "まだ決済前のため、費用は発生しません。この見積もりを断ります。", confirmLabel: "見積もりを断る" };
-  return { reason: "内容を確認のうえ、返金についてこちらからご案内します。", confirmLabel: "キャンセルを申請する" };
-}
-
+// 決済が発生した依頼のキャンセル・返金は一切行わない方針のため、ここで
+// キャンセルできるのは見積もり段階（まだ入金前）だけ。
 export function CancelDialog({
-  bundle,
-  refundPolicies,
   onClose,
   onConfirm,
   confirming,
 }: {
-  bundle: RequestBundle;
-  refundPolicies: RefundPolicyRow[];
   onClose: () => void;
   onConfirm: () => void;
   confirming: boolean;
 }) {
-  const isQuoteStage = bundle.request.phase === "quoted";
-  const refund = computeRefund(bundle.request, refundPolicies);
-  const copy = cancelCopy(isQuoteStage);
   return (
     <Centered onBackdrop={onClose}>
-      <div style={dialogTitle}>依頼をキャンセルしますか？</div>
-      <div style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.85 }}>{copy.reason}</div>
-      {!isQuoteStage && (
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "11px 12px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-          <span style={{ flex: 1, fontSize: 12, color: "var(--color-neutral-500)" }}>返金額の目安</span>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 19 }}>{yen(refund.amount)}</span>
-          <span style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>/ {refund.paid ? `${yen(refund.paid)} 決済済み` : "未決済"}</span>
-        </div>
-      )}
-      <div style={{ fontSize: 11.5, lineHeight: 1.6, color: "var(--color-neutral-600)" }}>
-        {isQuoteStage
-          ? "返金規定：対応開始前は全額、対応開始後は50%、対応が大幅に遅れている場合は全額をお返しします。"
-          : "上の金額は規定に基づく目安です。実際の返金額は事業主が内容を確認のうえ確定し、あらためてご案内します。"}
-      </div>
+      <div style={dialogTitle}>見積もりを断りますか？</div>
+      <div style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.85 }}>まだ決済前のため、費用は発生しません。この見積もりを断ります。</div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
         <button onClick={onClose} style={ghostBtn}>依頼を続ける</button>
         <button onClick={onConfirm} disabled={confirming} style={{ ...accentBtn, opacity: confirming ? 0.6 : 1 }}>
-          {confirming ? "処理中…" : copy.confirmLabel}
+          {confirming ? "処理中…" : "見積もりを断る"}
         </button>
       </div>
     </Centered>

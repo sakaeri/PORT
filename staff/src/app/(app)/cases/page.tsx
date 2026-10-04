@@ -13,7 +13,7 @@ export default async function CasesPage() {
   const [{ data: requests, error }, { data: caseThreads, error: threadsError }, { data: summaries, error: summariesError }, { data: unsentReports }] = await Promise.all([
     supabase
       .from("requests")
-      .select("id, title, amount, phase, pay_status, due_at, cancel_requested_at, created_at, customers(name, staff_label)")
+      .select("id, title, amount, phase, pay_status, due_at, created_at, customers(name, staff_label)")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
     supabase.from("threads").select("id, request_id, archived_at").eq("org_id", ctx.orgId).eq("kind", "case"),
@@ -57,7 +57,6 @@ export default async function CasesPage() {
       overdue,
       dueSoon,
       reportPending,
-      cancelRequested: r.cancel_requested_at != null,
       customerName: customer?.staff_label ?? customer?.name ?? "—",
       threadId: thread?.id ?? null,
       archived: !!thread?.archived_at,

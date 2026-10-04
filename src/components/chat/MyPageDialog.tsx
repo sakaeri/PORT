@@ -299,28 +299,29 @@ export default function MyPageDialog({
               </button>
             </div>
 
-            {/* チャージ残高 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            {/* チャージ残高・自動チャージ（1つの細いブロックにまとめる） */}
+            <div style={{ display: "flex", flexDirection: "column", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
                 <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>残高</span>
-                <span style={{ fontFamily: "var(--font-heading)", fontSize: 18 }}>¥{balance.toLocaleString("ja-JP")}</span>
+                <span style={{ fontFamily: "var(--font-heading)", fontSize: 15 }}>¥{balance.toLocaleString("ja-JP")}</span>
+                {!chargeOpen && (
+                  <button onClick={() => setChargeOpen(true)} style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+                    チャージ
+                  </button>
+                )}
               </div>
-              {!chargeOpen ? (
-                <button onClick={() => setChargeOpen(true)} style={{ ...smallBtn, alignSelf: "flex-start" }}>
-                  チャージする
-                </button>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {chargeOpen && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 7, padding: "0 12px 10px" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                     {CHARGE_AMOUNTS.map((a) => (
                       <button
                         key={a}
                         onClick={() => setChargeAmount(a)}
                         style={{
-                          height: 32,
-                          padding: "0 12px",
+                          height: 27,
+                          padding: "0 10px",
                           cursor: "pointer",
-                          fontSize: 12.5,
+                          fontSize: 11.5,
                           color: chargeAmount === a ? "var(--color-accent-100)" : "var(--color-accent)",
                           background: chargeAmount === a ? "var(--color-accent-900)" : "transparent",
                           border: "1px solid var(--color-accent)",
@@ -331,65 +332,66 @@ export default function MyPageDialog({
                       </button>
                     ))}
                   </div>
-                  {chargeError && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{chargeError}</span>}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => setChargeOpen(false)} style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                  {chargeError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{chargeError}</span>}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => setChargeOpen(false)} style={{ height: 28, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
                       閉じる
                     </button>
-                    <button onClick={startCharge} disabled={chargeStarting} style={{ height: 32, padding: "0 14px", cursor: "pointer", fontSize: 12, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: chargeStarting ? 0.6 : 1 }}>
+                    <button onClick={startCharge} disabled={chargeStarting} style={{ height: 28, padding: "0 12px", cursor: "pointer", fontSize: 11, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: chargeStarting ? 0.6 : 1 }}>
                       {chargeStarting ? "処理中…" : `¥${chargeAmount.toLocaleString("ja-JP")}をチャージ`}
                     </button>
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* 残高の自動チャージ */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>残高の自動チャージ</span>
-                <span style={{ fontSize: 12, color: arEnabled ? "var(--color-accent-300)" : "var(--color-neutral-500)" }}>{arEnabled ? "オン" : "オフ"}</span>
-              </div>
-              {arEnabled && (
-                <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-                  残高が¥{(autoRecharge.threshold ?? 0).toLocaleString("ja-JP")}未満になると、保存したカードから自動で¥{(autoRecharge.amount ?? 0).toLocaleString("ja-JP")}チャージします。
-                </div>
-              )}
-              {!arOpen && (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setArOpen(true)} style={{ ...smallBtn, alignSelf: "flex-start" }}>
-                    {arEnabled ? "設定を変更" : "設定する"}
-                  </button>
-                  {arEnabled && (
-                    <button
-                      onClick={turnOffAutoRecharge}
-                      disabled={arDisabling}
-                      style={{ height: 36, padding: "0 12px", cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", opacity: arDisabling ? 0.6 : 1 }}
-                    >
-                      {arDisabling ? "処理中…" : "オフにする"}
+              <div style={{ height: 1, background: "var(--color-divider)" }} />
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
+                <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>自動チャージ</span>
+                <span style={{ fontSize: 11, color: arEnabled ? "var(--color-accent-300)" : "var(--color-neutral-500)" }}>{arEnabled ? "オン" : "オフ"}</span>
+                {!arOpen && (
+                  <>
+                    <button onClick={() => setArOpen(true)} style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+                      {arEnabled ? "変更" : "設定"}
                     </button>
-                  )}
+                    {arEnabled && (
+                      <button
+                        onClick={turnOffAutoRecharge}
+                        disabled={arDisabling}
+                        style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", opacity: arDisabling ? 0.6 : 1 }}
+                      >
+                        {arDisabling ? "…" : "オフ"}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              {arEnabled && !arOpen && (
+                <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.5, padding: "0 12px 10px" }}>
+                  残高が¥{(autoRecharge.threshold ?? 0).toLocaleString("ja-JP")}未満で¥{(autoRecharge.amount ?? 0).toLocaleString("ja-JP")}自動チャージ
                 </div>
               )}
               {arOpen && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7, padding: "0 12px 10px" }}>
+                  <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.5 }}>
                     設定するとカード確認の画面に進みます。保存したカードへ、残高が下回った時に自動で課金することに同意したものとして扱われます。
                   </div>
-                  <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
-                    残高がいくら未満になったら
-                    <input value={arThreshold} onChange={(e) => setArThreshold(e.target.value)} type="number" min={1} style={input} />
-                  </label>
-                  <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
-                    いくらチャージするか
-                    <input value={arAmount} onChange={(e) => setArAmount(e.target.value)} type="number" min={1000} style={input} />
-                  </label>
-                  {arError && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{arError}</span>}
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => setArOpen(false)} style={{ height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                    <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, fontSize: 10.5, color: "var(--color-neutral-500)" }}>
+                      いくら未満で
+                      <input value={arThreshold} onChange={(e) => setArThreshold(e.target.value)} type="number" min={1} style={{ ...input, height: 30 }} />
+                    </label>
+                    <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, fontSize: 10.5, color: "var(--color-neutral-500)" }}>
+                      いくらチャージ
+                      <input value={arAmount} onChange={(e) => setArAmount(e.target.value)} type="number" min={1000} style={{ ...input, height: 30 }} />
+                    </label>
+                  </div>
+                  {arError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{arError}</span>}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => setArOpen(false)} style={{ height: 28, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
                       閉じる
                     </button>
-                    <button onClick={startAutoRecharge} disabled={arStarting} style={{ height: 32, padding: "0 14px", cursor: "pointer", fontSize: 12, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: arStarting ? 0.6 : 1 }}>
+                    <button onClick={startAutoRecharge} disabled={arStarting} style={{ height: 28, padding: "0 12px", cursor: "pointer", fontSize: 11, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: arStarting ? 0.6 : 1 }}>
                       {arStarting ? "処理中…" : "カードを確認して設定する"}
                     </button>
                   </div>

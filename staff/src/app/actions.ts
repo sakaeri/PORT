@@ -5,7 +5,7 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
 import { notifyCustomerCompletionReport, notifyCustomerQuoteCreated } from "@/lib/notify";
-import type { RefundMode, RefundStage, StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
+import type { StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
 // （キャンセル処理や、支払い設定そのものなど）用。既定はロック中なら弾く。
@@ -357,20 +357,6 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
     .select("id")
     .single();
   if (orgErr || !org) throw orgErr ?? new Error("事業者を作成できませんでした");
-
-  // 着手後は原則返金なし（既に実働が発生しているため）。例外は「未着手」
-  // （accepted）と「著しい遅延」（terminate、本部側の責任に相当）の2つだけ、
-  // この2つは全額返金にする。この表は事業者ごとに設定変更できる作りを
-  // 維持しているが、今はこの固定ルールだけを使う前提で値を決め打ちしている
-  // （MenuSettingsの「返金ポリシー」タブは編集不可の説明表示に変更済み）。
-  const defaults: { stage: RefundStage; mode: RefundMode; pct: number }[] = [
-    { stage: "prequote", mode: "nocharge", pct: 0 },
-    { stage: "accepted", mode: "full", pct: 100 },
-    { stage: "started", mode: "none", pct: 0 },
-    { stage: "delivered", mode: "none", pct: 0 },
-    { stage: "terminate", mode: "full", pct: 100 },
-  ];
-  await admin.from("refund_policies").insert(defaults.map((d) => ({ org_id: org.id, ...d })));
 
   return { orgId: org.id as string, slug };
 }
@@ -1035,33 +1021,6 @@ export async function declineQuote(requestId: string) {
   const { error } = await supabase.from("requests").update({ phase: "declined", cancelled_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
   if (error) throw error;
   await postCaseNotice(supabase, requestId, "受付が見積もりを見送りにしました");
-}
-
-// キャンセル時の返金額は、ポリシー通りの金額を自動確定させず、必ずここで
-// 事業主が内容を確認・入力してから確定する（依頼主からの申請があった
-// 場合も、対応の目安を過ぎた場合も、自動で返金扱いにはしない）。
-// refundAmount は依頼主アプリ側の computeRefund の結果をそのまま渡してもいいし、
-// 事業主が上書きした金額でもよい。
-export async function confirmCancellation(requestId: string, refundAmount: number) {
-  const ctx = await requireContext({ allowLocked: true });
-  const supabase = await createClient();
-
-  const { data: r, error: fetchError } = await supabase.from("requests").select("phase, amount").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
-  if (fetchError) throw fetchError;
-  if (!r) throw new Error("案件が見つかりません");
-  if (["completed", "cancelled", "declined"].includes(r.phase)) throw new Error("この依頼はすでに終了しています");
-  if (!Number.isFinite(refundAmount) || refundAmount < 0 || refundAmount > r.amount) throw new Error("返金額が正しくありません");
-
-  const now = new Date().toISOString();
-  const pct = r.amount > 0 ? Math.round((refundAmount / r.amount) * 100) : 0;
-  const { error } = await supabase
-    .from("requests")
-    .update({ phase: "cancelled", cancelled_at: now, cancel_requested_at: null, refund_pct: pct, refunded_amount: refundAmount })
-    .eq("id", requestId)
-    .eq("org_id", ctx.orgId);
-  if (error) throw error;
-
-  await postCaseNotice(supabase, requestId, `キャンセルが確定しました（返金 ¥${refundAmount.toLocaleString("ja-JP")}）`);
 }
 
 // 案件トーク（スタッフ内メモ・進捗ログ）への書き込み。削除は deleteMessage を共用する

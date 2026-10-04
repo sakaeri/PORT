@@ -2,8 +2,7 @@
 
 import { headers } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
-import { getCustomerContext, getRefundPolicies } from "@/lib/data";
-import { computeRefund } from "@/lib/refund";
+import { getCustomerContext } from "@/lib/data";
 import { notifyNewInquiryIfFirst, notifyStaffPaymentConfirmed } from "@/lib/notify";
 import { getStripe } from "@/lib/stripe";
 
@@ -229,52 +228,26 @@ export async function payFromBalance(requestId: string) {
   }
 }
 
-export async function cancelRequest(requestId: string) {
+// 頼んだ後のキャンセル・返金は一切行わない方針のため、キャンセルできるのは
+// まだ決済前（見積もり段階）の見積もりを断る場合だけ。
+export async function declineQuote(requestId: string) {
   const ctx = await requireContext();
   const admin = createServiceRoleClient();
 
   const { data: r, error } = await admin
     .from("requests")
-    .select("*")
+    .select("phase")
     .eq("id", requestId)
     .eq("customer_id", ctx.customerId)
     .single();
   if (error || !r) throw new Error("依頼が見つかりません");
-  if (r.phase === "completed" || r.phase === "cancelled" || r.phase === "declined") {
-    throw new Error("この依頼はすでに終了しています");
-  }
-  if (r.cancel_requested_at) throw new Error("すでにキャンセルを申請済みです");
+  if (r.phase !== "quoted") throw new Error("この依頼はすでに決済が完了しているため、キャンセルできません");
 
   const now = new Date().toISOString();
-
-  // 見積もり段階（まだ入金前）は費用が発生していないため、その場で断ってよい。
-  if (r.phase === "quoted") {
-    await admin.from("requests").update({ phase: "declined", cancelled_at: now }).eq("id", requestId);
-    const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
-    if (caseThread) {
-      await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body: "依頼主が見積もりをキャンセルしました" });
-      await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
-    }
-    return;
-  }
-
-  // すでに入金が発生している段階は、その場で返金額を確定させない。
-  // 「キャンセル申請」として記録するだけにして、実際の返金額の確定と
-  // 依頼主への案内は事業主が内容を確認してから行う（自動実行はしない）。
-  const policies = await getRefundPolicies(ctx.orgId);
-  const refund = computeRefund(r, policies);
-
-  await admin.from("requests").update({ cancel_requested_at: now }).eq("id", requestId);
-
+  await admin.from("requests").update({ phase: "declined", cancelled_at: now }).eq("id", requestId);
   const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
   if (caseThread) {
-    await admin.from("messages").insert({
-      thread_id: caseThread.id,
-      sender_id: null,
-      sender_role: null,
-      kind: "notice",
-      body: `依頼主がキャンセルを申請しました（規定上の目安：¥${refund.amount.toLocaleString("ja-JP")}・要確認）`,
-    });
+    await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body: "依頼主が見積もりをキャンセルしました" });
     await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
   }
 }

@@ -8,22 +8,18 @@ import { ProgressPanel, CancelDialog, ReportsDialog } from "@/components/chat/Di
 import MyPageDialog from "@/components/chat/MyPageDialog";
 import { createClient } from "@/lib/supabase/client";
 import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle } from "@/lib/chat-types";
-import type { Database } from "@/lib/supabase/types";
 import {
   sendMessage as sendMessageAction,
-  cancelRequest,
+  declineQuote,
   submitRating,
   skipRating,
   payFromBalance,
 } from "@/app/actions";
 
-type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
-
 interface Props {
   ctx: CustomerContext;
   initialMessages: MessageWithExtras[];
   initialHasMoreOlder?: boolean;
-  refundPolicies: RefundPolicyRow[];
 }
 
 const ACKED_KEY = "VID_acked_reports";
@@ -44,7 +40,7 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, refundPolicies }: Props) {
+export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }: Props) {
   const [messages, setMessages] = useState(initialMessages);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
@@ -188,7 +184,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
     if (!cancelTargetId || busy) return;
     setBusy(true);
     try {
-      await cancelRequest(cancelTargetId);
+      await declineQuote(cancelTargetId);
       await refresh();
       setCancelTargetId(null);
     } catch (e) {
@@ -256,9 +252,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
                   key={m.id}
                   msg={m}
                   bundle={m.requestBundle}
-                  refundPolicies={refundPolicies}
                   balance={ctx.balance}
-                  onCancel={setCancelTargetId}
                   onPay={async (id) => {
                     await payFromBalance(id);
                     await refresh();
@@ -284,14 +278,13 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
       {showProgress && (
         <ProgressPanel
           bundles={bundles}
-          refundPolicies={refundPolicies}
           onClose={() => setShowProgress(false)}
           onCancel={(id) => { setShowProgress(false); setCancelTargetId(id); }}
         />
       )}
       {showReports && <ReportsDialog bundles={bundles} ackedIds={ackedIds} onAck={ackReport} onClose={() => setShowReports(false)} />}
       {cancelTargetBundle && (
-        <CancelDialog bundle={cancelTargetBundle} refundPolicies={refundPolicies} confirming={busy} onClose={() => setCancelTargetId(null)} onConfirm={handleCancelConfirm} />
+        <CancelDialog confirming={busy} onClose={() => setCancelTargetId(null)} onConfirm={handleCancelConfirm} />
       )}
       {showMyPage && (
         <MyPageDialog

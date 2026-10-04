@@ -6,7 +6,6 @@ export type RequestItemRow = Database["public"]["Tables"]["request_items"]["Row"
 export type CompletionReportRow = Database["public"]["Tables"]["completion_reports"]["Row"];
 export type RatingRow = Database["public"]["Tables"]["ratings"]["Row"];
 export type AttachmentRow = Database["public"]["Tables"]["message_attachments"]["Row"];
-export type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 
 export interface RequestBundle {
   request: RequestRow;

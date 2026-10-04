@@ -23,16 +23,15 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   // タップしてからこの画面が出るまでの体感速度のため、全クエリを並列で投げる
   // （案件トークのメッセージは threads.id が要るが、messages を threads の
   // embed として一緒に取ることで、往復を1回減らしている）。
-  const [{ data: request }, { data: refundPolicies }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }, { data: staffDepartments }] = await Promise.all([
+  const [{ data: request }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }, { data: staffDepartments }] = await Promise.all([
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, cancel_requested_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
-    supabase.from("refund_policies").select("*").eq("org_id", ctx.orgId),
     supabase.from("case_staff").select("profile_id, profiles!case_staff_profile_id_fkey(display_name, staff_alias)").eq("request_id", id),
     canAssignStaff
       ? supabase.from("profiles").select("id, display_name, staff_alias").eq("org_id", ctx.orgId).eq("role", "dept_leader")
@@ -87,7 +86,6 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         phase: request.phase,
         createdAt: request.created_at,
         dueAt: request.due_at,
-        cancelRequestedAt: request.cancel_requested_at,
         paidAt: canSeeFinance ? request.paid_at : null,
         paymentTiming: request.payment_timing,
         depositAmount: canSeeFinance ? request.deposit_amount : null,
@@ -96,7 +94,6 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         hourlyRate: canSeeFinance ? request.hourly_rate : null,
         hourlyCap: canSeeFinance ? request.hourly_cap : null,
       }}
-      refundPolicies={canSeeFinance ? (refundPolicies ?? []) : []}
       customer={customer ? { id: customer.id, name: customer.staff_label ?? customer.name } : null}
       report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer, details: report.details ?? [], pending: reportPending } : null}
       rating={rating ? { stars: rating.stars, comment: rating.comment, skipped: rating.skipped } : null}

@@ -6,13 +6,9 @@ import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosp
 import type { AttachmentRow, MessageWithExtras, RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
-import { computeRefund } from "@/lib/refund";
-import type { Database } from "@/lib/supabase/types";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
 import { submitInfoRequestAnswer } from "@/app/actions";
-
-type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 
 function fileIconClass(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
@@ -200,18 +196,14 @@ const outlineBtn: React.CSSProperties = { height: 40, cursor: "pointer", fontFam
 export function RequestCard({
   msg,
   bundle,
-  refundPolicies,
   balance,
-  onCancel,
   onPay,
   onSubmitRating,
   onSkipRating,
 }: {
   msg: MessageWithExtras;
   bundle: RequestBundle;
-  refundPolicies: RefundPolicyRow[];
   balance: number;
-  onCancel: (id: string) => void;
   onPay: (id: string) => Promise<void>;
   onSubmitRating: (id: string, stars: number, comment: string) => void;
   onSkipRating: (id: string) => void;
@@ -226,9 +218,6 @@ export function RequestCard({
   const showProgress = !["quoted", "declined"].includes(r.phase);
   const showReport = r.phase === "completed" && !!report?.sent_at;
   const stage = stageInfoFor(r);
-  const refund = computeRefund(r, refundPolicies);
-  const started = !!r.started_at;
-  const canCancel = ["preparing", "started"].includes(r.phase);
 
   async function handlePay() {
     if (paying) return;
@@ -352,14 +341,6 @@ export function RequestCard({
                 );
               })}
             </div>
-            {canCancel && (
-              <button
-                onClick={() => onCancel(r.id)}
-                style={{ marginTop: 10, width: "100%", height: 38, cursor: "pointer", fontFamily: "var(--font-heading)", fontSize: 13, color: "var(--color-text)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-              >
-                {!started ? "依頼をキャンセルする（全額返金）" : `依頼をキャンセルする（返金 ${yen(refund.amount)}）`}
-              </button>
-            )}
             {r.phase === "cancelled" && (
               <span style={{ display: "inline-flex", marginTop: 8, fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-accent)", color: "var(--color-accent)", width: "fit-content" }}>
                 キャンセル・返金済み

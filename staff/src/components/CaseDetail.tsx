@@ -7,23 +7,19 @@ import { ArrowLeft, Archive, ArrowCounterClockwise, Star, Plus, X } from "@phosp
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
-import { computeRefund } from "@/lib/refund";
 import {
   startCaseRequest,
   submitCaseReport,
   approveCaseReport,
   declineQuote,
-  confirmCancellation,
   archiveCaseThread,
   unarchiveCaseThread,
   assignCaseStaff,
   unassignCaseStaff,
   cancelSubscription,
 } from "@/app/actions";
-import type { Database, PaymentTiming, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
+import type { PaymentTiming, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
-
-type RefundPolicyRow = Database["public"]["Tables"]["refund_policies"]["Row"];
 
 const card: React.CSSProperties = {
   padding: 16,
@@ -59,7 +55,6 @@ const inputStyle: React.CSSProperties = {
 
 export default function CaseDetail({
   request,
-  refundPolicies,
   customer,
   report,
   rating,
@@ -81,7 +76,6 @@ export default function CaseDetail({
     phase: RequestPhase;
     createdAt: string;
     dueAt: string | null;
-    cancelRequestedAt: string | null;
     paidAt: string | null;
     paymentTiming: PaymentTiming;
     depositAmount: number | null;
@@ -90,7 +84,6 @@ export default function CaseDetail({
     hourlyRate: number | null;
     hourlyCap: number | null;
   };
-  refundPolicies: RefundPolicyRow[];
   customer: { id: string; name: string } | null;
   report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[]; pending: boolean } | null;
   rating: { stars: number | null; comment: string | null; skipped: boolean } | null;
@@ -134,38 +127,8 @@ export default function CaseDetail({
 
   const canCancel = !["completed", "cancelled", "declined"].includes(request.phase);
   const isOverdue = request.dueAt != null && ["preparing", "started"].includes(request.phase) && new Date(request.dueAt) < new Date();
-  // ここでの返金額はあくまで規定に基づく「目安」。自動では確定させず、
-  // 事業主が金額を確認・上書きしてから confirmCancellation で確定する。
-  const refund = computeRefund(
-    {
-      phase: request.phase,
-      due_at: request.dueAt,
-      paid_at: request.paidAt,
-      amount: request.amount,
-      payment_timing: request.paymentTiming,
-      deposit_amount: request.depositAmount,
-      deposit_paid_at: request.depositPaidAt,
-    },
-    refundPolicies,
-  );
-  const [showCancelPanel, setShowCancelPanel] = useState(false);
-  const [cancelAmount, setCancelAmount] = useState<string>(String(refund.amount));
 
   const handleDecline = () => runAction(() => declineQuote(request.id), "この見積もりを見送りにします。よろしいですか？");
-  const handleOpenCancelPanel = () => {
-    setCancelAmount(String(refund.amount));
-    setShowCancelPanel(true);
-  };
-  const handleConfirmCancel = () => {
-    const amount = Number(cancelAmount);
-    return runAction(
-      async () => {
-        await confirmCancellation(request.id, amount);
-        setShowCancelPanel(false);
-      },
-      `返金額 ¥${Number.isFinite(amount) ? amount.toLocaleString("ja-JP") : cancelAmount} でキャンセルを確定します。よろしいですか？`,
-    );
-  };
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 640, width: "100%", margin: "0 auto" }}>
@@ -210,14 +173,6 @@ export default function CaseDetail({
             </span>
           )}
         </div>
-
-        {canSeeFinance && request.cancelRequestedAt && canCancel && (
-          <div style={{ fontSize: 12, color: "var(--stb-seal-ink)", padding: "8px 10px", borderRadius: "var(--radius-md)", background: "color-mix(in srgb, var(--stb-seal-ink) 10%, transparent)" }}>
-            依頼主からキャンセルの申請があります（
-            {new Date(request.cancelRequestedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-            ）。内容を確認して下の「キャンセルを処理する」から返金額を確定してください。
-          </div>
-        )}
 
         {canSeeFinance && (
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>支払い：{PAYMENT_TIMING_LABEL[request.paymentTiming]}</div>
@@ -296,59 +251,6 @@ export default function CaseDetail({
             >
               この見積もりを見送りにする
             </button>
-          </div>
-        )}
-
-        {canCancel && request.phase !== "quoted" && (
-          <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-            {!showCancelPanel ? (
-              <button
-                onClick={handleOpenCancelPanel}
-                disabled={busy}
-                style={{
-                  alignSelf: "flex-start",
-                  height: 34,
-                  padding: "0 12px",
-                  cursor: "pointer",
-                  fontSize: 12.5,
-                  color: request.cancelRequestedAt ? "var(--stb-seal-ink)" : "var(--color-neutral-400)",
-                  background: "transparent",
-                  border: `1px solid ${request.cancelRequestedAt ? "var(--stb-seal-ink)" : "var(--color-divider)"}`,
-                  borderRadius: "var(--radius-md)",
-                }}
-              >
-                キャンセルを処理する
-              </button>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-                <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-                  規定上の目安：¥{refund.amount.toLocaleString("ja-JP")}（決済済み ¥{refund.paid.toLocaleString("ja-JP")}）。金額は下で変更できます。
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>返金額</span>
-                  <input
-                    type="number"
-                    value={cancelAmount}
-                    onChange={(e) => setCancelAmount(e.target.value)}
-                    className="vid-input"
-                    style={{ ...inputStyle, width: 140 }}
-                  />
-                  <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>円</span>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={handleConfirmCancel} disabled={busy} style={{ ...btn, height: 34 }}>
-                    {busy ? "処理中…" : "この内容で確定する"}
-                  </button>
-                  <button
-                    onClick={() => setShowCancelPanel(false)}
-                    disabled={busy}
-                    style={{ height: 34, padding: "0 12px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-                  >
-                    やめる
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
 

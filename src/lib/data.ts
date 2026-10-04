@@ -135,9 +135,3 @@ export async function getThreadMessages(threadId: string): Promise<{ messages: M
   return { messages: rows.map(mapMessageRow), hasMoreOlder: data.length === MESSAGE_PAGE_SIZE };
 }
 
-export async function getRefundPolicies(orgId: string) {
-  const supabase = await createClient();
-  const { data } = await supabase.from("refund_policies").select("*").eq("org_id", orgId);
-  return data ?? [];
-}
-

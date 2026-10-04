@@ -77,9 +77,9 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   }, [ctx.orgId, ctx.orgs, pathname]);
 
   // 「案件トーク」ナビの赤丸：未着手（支払い済み・未着手）／着手後で報告の
-  // 目安時間まで残り15分以内（経過済みも含む）／キャンセル申請中、のいずれか
-  // に当たる案件の件数。is_office()のRLS（case_visible）に任せているので、
-  // マネージャーは自分の窓口、スタッフは自分の担当案件だけの件数になる。
+  // 目安時間まで残り15分以内（経過済みも含む）、のいずれかに当たる案件の件数。
+  // is_office()のRLS（case_visible）に任せているので、マネージャーは自分の
+  // 窓口、スタッフは自分の担当案件だけの件数になる。
   const [attentionCount, setAttentionCount] = useState(0);
   useEffect(() => {
     const supabase = createClient(ctx.orgId);
@@ -90,7 +90,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
         .from("requests")
         .select("id", { count: "exact", head: true })
         .eq("org_id", ctx.orgId)
-        .or(`phase.eq.preparing,cancel_requested_at.not.is.null,and(phase.eq.started,due_at.lte.${soon})`);
+        .or(`phase.eq.preparing,and(phase.eq.started,due_at.lte.${soon})`);
       if (!cancelled) setAttentionCount(count ?? 0);
     }
     void refreshAttention();
