@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Trash,
   Plus,
+  X,
   CaretDown,
   CaretRight,
   Gift,
@@ -508,12 +509,31 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
               )}
               {questionsMenuId === m.id && (
                 <Modal onClose={() => setQuestionsMenuId(null)} maxWidth={480}>
-                  <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} canEdit={canEdit} />
+                  <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>はじめの質問</div>
+                      <div style={{ flex: 1 }} />
+                      <button onClick={() => setQuestionsMenuId(null)} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} canEdit={canEdit} />
+                  </div>
                 </Modal>
               )}
               {presetsMenuId === m.id && (
                 <Modal onClose={() => setPresetsMenuId(null)} maxWidth={480}>
-                  <MenuReportFieldPresetsEditor menuId={m.id} presets={m.report_field_presets} onChange={(p) => patchLocal(m.id, { report_field_presets: p })} canEdit={canEdit} />
+                  <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>報告書の定型項目</div>
+                      <InfoTooltip text="このメニューの完了報告を書くとき、スタッフがワンタップで項目を追加できる定型の項目名です（自由な項目追加も別途できます）。" />
+                      <div style={{ flex: 1 }} />
+                      <button onClick={() => setPresetsMenuId(null)} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <MenuReportFieldPresetsEditor menuId={m.id} presets={m.report_field_presets} onChange={(p) => patchLocal(m.id, { report_field_presets: p })} canEdit={canEdit} />
+                  </div>
                 </Modal>
               )}
             </div>
@@ -542,7 +562,6 @@ function QuestionsEditor({ menuId, questions, onChange, canEdit }: { menuId: str
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <span style={label}>はじめの質問</span>
       {questions.map((q) => (
         <div key={q.id} style={{ display: "flex", gap: 8 }}>
           <input
@@ -685,10 +704,6 @@ function MenuReportFieldPresetsEditor({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={label}>報告書の定型項目</span>
-        <InfoTooltip text="このメニューの完了報告を書くとき、スタッフがワンタップで項目を追加できる定型の項目名です（自由な項目追加も別途できます）。" />
-      </div>
       {presets.map((p) => (
         <div key={p.id} style={{ display: "flex", gap: 8 }}>
           <input
