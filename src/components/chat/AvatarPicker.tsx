@@ -8,6 +8,13 @@ import { updateAvatar, removeAvatar } from "@/app/actions";
 
 const NAME_PLACEHOLDER = "未登録の依頼主";
 
+// Supabase Storageのキーは日本語など非ASCII文字を含むと "Invalid key" で
+// アップロードが失敗するため、キーには拡張子だけ残して元のファイル名は使わない。
+function safeFileExt(name: string): string {
+  const m = /\.[a-zA-Z0-9]{1,8}$/.exec(name);
+  return m ? m[0].toLowerCase() : "";
+}
+
 const menuItemStyle: React.CSSProperties = {
   textAlign: "left",
   padding: "9px 14px",
@@ -78,7 +85,7 @@ export default function AvatarPicker({
     setError("");
     try {
       const supabase = createClient();
-      const path = `${userId}/${crypto.randomUUID()}-${file.name}`;
+      const path = `${userId}/${crypto.randomUUID()}${safeFileExt(file.name)}`;
       const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { contentType: file.type });
       if (upErr) throw upErr;
       const { data } = supabase.storage.from("avatars").getPublicUrl(path);

@@ -12,7 +12,7 @@ function mapMessageRows(data: NonNullable<Awaited<ReturnType<typeof fetchMessage
       attachments: m.message_attachments ?? [],
       requestPhase: req?.phase ?? null,
       requestAmount: req?.amount ?? null,
-      report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [], noteToCustomer: reportRaw.note_to_customer } : null,
+      report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [] } : null,
     };
   });
 }
@@ -22,7 +22,7 @@ function fetchMessagePage(supabase: Awaited<ReturnType<typeof createClient>>, th
   // 昇順で表示するため、直近N件を降順で取ってから並べ替える。
   return supabase
     .from("messages")
-    .select("*, message_attachments(*), requests(phase, amount, completion_reports(summary, details, note_to_customer))")
+    .select("*, message_attachments(*), requests(phase, amount, completion_reports(summary, details))")
     .eq("thread_id", threadId)
     .order("sent_at", { ascending: false })
     .limit(MESSAGE_PAGE_SIZE);

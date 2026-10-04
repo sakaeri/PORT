@@ -11,9 +11,13 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
 
   const supabase = await createClient();
   const canAssignStaff = ctx.role !== "dept_leader";
-  // スタッフ（dept_leader）には金額・支払い方法・返金関連の情報を一切渡さない
+  // 請求金額・支払い方法・時間精算単価は本部（owner）だけに渡す。マネージャーが
+  // 金額を見て着手の判断をしてしまわないよう、案件詳細では本部以外に一切渡さない
   // （表示を隠すだけでなく、サーバー側で値そのものを送らないようにする）。
-  const canSeeFinance = ctx.role === "owner" || ctx.role === "dept_manager";
+  const canSeeFinance = ctx.role === "owner";
+  // 完了報告をそのまま依頼主に送れるか（確認なしで送信できるか）は、金額が
+  // 見えるかどうかとは別の話なので分けて持つ。
+  const canApprove = ctx.role === "owner" || ctx.role === "dept_manager";
 
   // マネージャーが案件に割り当てられるのは「自分に割り当てられている
   // スタッフ」だけ（他のマネージャーのスタッフは選べない）。オーナーは
@@ -111,7 +115,6 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         report
           ? {
               summary: report.summary,
-              noteToCustomer: report.note_to_customer,
               details: report.details ?? [],
               pending: reportPending,
               attachments: reportAttachments.map((a) => ({ id: a.id, path: a.file_path, name: a.file_name, label: a.label })),
@@ -128,7 +131,8 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       availableStaff={availableStaff}
       canAssignStaff={canAssignStaff}
       canSeeFinance={canSeeFinance}
-      subscription={canSeeFinance && subscription ? { id: subscription.id, cadence: subscription.cadence, active: subscription.active, nextDueAt: subscription.next_due_at } : null}
+      canApprove={canApprove}
+      subscription={canApprove && subscription ? { id: subscription.id, cadence: subscription.cadence, active: subscription.active, nextDueAt: subscription.next_due_at } : null}
     />
   );
 }

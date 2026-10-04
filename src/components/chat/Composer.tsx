@@ -12,6 +12,14 @@ export interface PendingAttachment {
   bytes: number;
 }
 
+// Supabase Storageのキーは日本語など非ASCII文字を含むと "Invalid key" で
+// アップロードが失敗するため、キーには拡張子だけ残して元のファイル名は使わない
+// （表示用のファイル名は添付レコードのname列に別で保存される）。
+function safeFileExt(name: string): string {
+  const m = /\.[a-zA-Z0-9]{1,8}$/.exec(name);
+  return m ? m[0].toLowerCase() : "";
+}
+
 interface Props {
   threadId: string;
   orgId: string;
@@ -83,7 +91,7 @@ export default function Composer({ threadId, orgId, onSend }: Props) {
   // 成功なら null、失敗ならエラーメッセージを返す
   async function uploadFile(file: File): Promise<string | null> {
     const supabase = createClient(orgId);
-    const path = `${threadId}/${crypto.randomUUID()}-${file.name}`;
+    const path = `${threadId}/${crypto.randomUUID()}${safeFileExt(file.name)}`;
     const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
     if (error) {
       // 合計容量の上限（Storage側のRLSポリシー、20260919000001_attachment_total_cap.sql）

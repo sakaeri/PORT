@@ -941,7 +941,6 @@ export async function startCaseRequest(requestId: string) {
 export async function submitCaseReport(
   requestId: string,
   summary: string,
-  noteToCustomer: string,
   details: { label: string; value: string }[],
   attachments: { path: string; name: string; mime: string | null; bytes: number | null; label?: string }[],
 ) {
@@ -969,7 +968,6 @@ export async function submitCaseReport(
     request_id: requestId,
     summary: trimmed,
     details: cleanDetails,
-    note_to_customer: noteToCustomer.trim() || null,
     submitted_at: now,
     sent_at: canSendDirectly ? now : null,
   });

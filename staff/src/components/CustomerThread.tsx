@@ -43,7 +43,6 @@ export interface ThreadAttachment {
 export interface ThreadReport {
   summary: string;
   details: { label: string; value: string }[];
-  noteToCustomer: string | null;
 }
 
 export interface ThreadMessage {
@@ -580,7 +579,7 @@ export default function CustomerThread({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  const MESSAGE_SELECT = "*, message_attachments(*), requests(phase, amount, completion_reports(summary, details, note_to_customer))";
+  const MESSAGE_SELECT = "*, message_attachments(*), requests(phase, amount, completion_reports(summary, details))";
 
   // 開いている間に届いた新着分だけを取りに行く（既に読み込んだ最古の時点以降のみ）。
   // 会話全体を毎回取り直すと、履歴が長い依頼主ほどポーリングのたびに重くなるため。
@@ -601,7 +600,7 @@ export default function CustomerThread({
             attachments: m.message_attachments ?? [],
             requestPhase: req?.phase ?? null,
             requestAmount: req?.amount ?? null,
-            report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [], noteToCustomer: reportRaw.note_to_customer } : null,
+            report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [] } : null,
           };
         }),
       );
@@ -636,7 +635,7 @@ export default function CustomerThread({
               attachments: m.message_attachments ?? [],
               requestPhase: req?.phase ?? null,
               requestAmount: req?.amount ?? null,
-              report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [], noteToCustomer: reportRaw.note_to_customer } : null,
+              report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [] } : null,
             };
           });
         const container = scrollRef.current;

@@ -68,6 +68,7 @@ export default function CaseDetail({
   availableStaff,
   canAssignStaff,
   canSeeFinance,
+  canApprove,
   subscription,
 }: {
   request: {
@@ -87,7 +88,7 @@ export default function CaseDetail({
     hourlyCap: number | null;
   };
   customer: { id: string; name: string } | null;
-  report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[]; pending: boolean; attachments: { id: string; path: string; name: string; label: string | null }[] } | null;
+  report: { summary: string; details: { label: string; value: string }[]; pending: boolean; attachments: { id: string; path: string; name: string; label: string | null }[] } | null;
   reportFieldPresets: { id: string; label: string; kind: string; required: boolean }[];
   rating: { stars: number | null; comment: string | null; skipped: boolean } | null;
   caseThread: { id: string; archived: boolean } | null;
@@ -97,8 +98,11 @@ export default function CaseDetail({
   assignedStaff: { id: string; displayName: string }[];
   availableStaff: { id: string; displayName: string }[];
   canAssignStaff: boolean;
-  // オーナー・マネージャーだけ金額・支払い・返金の情報を見られる。
+  // 請求金額・支払い状況・時間精算単価は本部（owner）のみ見られる。マネージャーが
+  // 金額でやる／やらないを判断しないよう、案件詳細では本部以外に一切見せない。
   canSeeFinance: boolean;
+  // 完了報告をそのまま依頼主へ送れるか（オーナー・マネージャー）。金額とは別軸。
+  canApprove: boolean;
   // この案件が定期対応（毎週・毎月）から生まれたものなら、その定期対応自体の情報。
   subscription: { id: string; cadence: SubscriptionCadence; active: boolean; nextDueAt: string | null } | null;
 }) {
@@ -185,7 +189,7 @@ export default function CaseDetail({
             時間精算：時間単価¥{request.hourlyRate.toLocaleString("ja-JP")}・上限¥{(request.hourlyCap ?? 0).toLocaleString("ja-JP")}
           </div>
         )}
-        {canSeeFinance && subscription && (
+        {canApprove && subscription && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
             <span>
               定期対応（{CADENCE_LABEL[subscription.cadence]}）{subscription.active ? "・有効" : "・停止済み"}
@@ -217,12 +221,12 @@ export default function CaseDetail({
         )}
 
         {request.phase === "started" && !report && (
-          <CompletionReportForm requestId={request.id} orgId={orgId} canSendDirectly={canSeeFinance} presets={reportFieldPresets} />
+          <CompletionReportForm requestId={request.id} orgId={orgId} canSendDirectly={canApprove} presets={reportFieldPresets} />
         )}
 
         {request.phase === "started" && report?.pending && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{canSeeFinance ? "スタッフが提出した完了報告（未送信）" : "完了報告を提出しました。マネージャーの確認をお待ちください。"}</div>
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{canApprove ? "スタッフが提出した完了報告（未送信）" : "完了報告を提出しました。マネージャーの確認をお待ちください。"}</div>
             <div style={{ fontSize: 13, lineHeight: 1.6 }}>{report.summary}</div>
             {report.details.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -235,8 +239,7 @@ export default function CaseDetail({
               </div>
             )}
             <ReportAttachmentList attachments={report.attachments} orgId={orgId} />
-            {report.noteToCustomer && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{report.noteToCustomer}</div>}
-            {canSeeFinance && (
+            {canApprove && (
               <button onClick={handleApproveReport} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
                 {busy ? "処理中…" : "承認して依頼主へ送る"}
               </button>
@@ -275,7 +278,6 @@ export default function CaseDetail({
               </div>
             )}
             <ReportAttachmentList attachments={report.attachments} orgId={orgId} />
-            {report.noteToCustomer && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{report.noteToCustomer}</div>}
           </div>
         )}
 
@@ -323,6 +325,13 @@ interface ReportRow {
 function isPdfFile(file: File): boolean {
   return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
 }
+// Supabase Storageのキーは日本語など非ASCII文字を含むと "Invalid key" で
+// アップロードが失敗するため、キーには拡張子だけ残して元のファイル名は使わない
+// （表示用のファイル名はDBのfile_name列に別で保存される）。
+function safeFileExt(name: string): string {
+  const m = /\.[a-zA-Z0-9]{1,8}$/.exec(name);
+  return m ? m[0].toLowerCase() : "";
+}
 function reportAttachmentIcon(name: string) {
   return /\.pdf$/i.test(name) ? FilePdf : ImageIcon;
 }
@@ -341,8 +350,8 @@ function CompletionReportForm({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
-  const [rows, setRows] = useState<ReportRow[]>([]);
-  const [noteToCustomer, setNoteToCustomer] = useState("");
+  // 必須項目は、押さないと存在に気づかれにくいので最初から行を出しておく。
+  const [rows, setRows] = useState<ReportRow[]>(() => presets.filter((p) => p.required).map((p) => ({ label: p.label, value: "", kind: p.kind as ReportRowKind })));
   const [attachments, setAttachments] = useState<PendingReportAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [rowUploading, setRowUploading] = useState<number | null>(null);
@@ -378,7 +387,7 @@ function CompletionReportForm({
     setRowUploading(i);
     try {
       const supabase = createClient(orgId);
-      const path = `report-${requestId}/${crypto.randomUUID()}-${file.name}`;
+      const path = `report-${requestId}/${crypto.randomUUID()}${safeFileExt(file.name)}`;
       const { error: upError } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
       if (upError) {
         setUploadError(upError.message);
@@ -404,7 +413,7 @@ function CompletionReportForm({
           setUploadError("画像またはPDFファイルのみ添付できます");
           continue;
         }
-        const path = `report-${requestId}/${crypto.randomUUID()}-${file.name}`;
+        const path = `report-${requestId}/${crypto.randomUUID()}${safeFileExt(file.name)}`;
         const { error: upError } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
         if (upError) {
           setUploadError(upError.message);
@@ -446,7 +455,7 @@ function CompletionReportForm({
     setSaving(true);
     try {
       const details = rows.filter((r) => r.kind !== "image" && r.kind !== "pdf").map((r) => ({ label: r.label, value: r.value }));
-      await submitCaseReport(requestId, summary, noteToCustomer, details, attachments);
+      await submitCaseReport(requestId, summary, details, attachments);
       router.refresh();
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));
@@ -575,15 +584,6 @@ function CompletionReportForm({
           </button>
         </div>
       )}
-
-      <textarea
-        value={noteToCustomer}
-        onChange={(e) => setNoteToCustomer(e.target.value)}
-        placeholder="依頼主へのメッセージ（任意）"
-        rows={2}
-        className="vid-input"
-        style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
-      />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {attachments.filter((a) => !a.label).map((a) => {

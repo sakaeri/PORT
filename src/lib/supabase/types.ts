@@ -312,7 +312,6 @@ export interface Database {
           summary: string;
           details: ReportDetail[];
           revisions_left: number | null;
-          note_to_customer: string | null;
           delivery_url: string | null;
           delivery_expires_on: string | null;
           delivery_note: string | null;
