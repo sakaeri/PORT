@@ -314,12 +314,18 @@ export async function createReportFieldPreset(menuId: string, label: string, sor
   return data.id;
 }
 
-export async function updateReportFieldPreset(id: string, label: string) {
+export async function updateReportFieldPreset(id: string, patch: { label?: string; kind?: string; required?: boolean }) {
   await requireHqPrivileged();
   const supabase = await createClient();
-  const trimmed = label.trim();
-  if (!trimmed) throw new Error("項目名を入力してください");
-  const { error } = await supabase.from("report_field_presets").update({ label: trimmed }).eq("id", id);
+  const update: { label?: string; kind?: string; required?: boolean } = {};
+  if (patch.label !== undefined) {
+    const trimmed = patch.label.trim();
+    if (!trimmed) throw new Error("項目名を入力してください");
+    update.label = trimmed;
+  }
+  if (patch.kind !== undefined) update.kind = patch.kind;
+  if (patch.required !== undefined) update.required = patch.required;
+  const { error } = await supabase.from("report_field_presets").update(update).eq("id", id);
   if (error) throw error;
 }
 
@@ -937,7 +943,7 @@ export async function submitCaseReport(
   summary: string,
   noteToCustomer: string,
   details: { label: string; value: string }[],
-  attachments: { path: string; name: string; mime: string | null; bytes: number | null }[],
+  attachments: { path: string; name: string; mime: string | null; bytes: number | null; label?: string }[],
 ) {
   const ctx = await requireContext();
   const supabase = await createClient();
@@ -952,7 +958,7 @@ export async function submitCaseReport(
 
   if (attachments.length > 0) {
     const { error: attError } = await supabase.from("completion_report_attachments").insert(
-      attachments.map((a) => ({ request_id: requestId, file_path: a.path, file_name: a.name, mime: a.mime, bytes: a.bytes })),
+      attachments.map((a) => ({ request_id: requestId, file_path: a.path, file_name: a.name, mime: a.mime, bytes: a.bytes, label: a.label ?? null })),
     );
     if (attError) throw attError;
   }

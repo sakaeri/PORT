@@ -394,7 +394,7 @@ export function RequestCard({
                     ) : (
                       <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 15, color: "var(--color-accent)" }} />
                     )}
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{f.file_name}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{f.label ? `${f.label}：${f.file_name}` : f.file_name}</span>
                   </button>
                 ))}
               </div>

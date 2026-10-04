@@ -192,6 +192,8 @@ interface ReportFieldPreset {
   id: string;
   menu_id: string;
   label: string;
+  kind: string;
+  required: boolean;
   sort: number;
 }
 
@@ -215,6 +217,10 @@ const input: React.CSSProperties = {
   borderRadius: "var(--radius-md)",
   outline: "none",
 };
+// Modal.tsx のボックス背景が var(--color-bg) なので、その中に置く入力欄は
+// 同じ var(--color-bg) だと背景と色が被って見えなくなる（AccountSettingsPanel.tsx
+// など他のModal内フォームと同じく、ここでは var(--color-surface) にして区別する）。
+const modalInput: React.CSSProperties = { ...input, background: "var(--color-surface)" };
 const label: React.CSSProperties = { fontSize: 12, color: "var(--color-neutral-500)" };
 const card: React.CSSProperties = {
   padding: 16,
@@ -570,7 +576,7 @@ function QuestionsEditor({ menuId, questions, onChange, canEdit }: { menuId: str
             onBlur={() => commit(q.id, q.label)}
             disabled={!canEdit}
             className="vid-input"
-            style={{ ...input, flex: 1, height: 32 }}
+            style={{ ...modalInput, flex: 1, height: 32 }}
           />
           {canEdit && (
             <button onClick={() => remove(q.id)} aria-label="削除" style={{ flex: "none", width: 32, height: 32, cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
@@ -675,6 +681,13 @@ function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemp
   );
 }
 
+const PRESET_KINDS = [
+  { value: "text", label: "テキスト" },
+  { value: "url", label: "URL" },
+  { value: "image", label: "画像" },
+  { value: "pdf", label: "PDF" },
+];
+
 function MenuReportFieldPresetsEditor({
   menuId,
   presets,
@@ -688,14 +701,14 @@ function MenuReportFieldPresetsEditor({
 }) {
   async function add() {
     const id = await createReportFieldPreset(menuId, "", presets.length);
-    onChange([...presets, { id, menu_id: menuId, label: "", sort: presets.length }]);
+    onChange([...presets, { id, menu_id: menuId, label: "", kind: "text", required: false, sort: presets.length }]);
   }
-  function patch(id: string, val: string) {
-    onChange(presets.map((p) => (p.id === id ? { ...p, label: val } : p)));
+  function patch(id: string, p: Partial<ReportFieldPreset>) {
+    onChange(presets.map((x) => (x.id === id ? { ...x, ...p } : x)));
   }
-  async function commit(id: string, val: string) {
+  async function commitLabel(id: string, val: string) {
     if (!val.trim()) return;
-    await updateReportFieldPreset(id, val);
+    await updateReportFieldPreset(id, { label: val });
   }
   async function remove(id: string) {
     await deleteReportFieldPreset(id);
@@ -705,15 +718,44 @@ function MenuReportFieldPresetsEditor({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {presets.map((p) => (
-        <div key={p.id} style={{ display: "flex", gap: 8 }}>
+        <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <input
             value={p.label}
-            onChange={(e) => patch(p.id, e.target.value)}
-            onBlur={() => commit(p.id, p.label)}
+            onChange={(e) => patch(p.id, { label: e.target.value })}
+            onBlur={() => commitLabel(p.id, p.label)}
+            placeholder="項目名"
             disabled={!canEdit}
             className="vid-input"
-            style={{ ...input, flex: 1, height: 32 }}
+            style={{ ...modalInput, flex: 1, minWidth: 100, height: 32 }}
           />
+          <select
+            value={p.kind}
+            onChange={(e) => {
+              patch(p.id, { kind: e.target.value });
+              updateReportFieldPreset(p.id, { kind: e.target.value });
+            }}
+            disabled={!canEdit}
+            className="vid-input"
+            style={{ ...modalInput, flex: "none", width: 92, height: 32 }}
+          >
+            {PRESET_KINDS.map((k) => (
+              <option key={k.value} value={k.value}>
+                {k.label}
+              </option>
+            ))}
+          </select>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, flex: "none", fontSize: 11.5, color: "var(--color-neutral-400)" }}>
+            <input
+              type="checkbox"
+              checked={p.required}
+              onChange={(e) => {
+                patch(p.id, { required: e.target.checked });
+                updateReportFieldPreset(p.id, { required: e.target.checked });
+              }}
+              disabled={!canEdit}
+            />
+            必須
+          </label>
           {canEdit && (
             <button onClick={() => remove(p.id)} aria-label="削除" style={{ flex: "none", width: 32, height: 32, cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
               <Trash size={13} />

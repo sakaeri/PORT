@@ -87,8 +87,8 @@ export default function CaseDetail({
     hourlyCap: number | null;
   };
   customer: { id: string; name: string } | null;
-  report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[]; pending: boolean; attachments: { id: string; path: string; name: string }[] } | null;
-  reportFieldPresets: { id: string; label: string }[];
+  report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[]; pending: boolean; attachments: { id: string; path: string; name: string; label: string | null }[] } | null;
+  reportFieldPresets: { id: string; label: string; kind: string; required: boolean }[];
   rating: { stars: number | null; comment: string | null; skipped: boolean } | null;
   caseThread: { id: string; archived: boolean } | null;
   caseMessages: CaseMessage[];
@@ -310,6 +310,14 @@ interface PendingReportAttachment {
   name: string;
   mime: string | null;
   bytes: number | null;
+  label?: string;
+}
+
+type ReportRowKind = "text" | "url" | "image" | "pdf";
+interface ReportRow {
+  label: string;
+  value: string;
+  kind: ReportRowKind;
 }
 
 function isPdfFile(file: File): boolean {
@@ -328,27 +336,59 @@ function CompletionReportForm({
   requestId: string;
   orgId: string;
   canSendDirectly: boolean;
-  presets: { id: string; label: string }[];
+  presets: { id: string; label: string; kind: string; required: boolean }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
-  const [rows, setRows] = useState<{ label: string; value: string }[]>([]);
+  const [rows, setRows] = useState<ReportRow[]>([]);
   const [noteToCustomer, setNoteToCustomer] = useState("");
   const [attachments, setAttachments] = useState<PendingReportAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [rowUploading, setRowUploading] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  function addRow(label: string) {
-    setRows((r) => [...r, { label, value: "" }]);
+  function addPresetRow(p: { label: string; kind: string }) {
+    setRows((r) => [...r, { label: p.label, value: "", kind: p.kind as ReportRowKind }]);
   }
-  function updateRow(i: number, patch: Partial<{ label: string; value: string }>) {
+  function addCustomRow() {
+    setRows((r) => [...r, { label: "", value: "", kind: "text" }]);
+  }
+  function updateRow(i: number, patch: Partial<ReportRow>) {
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
   }
   function removeRow(i: number) {
-    setRows((r) => r.filter((_, idx) => idx !== i));
+    setRows((r) => {
+      const row = r[i];
+      if (row && (row.kind === "image" || row.kind === "pdf") && row.value) {
+        setAttachments((a) => a.filter((att) => !(att.label === row.label && att.name === row.value)));
+      }
+      return r.filter((_, idx) => idx !== i);
+    });
+  }
+
+  async function handlePickFileForRow(e: React.ChangeEvent<HTMLInputElement>, i: number) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const row = rows[i];
+    setUploadError("");
+    setRowUploading(i);
+    try {
+      const supabase = createClient(orgId);
+      const path = `report-${requestId}/${crypto.randomUUID()}-${file.name}`;
+      const { error: upError } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
+      if (upError) {
+        setUploadError(upError.message);
+        return;
+      }
+      setAttachments((a) => [...a, { path, name: file.name, mime: file.type, bytes: file.size, label: row.label }]);
+      updateRow(i, { value: file.name });
+    } finally {
+      setRowUploading(null);
+    }
   }
 
   async function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -381,12 +421,32 @@ function CompletionReportForm({
     setAttachments((a) => a.filter((f) => f.path !== path));
   }
 
+  function missingRequiredLabels(): string[] {
+    const missing: string[] = [];
+    for (const p of presets) {
+      if (!p.required) continue;
+      if (p.kind === "image" || p.kind === "pdf") {
+        if (!attachments.some((a) => a.label === p.label)) missing.push(p.label);
+      } else {
+        const row = rows.find((r) => r.label === p.label);
+        if (!row || !row.value.trim()) missing.push(p.label);
+      }
+    }
+    return missing;
+  }
+
   async function submit() {
     if (saving) return;
     setError("");
+    const missing = missingRequiredLabels();
+    if (missing.length > 0) {
+      setError(`必須項目が未入力です：${missing.join("、")}`);
+      return;
+    }
     setSaving(true);
     try {
-      await submitCaseReport(requestId, summary, noteToCustomer, rows, attachments);
+      const details = rows.filter((r) => r.kind !== "image" && r.kind !== "pdf").map((r) => ({ label: r.label, value: r.value }));
+      await submitCaseReport(requestId, summary, noteToCustomer, details, attachments);
       router.refresh();
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));
@@ -421,41 +481,93 @@ function CompletionReportForm({
         style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
       />
 
-      {rows.map((row, i) => (
-        <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <input
-            value={row.label}
-            onChange={(e) => updateRow(i, { label: e.target.value })}
-            placeholder="項目名"
-            className="vid-input"
-            style={{ ...inputStyle, width: 110, flex: "none" }}
-          />
-          <input
-            value={row.value}
-            onChange={(e) => updateRow(i, { value: e.target.value })}
-            placeholder="内容"
-            className="vid-input"
-            style={{ ...inputStyle, flex: 1, minWidth: 0 }}
-          />
-          <button onClick={() => removeRow(i)} aria-label="削除" style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
-            <X size={14} />
-          </button>
-        </div>
-      ))}
+      {rows.map((row, i) => {
+        const isFile = row.kind === "image" || row.kind === "pdf";
+        const preset = presets.find((p) => p.label === row.label && p.kind === row.kind);
+        return (
+          <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            {preset ? (
+              <span style={{ width: 110, flex: "none", fontSize: 13 }}>
+                {row.label}
+                {preset.required && <span style={{ color: "var(--color-accent-200)" }}> *</span>}
+              </span>
+            ) : (
+              <input
+                value={row.label}
+                onChange={(e) => updateRow(i, { label: e.target.value })}
+                placeholder="項目名"
+                className="vid-input"
+                style={{ ...inputStyle, width: 110, flex: "none" }}
+              />
+            )}
+            {isFile ? (
+              row.value ? (
+                <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                  {(() => {
+                    const Icon = row.kind === "pdf" ? FilePdf : ImageIcon;
+                    return <Icon size={14} style={{ flex: "none", color: "var(--color-accent)" }} />;
+                  })()}
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{row.value}</span>
+                </div>
+              ) : (
+                <label
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    height: 30,
+                    padding: "0 10px",
+                    cursor: rowUploading === i ? "wait" : "pointer",
+                    fontSize: 11.5,
+                    color: "var(--color-neutral-400)",
+                    border: "1px dashed var(--color-divider)",
+                    borderRadius: "var(--radius-md)",
+                  }}
+                >
+                  {rowUploading === i ? <CircleNotch size={13} style={{ animation: "vid-spin 0.7s linear infinite" }} /> : <Paperclip size={13} />}
+                  {row.kind === "pdf" ? "PDFを選択" : "画像を選択"}
+                  <input
+                    type="file"
+                    accept={row.kind === "pdf" ? "application/pdf" : "image/*"}
+                    onChange={(e) => handlePickFileForRow(e, i)}
+                    disabled={rowUploading === i}
+                    style={{ display: "none" }}
+                  />
+                </label>
+              )
+            ) : (
+              <input
+                value={row.value}
+                onChange={(e) => updateRow(i, { value: e.target.value })}
+                placeholder={row.kind === "url" ? "URL（https://...）" : "内容"}
+                type={row.kind === "url" ? "url" : "text"}
+                className="vid-input"
+                style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+              />
+            )}
+            <button onClick={() => removeRow(i)} aria-label="削除" style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
+              <X size={14} />
+            </button>
+          </div>
+        );
+      })}
       {unusedPresets.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {unusedPresets.map((p) => (
             <button
               key={p.id}
-              onClick={() => addRow(p.label)}
+              onClick={() => addPresetRow(p)}
               style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 28, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
             >
               <Plus size={11} />
               {p.label}
+              {p.required && "＊"}
             </button>
           ))}
           <button
-            onClick={() => addRow("")}
+            onClick={addCustomRow}
             style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 28, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
           >
             <Plus size={11} />
@@ -474,7 +586,7 @@ function CompletionReportForm({
       />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {attachments.map((a) => {
+        {attachments.filter((a) => !a.label).map((a) => {
           const Icon = reportAttachmentIcon(a.name);
           return (
             <div key={a.path} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
@@ -507,7 +619,7 @@ function CompletionReportForm({
   );
 }
 
-function ReportAttachmentList({ attachments, orgId }: { attachments: { id: string; path: string; name: string }[]; orgId: string }) {
+function ReportAttachmentList({ attachments, orgId }: { attachments: { id: string; path: string; name: string; label: string | null }[]; orgId: string }) {
   const [openingId, setOpeningId] = useState<string | null>(null);
 
   async function open(path: string, id: string) {
@@ -536,7 +648,7 @@ function ReportAttachmentList({ attachments, orgId }: { attachments: { id: strin
             style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, padding: "6px 8px", cursor: openingId === a.id ? "wait" : "pointer", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-bg)" }}
           >
             {openingId === a.id ? <CircleNotch size={14} style={{ flex: "none", color: "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} /> : <Icon size={14} style={{ flex: "none", color: "var(--color-accent)" }} />}
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{a.name}</span>
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{a.label ? `${a.label}：${a.name}` : a.name}</span>
           </button>
         );
       })}

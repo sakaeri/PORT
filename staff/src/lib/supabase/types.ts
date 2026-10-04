@@ -454,6 +454,7 @@ export interface Database {
           file_name: string;
           mime: string | null;
           bytes: number | null;
+          label: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["completion_report_attachments"]["Row"]> & { request_id: string; file_path: string; file_name: string };
@@ -465,6 +466,8 @@ export interface Database {
           id: string;
           menu_id: string;
           label: string;
+          kind: string;
+          required: boolean;
           sort: number;
           created_at: string;
         };

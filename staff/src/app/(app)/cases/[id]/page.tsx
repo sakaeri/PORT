@@ -27,7 +27,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), completion_report_attachments(id, file_path, file_name), ratings(*), request_subscriptions(id, cadence, active, next_due_at), request_items(menu_id)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), completion_report_attachments(id, file_path, file_name, label), ratings(*), request_subscriptions(id, cadence, active, next_due_at), request_items(menu_id)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -53,8 +53,8 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const menuIds = [...new Set((request.request_items ?? []).map((it) => it.menu_id).filter((v): v is string => !!v))];
   const { data: presetRows } =
     menuIds.length > 0
-      ? await supabase.from("report_field_presets").select("id, label").in("menu_id", menuIds).order("sort", { ascending: true })
-      : { data: [] as { id: string; label: string }[] };
+      ? await supabase.from("report_field_presets").select("id, label, kind, required").in("menu_id", menuIds).order("sort", { ascending: true })
+      : { data: [] as { id: string; label: string; kind: string; required: boolean }[] };
   const seenPresetLabels = new Set<string>();
   const reportFieldPresets = (presetRows ?? []).filter((p) => (seenPresetLabels.has(p.label) ? false : (seenPresetLabels.add(p.label), true)));
 
@@ -81,7 +81,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
 
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
-  const reportAttachments = request.completion_report_attachments ?? [];
+  const reportAttachments: { id: string; file_path: string; file_name: string; label: string | null }[] = request.completion_report_attachments ?? [];
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
   const subscription = Array.isArray(request.request_subscriptions) ? request.request_subscriptions[0] : request.request_subscriptions;
   const reportPending = !!report && !report.sent_at;
@@ -114,11 +114,11 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
               noteToCustomer: report.note_to_customer,
               details: report.details ?? [],
               pending: reportPending,
-              attachments: reportAttachments.map((a) => ({ id: a.id, path: a.file_path, name: a.file_name })),
+              attachments: reportAttachments.map((a) => ({ id: a.id, path: a.file_path, name: a.file_name, label: a.label })),
             }
           : null
       }
-      reportFieldPresets={reportFieldPresets.map((p) => ({ id: p.id, label: p.label }))}
+      reportFieldPresets={reportFieldPresets.map((p) => ({ id: p.id, label: p.label, kind: p.kind, required: p.required }))}
       rating={rating ? { stars: rating.stars, comment: rating.comment, skipped: rating.skipped } : null}
       caseThread={caseThread ? { id: caseThread.id, archived: !!caseThread.archived_at } : null}
       caseMessages={caseMessages}
