@@ -298,16 +298,16 @@ export async function deleteIntakeField(id: string) {
   if (error) throw error;
 }
 
-// 完了報告でよく使う項目名（プリセット）。スタッフが報告を書くとき、
-// ここから選んでワンタップで項目を追加できる（自由な項目追加もできるが、
-// 何を報告すべきか迷わないための定型的な選択肢）。
-export async function createReportFieldPreset(orgId: string, label: string) {
-  const ctx = await requireContext();
-  if (ctx.orgId !== orgId) throw new Error("権限がありません");
+// 完了報告でよく使う項目名（プリセット）。メニューごとに持つ
+// （menu_questions＝「はじめの質問」と同じ考え方）。スタッフが報告を
+// 書くとき、ここから選んでワンタップで項目を追加できる（自由な項目追加
+// もできるが、何を報告すべきか迷わないための定型的な選択肢）。
+export async function createReportFieldPreset(menuId: string, label: string, sort: number) {
+  await requireHqPrivileged();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("report_field_presets")
-    .insert({ org_id: orgId, label: label.trim() || "新しい項目", sort: 999 })
+    .insert({ menu_id: menuId, label: label.trim() || "新しい項目", sort })
     .select("id")
     .single();
   if (error || !data) throw error ?? new Error("作成できませんでした");
@@ -315,7 +315,7 @@ export async function createReportFieldPreset(orgId: string, label: string) {
 }
 
 export async function updateReportFieldPreset(id: string, label: string) {
-  await requireContext();
+  await requireHqPrivileged();
   const supabase = await createClient();
   const trimmed = label.trim();
   if (!trimmed) throw new Error("項目名を入力してください");
@@ -324,7 +324,7 @@ export async function updateReportFieldPreset(id: string, label: string) {
 }
 
 export async function deleteReportFieldPreset(id: string) {
-  await requireContextWithDelete();
+  await requireHqPrivileged();
   const supabase = await createClient();
   const { error } = await supabase.from("report_field_presets").delete().eq("id", id);
   if (error) throw error;
@@ -388,11 +388,6 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
     .select("id")
     .single();
   if (orgErr || !org) throw orgErr ?? new Error("事業者を作成できませんでした");
-
-  await admin.from("report_field_presets").insert([
-    { org_id: org.id, label: "納品物", sort: 0 },
-    { org_id: org.id, label: "受け渡し方法", sort: 1 },
-  ]);
 
   return { orgId: org.id as string, slug };
 }

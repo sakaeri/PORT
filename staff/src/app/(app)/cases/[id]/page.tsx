@@ -23,11 +23,11 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   // タップしてからこの画面が出るまでの体感速度のため、全クエリを並列で投げる
   // （案件トークのメッセージは threads.id が要るが、messages を threads の
   // embed として一緒に取ることで、往復を1回減らしている）。
-  const [{ data: request }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }, { data: staffDepartments }, { data: presetRows }] = await Promise.all([
+  const [{ data: request }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }, { data: staffDepartments }] = await Promise.all([
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), completion_report_attachments(id, file_path, file_name), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), completion_report_attachments(id, file_path, file_name), ratings(*), request_subscriptions(id, cadence, active, next_due_at), request_items(menu_id)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -44,9 +44,19 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       .order("sent_at", { referencedTable: "messages", ascending: true })
       .maybeSingle(),
     isManagerAssigning ? supabase.from("staff_departments").select("profile_id, department_id") : Promise.resolve({ data: [] }),
-    supabase.from("report_field_presets").select("id, label").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
   ]);
   if (!request) notFound();
+
+  // 完了報告の定型項目はメニュー単位なので、この案件で使われたメニュー
+  // （複数ありうる）の分をまとめて集める。同じ項目名が複数メニューに
+  // あってもボタンが重複しないよう、項目名で重複を除く。
+  const menuIds = [...new Set((request.request_items ?? []).map((it) => it.menu_id).filter((v): v is string => !!v))];
+  const { data: presetRows } =
+    menuIds.length > 0
+      ? await supabase.from("report_field_presets").select("id, label").in("menu_id", menuIds).order("sort", { ascending: true })
+      : { data: [] as { id: string; label: string }[] };
+  const seenPresetLabels = new Set<string>();
+  const reportFieldPresets = (presetRows ?? []).filter((p) => (seenPresetLabels.has(p.label) ? false : (seenPresetLabels.add(p.label), true)));
 
   // 表示名は「本人には常に本人の本当の表示名、他人にはエイリアス」が
   // ルールなので、自分自身の行だけは staff_alias を無視して display_name を使う。
@@ -108,7 +118,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
             }
           : null
       }
-      reportFieldPresets={(presetRows ?? []).map((p) => ({ id: p.id, label: p.label }))}
+      reportFieldPresets={reportFieldPresets.map((p) => ({ id: p.id, label: p.label }))}
       rating={rating ? { stars: rating.stars, comment: rating.comment, skipped: rating.skipped } : null}
       caseThread={caseThread ? { id: caseThread.id, archived: !!caseThread.archived_at } : null}
       caseMessages={caseMessages}

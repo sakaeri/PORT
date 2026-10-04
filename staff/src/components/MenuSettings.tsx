@@ -46,6 +46,7 @@ import {
 import { headingWeight } from "@/lib/style";
 import { useIsMobile } from "@/lib/useIsMobile";
 import InfoTooltip from "@/components/InfoTooltip";
+import Modal from "@/components/Modal";
 import {
   createMenu,
   updateMenu,
@@ -82,6 +83,7 @@ interface Menu {
   active: boolean;
   department_id: string | null;
   menu_questions: Question[];
+  report_field_presets: ReportFieldPreset[];
 }
 
 // 依頼主側の「メニューから問い合わせる」で ph.ph-xxx のアイコンフォントとして
@@ -187,7 +189,7 @@ interface IntakeField {
 
 interface ReportFieldPreset {
   id: string;
-  org_id: string;
+  menu_id: string;
   label: string;
   sort: number;
 }
@@ -239,15 +241,13 @@ export default function MenuSettings({
   orgId,
   initialMenus,
   initialTemplates,
-  initialReportFieldPresets,
   canEdit,
 }: {
   orgId: string;
   initialMenus: Menu[];
   initialTemplates: IntakeForm[];
-  initialReportFieldPresets: ReportFieldPreset[];
   // 受付メニューはFC展開でのブランド・料金統一のため本部専用で、
-  // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレ・報告書項目は常に編集可。
+  // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレは常に編集可。
   canEdit: boolean;
 }) {
   const [tab, setTab] = useState<TabKey>("menu");
@@ -318,26 +318,26 @@ export default function MenuSettings({
 
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
-      {tab === "reportFields" && <ReportFieldPresetsCard orgId={orgId} initialPresets={initialReportFieldPresets} />}
     </div>
   );
 }
 
-type TabKey = "menu" | "templates" | "reportFields";
+type TabKey = "menu" | "templates";
 
 const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
   { key: "menu", label: "受付メニュー", mobileLabel: "メニュー" },
   { key: "templates", label: "返信テンプレ", mobileLabel: "テンプレ" },
-  { key: "reportFields", label: "報告書の項目", mobileLabel: "報告項目" },
 ];
 
 function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
   const [menus, setMenus] = useState(initialMenus);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [questionsMenuId, setQuestionsMenuId] = useState<string | null>(null);
+  const [presetsMenuId, setPresetsMenuId] = useState<string | null>(null);
 
   async function handleAdd() {
     const id = await createMenu(orgId);
-    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: null, lead_hours: 24, active: true, department_id: null, menu_questions: [] }]);
+    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: null, lead_hours: 24, active: true, department_id: null, menu_questions: [], report_field_presets: [] }]);
     setOpenId(id);
   }
 
@@ -485,14 +485,18 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                     </div>
                   )}
 
-                  <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} canEdit={canEdit} />
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
+                    <button onClick={() => setQuestionsMenuId(m.id)} style={smallBtn}>
+                      はじめの質問　{m.menu_questions.length}問
+                    </button>
+                    <button onClick={() => setPresetsMenuId(m.id)} style={smallBtn}>
+                      報告書の定型項目　{m.report_field_presets.length}件
+                    </button>
+                    <div style={{ flex: 1 }} />
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
                       <input type="checkbox" checked={m.active} onChange={(e) => { patchLocal(m.id, { active: e.target.checked }); commit({ ...m, active: e.target.checked }); }} disabled={!canEdit} />
                       表示する
                     </label>
-                    <div style={{ flex: 1 }} />
                     {canEdit && (
                       <button onClick={() => handleDelete(m.id)} style={{ ...smallBtn, color: "var(--color-accent-200)", borderColor: "var(--color-divider)" }}>
                         <Trash size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
@@ -501,6 +505,16 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                     )}
                   </div>
                 </div>
+              )}
+              {questionsMenuId === m.id && (
+                <Modal onClose={() => setQuestionsMenuId(null)} maxWidth={480}>
+                  <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} canEdit={canEdit} />
+                </Modal>
+              )}
+              {presetsMenuId === m.id && (
+                <Modal onClose={() => setPresetsMenuId(null)} maxWidth={480}>
+                  <MenuReportFieldPresetsEditor menuId={m.id} presets={m.report_field_presets} onChange={(p) => patchLocal(m.id, { report_field_presets: p })} canEdit={canEdit} />
+                </Modal>
               )}
             </div>
           );
@@ -642,53 +656,61 @@ function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemp
   );
 }
 
-function ReportFieldPresetsCard({ orgId, initialPresets }: { orgId: string; initialPresets: ReportFieldPreset[] }) {
-  const [presets, setPresets] = useState(initialPresets);
-
-  async function handleAdd() {
-    const id = await createReportFieldPreset(orgId, "新しい項目");
-    setPresets((p) => [...p, { id, org_id: orgId, label: "新しい項目", sort: 999 }]);
+function MenuReportFieldPresetsEditor({
+  menuId,
+  presets,
+  onChange,
+  canEdit,
+}: {
+  menuId: string;
+  presets: ReportFieldPreset[];
+  onChange: (p: ReportFieldPreset[]) => void;
+  canEdit: boolean;
+}) {
+  async function add() {
+    const id = await createReportFieldPreset(menuId, "", presets.length);
+    onChange([...presets, { id, menu_id: menuId, label: "", sort: presets.length }]);
   }
-
-  async function handleDelete(id: string) {
-    if (!confirm("この項目を削除しますか？")) return;
+  function patch(id: string, val: string) {
+    onChange(presets.map((p) => (p.id === id ? { ...p, label: val } : p)));
+  }
+  async function commit(id: string, val: string) {
+    if (!val.trim()) return;
+    await updateReportFieldPreset(id, val);
+  }
+  async function remove(id: string) {
     await deleteReportFieldPreset(id);
-    setPresets((p) => p.filter((x) => x.id !== id));
-  }
-
-  function patchLocal(id: string, newLabel: string) {
-    setPresets((rows) => rows.map((r) => (r.id === id ? { ...r, label: newLabel } : r)));
-  }
-
-  async function commit(p: ReportFieldPreset) {
-    if (!p.label.trim()) return;
-    await updateReportFieldPreset(p.id, p.label);
+    onChange(presets.filter((p) => p.id !== id));
   }
 
   return (
-    <div style={card}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>報告書の項目</div>
-        <InfoTooltip text="完了報告を書くとき、スタッフがワンタップで項目を追加できる定型の項目名です（自由な項目追加も別途できます）。" />
-        <div style={{ flex: 1 }} />
-        <button onClick={handleAdd} style={smallBtn}>
-          <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-          項目を追加
-        </button>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={label}>報告書の定型項目</span>
+        <InfoTooltip text="このメニューの完了報告を書くとき、スタッフがワンタップで項目を追加できる定型の項目名です（自由な項目追加も別途できます）。" />
       </div>
-
-      {presets.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ項目がありません。</div>}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {presets.map((p) => (
-          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input value={p.label} onChange={(e) => patchLocal(p.id, e.target.value)} onBlur={() => commit(p)} className="vid-input" style={{ ...input, flex: 1 }} />
-            <button onClick={() => handleDelete(p.id)} aria-label="削除" style={{ ...smallBtn, color: "var(--color-accent-200)", borderColor: "var(--color-divider)" }}>
-              <Trash size={12} />
+      {presets.map((p) => (
+        <div key={p.id} style={{ display: "flex", gap: 8 }}>
+          <input
+            value={p.label}
+            onChange={(e) => patch(p.id, e.target.value)}
+            onBlur={() => commit(p.id, p.label)}
+            disabled={!canEdit}
+            className="vid-input"
+            style={{ ...input, flex: 1, height: 32 }}
+          />
+          {canEdit && (
+            <button onClick={() => remove(p.id)} aria-label="削除" style={{ flex: "none", width: 32, height: 32, cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+              <Trash size={13} />
             </button>
-          </div>
-        ))}
-      </div>
+          )}
+        </div>
+      ))}
+      {canEdit && (
+        <button onClick={add} style={{ alignSelf: "flex-start", ...smallBtn, height: 30 }}>
+          ＋項目を追加
+        </button>
+      )}
     </div>
   );
 }
