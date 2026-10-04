@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PHASE_LABEL } from "@/lib/stage";
 import { archiveCaseThread, unarchiveCaseThread, deleteCaseRequest } from "@/app/actions";
 import RowKebabMenu from "@/components/RowKebabMenu";
+import DepartmentFilterDropdown from "@/components/DepartmentFilterDropdown";
 import type { RequestPhase } from "@/lib/supabase/types";
 
 export interface CaseRow {
@@ -20,6 +21,7 @@ export interface CaseRow {
   // 本部メンバーが依頼主に送っていない状態（＝報告済み・承認待ち）。
   reportPending: boolean;
   customerName: string;
+  departmentId: string | null;
   threadId: string | null;
   archived: boolean;
   lastMessagePreview: string | null;
@@ -27,13 +29,27 @@ export interface CaseRow {
 
 type Filter = "all" | "preparing" | "awaitingReport" | "reportPending" | "completed" | "declined";
 
-export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }: { rows: CaseRow[]; canDelete: boolean; canSeeAmount: boolean }) {
+export default function CasesList({
+  rows: initialRows,
+  departments,
+  canDelete,
+  canSeeAmount,
+}: {
+  rows: CaseRow[];
+  departments: { id: string; name: string }[];
+  canDelete: boolean;
+  canSeeAmount: boolean;
+}) {
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const active = rows.filter((r) => !r.archived);
-  const archivedCount = rows.filter((r) => r.archived).length;
+  const departmentById = new Map(departments.map((d) => [d.id, d.name]));
+  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "窓口未設定" }];
+  const byDepartment = rows.filter((r) => departmentFilter === "all" || (departmentFilter === "none" ? r.departmentId === null : r.departmentId === departmentFilter));
+  const active = byDepartment.filter((r) => !r.archived);
+  const archivedCount = byDepartment.filter((r) => r.archived).length;
   // 「見送り」は件数が増えると埋もれて邪魔になるだけなので、「すべて」には
   // 出さず、専用のチップでだけ見られるようにする。
   const allCount = active.filter((r) => r.phase !== "declined").length;
@@ -42,7 +58,7 @@ export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }
   const reportPendingCount = active.filter((r) => r.reportPending).length;
   const completedCount = active.filter((r) => r.phase === "completed").length;
   const declinedCount = active.filter((r) => r.phase === "declined").length;
-  const visible = rows
+  const visible = byDepartment
     .filter((r) => !r.archived || showArchived)
     .filter((r) => {
       if (filter === "preparing") return r.phase === "preparing";
@@ -92,6 +108,7 @@ export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {departments.length > 0 && <DepartmentFilterDropdown options={filterOptions} value={departmentFilter} onChange={setDepartmentFilter} />}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {chips.map((c) => {
           const on = filter === c.key;
@@ -133,7 +150,14 @@ export default function CasesList({ rows: initialRows, canDelete, canSeeAmount }
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)", opacity: r.archived ? 0.55 : 1 }}>
             <Link href={`/cases/${r.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
               <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</div>
-              <div style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{r.customerName}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{r.customerName}</span>
+                {r.departmentId && departmentById.get(r.departmentId) && (
+                  <span style={{ flex: "none", fontSize: 10, color: "var(--color-neutral-500)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-sm)", padding: "1px 6px" }}>
+                    {departmentById.get(r.departmentId)}
+                  </span>
+                )}
+              </div>
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lastMessagePreview ?? "まだ記録がありません"}</div>
             </Link>
             {canSeeAmount && <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>¥{r.amount.toLocaleString("ja-JP")}</div>}

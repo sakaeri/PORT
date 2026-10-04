@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowSquareOut, Buildings, CaretDown } from "@phosphor-icons/react";
+import { ArrowSquareOut, Buildings } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { archiveThread, unarchiveThread, deleteCustomer } from "@/app/actions";
 import type { Department } from "@/components/StaffAdmin";
 import RowKebabMenu from "@/components/RowKebabMenu";
+import DepartmentFilterDropdown from "@/components/DepartmentFilterDropdown";
 
 interface CustomerRow {
   id: string;
@@ -43,14 +44,12 @@ export default function CustomersList({
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
-  const [filterOpen, setFilterOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const visible = rows
     .filter((c) => c.active || showArchived)
     .filter((c) => departmentFilter === "all" || (departmentFilter === "none" ? c.departmentId === null : c.departmentId === departmentFilter));
   const archivedCount = rows.filter((c) => !c.active).length;
   const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "窓口未設定" }];
-  const filterLabel = filterOptions.find((d) => d.id === departmentFilter)?.name ?? "すべて";
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a server-refetched prop (router.refresh()), not state derived from other client state
@@ -108,75 +107,7 @@ export default function CustomersList({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ position: "relative", alignSelf: "flex-start" }}>
-        <button
-          onClick={() => setFilterOpen((v) => !v)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            height: 30,
-            padding: "0 12px",
-            cursor: "pointer",
-            fontSize: 12.5,
-            color: "var(--color-text)",
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-divider)",
-            borderRadius: "var(--radius-md)",
-          }}
-        >
-          窓口：{filterLabel}
-          <CaretDown size={12} color="var(--color-neutral-500)" />
-        </button>
-        {filterOpen && (
-          <>
-            <div onClick={() => setFilterOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 59 }} />
-            <div
-              style={{
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                marginTop: 4,
-                zIndex: 60,
-                minWidth: 180,
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-                padding: 6,
-                borderRadius: "var(--radius-md)",
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-divider)",
-                boxShadow: "var(--shadow-md)",
-              }}
-            >
-              {filterOptions.map((d) => (
-                <button
-                  key={d.id}
-                  onClick={() => {
-                    setDepartmentFilter(d.id);
-                    setFilterOpen(false);
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    height: 32,
-                    padding: "0 10px",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 12.5,
-                    borderRadius: "var(--radius-sm)",
-                    border: "none",
-                    color: d.id === departmentFilter ? "var(--color-accent)" : "var(--color-text)",
-                    background: d.id === departmentFilter ? "color-mix(in srgb, var(--color-accent) 14%, transparent)" : "transparent",
-                  }}
-                >
-                  {d.name}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+      <DepartmentFilterDropdown options={filterOptions} value={departmentFilter} onChange={setDepartmentFilter} />
       {archivedCount > 0 && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />

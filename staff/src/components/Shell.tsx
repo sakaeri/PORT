@@ -201,7 +201,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           <Headset size={16} color="var(--color-nav-accent)" />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <OrgSwitcher orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} role={ctx.role} orgs={ctx.orgs} unreadCounts={orgUnreadCounts} />
+          <OrgSwitcher orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} orgs={ctx.orgs} unreadCounts={orgUnreadCounts} />
         </div>
       </div>
 

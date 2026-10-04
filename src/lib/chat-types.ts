@@ -6,11 +6,12 @@ export type RequestItemRow = Database["public"]["Tables"]["request_items"]["Row"
 export type CompletionReportRow = Database["public"]["Tables"]["completion_reports"]["Row"];
 export type RatingRow = Database["public"]["Tables"]["ratings"]["Row"];
 export type AttachmentRow = Database["public"]["Tables"]["message_attachments"]["Row"];
+export type ReportAttachmentRow = Database["public"]["Tables"]["completion_report_attachments"]["Row"];
 
 export interface RequestBundle {
   request: RequestRow;
   items: RequestItemRow[];
-  report: CompletionReportRow | null;
+  report: (CompletionReportRow & { attachments: ReportAttachmentRow[] }) | null;
   rating: RatingRow | null;
 }
 
@@ -25,6 +26,7 @@ export type RawMessageRow = MessageRow & {
     | (RequestRow & {
         request_items: RequestItemRow[] | null;
         completion_reports: CompletionReportRow[] | CompletionReportRow | null;
+        completion_report_attachments: ReportAttachmentRow[] | null;
         ratings: RatingRow[] | RatingRow | null;
       })
     | null;
@@ -35,11 +37,13 @@ export const MESSAGE_PAGE_SIZE = 60;
 
 export function mapMessageRow(row: RawMessageRow): MessageWithExtras {
   const { message_attachments, requests, ...msg } = row;
+  const reportRaw = requests ? (Array.isArray(requests.completion_reports) ? requests.completion_reports[0] : requests.completion_reports) : null;
+  const report = reportRaw ? { ...reportRaw, attachments: requests?.completion_report_attachments ?? [] } : null;
   const requestBundle: RequestBundle | null = requests
     ? {
         request: requests,
         items: requests.request_items ?? [],
-        report: (Array.isArray(requests.completion_reports) ? requests.completion_reports[0] : requests.completion_reports) ?? null,
+        report,
         rating: (Array.isArray(requests.ratings) ? requests.ratings[0] : requests.ratings) ?? null,
       }
     : null;

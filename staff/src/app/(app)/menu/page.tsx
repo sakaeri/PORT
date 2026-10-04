@@ -10,7 +10,7 @@ export default async function MenuSettingsPage() {
   if (ctx.role === "dept_leader") return null;
 
   const supabase = await createClient();
-  const [{ data: menus }, { data: templates }] = await Promise.all([
+  const [{ data: menus }, { data: templates }, { data: reportFieldPresets }] = await Promise.all([
     supabase
       .from("menus")
       .select("*, menu_questions(*)")
@@ -21,6 +21,7 @@ export default async function MenuSettingsPage() {
       .select("*, intake_fields(*)")
       .eq("org_id", ctx.orgId)
       .order("sort", { ascending: true }),
+    supabase.from("report_field_presets").select("*").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
   ]);
 
   return (
@@ -28,6 +29,7 @@ export default async function MenuSettingsPage() {
       orgId={ctx.orgId}
       initialMenus={(menus ?? []).map((m) => ({ ...m, menu_questions: (m.menu_questions ?? []).sort((a, b) => a.sort - b.sort) }))}
       initialTemplates={(templates ?? []).map((t) => ({ ...t, intake_fields: (t.intake_fields ?? []).sort((a, b) => a.sort - b.sort) }))}
+      initialReportFieldPresets={reportFieldPresets ?? []}
       canEdit={ctx.role === "owner"}
     />
   );

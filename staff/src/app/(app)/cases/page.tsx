@@ -10,10 +10,10 @@ export default async function CasesPage() {
   if (!ctx) return null;
 
   const supabase = await createClient();
-  const [{ data: requests, error }, { data: caseThreads, error: threadsError }, { data: summaries, error: summariesError }, { data: unsentReports }] = await Promise.all([
+  const [{ data: requests, error }, { data: caseThreads, error: threadsError }, { data: summaries, error: summariesError }, { data: unsentReports }, { data: customerThreads }, { data: departments }] = await Promise.all([
     supabase
       .from("requests")
-      .select("id, title, amount, phase, pay_status, due_at, created_at, customers(name, staff_label)")
+      .select("id, title, amount, phase, pay_status, due_at, created_at, customer_id, customers(name, staff_label)")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
     supabase.from("threads").select("id, request_id, archived_at").eq("org_id", ctx.orgId).eq("kind", "case"),
@@ -22,6 +22,10 @@ export default async function CasesPage() {
     // マネージャー・本部メンバーが依頼主に送っていない（＝報告済み・承認待ち）
     // ものを調べるため。
     supabase.from("completion_reports").select("request_id").is("sent_at", null),
+    // 案件がどの窓口（マネージャー）の依頼主のものかを調べるため、依頼主の
+    // トーク（kind='customer'）の department_id を customer_id ごとに引く。
+    supabase.from("threads").select("customer_id, department_id").eq("org_id", ctx.orgId).eq("kind", "customer"),
+    supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
   ]);
   if (error) console.error("requests select failed:", error);
   if (threadsError) console.error("case threads select failed:", threadsError);
@@ -30,6 +34,7 @@ export default async function CasesPage() {
   const threadByRequestId = new Map((caseThreads ?? []).map((t) => [t.request_id, t]));
   const summaryByRequestId = new Map((summaries ?? []).map((s) => [s.request_id, s]));
   const unsentReportRequestIds = new Set((unsentReports ?? []).map((r) => r.request_id));
+  const departmentIdByCustomerId = new Map((customerThreads ?? []).map((t) => [t.customer_id, t.department_id]));
   // 着手後、報告の目安時間（due_at）まで残り15分以内（経過済みも含む）か
   // どうかの判定に使う閾値。ナビの赤丸バッジ（Shell.tsx）と同じ基準。
   const soonThreshold = new Date(new Date().getTime() + 15 * 60 * 1000);
@@ -58,6 +63,7 @@ export default async function CasesPage() {
       dueSoon,
       reportPending,
       customerName: customer?.staff_label ?? customer?.name ?? "—",
+      departmentId: departmentIdByCustomerId.get(r.customer_id) ?? null,
       threadId: thread?.id ?? null,
       archived: !!thread?.archived_at,
       lastMessagePreview,
@@ -77,7 +83,12 @@ export default async function CasesPage() {
       )}
 
       {!error && rows.length > 0 && (
-        <CasesList rows={rows} canDelete={ctx.role === "owner" || ctx.role === "dept_manager"} canSeeAmount={ctx.role === "owner" || ctx.role === "dept_manager"} />
+        <CasesList
+          rows={rows}
+          departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
+          canDelete={ctx.role === "owner" || ctx.role === "dept_manager"}
+          canSeeAmount={ctx.role === "owner" || ctx.role === "dept_manager"}
+        />
       )}
     </div>
   );

@@ -59,6 +59,9 @@ import {
   addIntakeField,
   updateIntakeField,
   deleteIntakeField,
+  createReportFieldPreset,
+  updateReportFieldPreset,
+  deleteReportFieldPreset,
 } from "@/app/actions";
 
 interface Question {
@@ -182,6 +185,13 @@ interface IntakeField {
   sort: number;
 }
 
+interface ReportFieldPreset {
+  id: string;
+  org_id: string;
+  label: string;
+  sort: number;
+}
+
 interface IntakeForm {
   id: string;
   org_id: string;
@@ -229,13 +239,15 @@ export default function MenuSettings({
   orgId,
   initialMenus,
   initialTemplates,
+  initialReportFieldPresets,
   canEdit,
 }: {
   orgId: string;
   initialMenus: Menu[];
   initialTemplates: IntakeForm[];
+  initialReportFieldPresets: ReportFieldPreset[];
   // 受付メニューはFC展開でのブランド・料金統一のため本部専用で、
-  // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレは常に編集可。
+  // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレ・報告書項目は常に編集可。
   canEdit: boolean;
 }) {
   const [tab, setTab] = useState<TabKey>("menu");
@@ -306,15 +318,17 @@ export default function MenuSettings({
 
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
+      {tab === "reportFields" && <ReportFieldPresetsCard orgId={orgId} initialPresets={initialReportFieldPresets} />}
     </div>
   );
 }
 
-type TabKey = "menu" | "templates";
+type TabKey = "menu" | "templates" | "reportFields";
 
 const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
   { key: "menu", label: "受付メニュー", mobileLabel: "メニュー" },
   { key: "templates", label: "返信テンプレ", mobileLabel: "テンプレ" },
+  { key: "reportFields", label: "報告書の項目", mobileLabel: "報告項目" },
 ];
 
 function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
@@ -623,6 +637,57 @@ function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemp
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function ReportFieldPresetsCard({ orgId, initialPresets }: { orgId: string; initialPresets: ReportFieldPreset[] }) {
+  const [presets, setPresets] = useState(initialPresets);
+
+  async function handleAdd() {
+    const id = await createReportFieldPreset(orgId, "新しい項目");
+    setPresets((p) => [...p, { id, org_id: orgId, label: "新しい項目", sort: 999 }]);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("この項目を削除しますか？")) return;
+    await deleteReportFieldPreset(id);
+    setPresets((p) => p.filter((x) => x.id !== id));
+  }
+
+  function patchLocal(id: string, newLabel: string) {
+    setPresets((rows) => rows.map((r) => (r.id === id ? { ...r, label: newLabel } : r)));
+  }
+
+  async function commit(p: ReportFieldPreset) {
+    if (!p.label.trim()) return;
+    await updateReportFieldPreset(p.id, p.label);
+  }
+
+  return (
+    <div style={card}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>報告書の項目</div>
+        <InfoTooltip text="完了報告を書くとき、スタッフがワンタップで項目を追加できる定型の項目名です（自由な項目追加も別途できます）。" />
+        <div style={{ flex: 1 }} />
+        <button onClick={handleAdd} style={smallBtn}>
+          <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
+          項目を追加
+        </button>
+      </div>
+
+      {presets.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ項目がありません。</div>}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {presets.map((p) => (
+          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input value={p.label} onChange={(e) => patchLocal(p.id, e.target.value)} onBlur={() => commit(p)} className="vid-input" style={{ ...input, flex: 1 }} />
+            <button onClick={() => handleDelete(p.id)} aria-label="削除" style={{ ...smallBtn, color: "var(--color-accent-200)", borderColor: "var(--color-divider)" }}>
+              <Trash size={12} />
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

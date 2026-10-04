@@ -1249,6 +1249,8 @@ function QuoteDialog({
   const [saveAsMenu, setSaveAsMenu] = useState(false);
   const [isHourly, setIsHourly] = useState(false);
   const [cadence, setCadence] = useState<SubscriptionCadence | "">("");
+  const [anchorWeekday, setAnchorWeekday] = useState<number | null>(null);
+  const [anchorDayOfMonth, setAnchorDayOfMonth] = useState("");
   const [estimatedHours, setEstimatedHours] = useState("");
   const [hourlyLabel, setHourlyLabel] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1302,6 +1304,8 @@ function QuoteDialog({
         saveAsMenu,
         hourly: isHourly ? { rate: HOURLY_RATE_PER_HOUR, cap: hourlyCap, label: hourlyLabel } : undefined,
         cadence: !isHourly && cadence ? cadence : undefined,
+        anchorWeekday: !isHourly && cadence === "weekly" && anchorWeekday != null ? anchorWeekday : undefined,
+        anchorDayOfMonth: !isHourly && cadence === "monthly" && anchorDayOfMonth.trim() ? Number(anchorDayOfMonth) : undefined,
       });
       onCreated(requestId);
     } catch (e) {
@@ -1454,6 +1458,33 @@ function QuoteDialog({
                 毎月
               </button>
             </div>
+            {cadence === "weekly" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)" }}>曜日を指定（任意・無指定なら初回決済日から7日ごと）</span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {["日", "月", "火", "水", "木", "金", "土"].map((label, i) => (
+                    <button key={i} onClick={() => setAnchorWeekday((v) => (v === i ? null : i))} style={{ ...pillStyle(anchorWeekday === i), minWidth: 30, padding: "0 6px" }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {cadence === "monthly" && (
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--color-neutral-600)" }}>
+                日付を指定（任意・1〜28。無指定なら初回決済日から1ヶ月ごと）
+                <input
+                  value={anchorDayOfMonth}
+                  onChange={(e) => setAnchorDayOfMonth(e.target.value)}
+                  type="number"
+                  min={1}
+                  max={28}
+                  placeholder="例）25"
+                  className="vid-input"
+                  style={{ ...inputStyle, width: 90 }}
+                />
+              </label>
+            )}
           </div>
         )}
 

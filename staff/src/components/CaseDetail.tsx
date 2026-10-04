@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Archive, ArrowCounterClockwise, Star, Plus, X } from "@phosphor-icons/react";
+import { ArrowLeft, Archive, ArrowCounterClockwise, Star, Plus, X, Paperclip, CircleNotch, FilePdf, Image as ImageIcon } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
@@ -19,6 +19,7 @@ import {
   cancelSubscription,
 } from "@/app/actions";
 import type { PaymentTiming, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
+import { createClient } from "@/lib/supabase/client";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
 
 const card: React.CSSProperties = {
@@ -57,6 +58,7 @@ export default function CaseDetail({
   request,
   customer,
   report,
+  reportFieldPresets,
   rating,
   caseThread,
   caseMessages,
@@ -85,7 +87,8 @@ export default function CaseDetail({
     hourlyCap: number | null;
   };
   customer: { id: string; name: string } | null;
-  report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[]; pending: boolean } | null;
+  report: { summary: string; noteToCustomer: string | null; details: { label: string; value: string }[]; pending: boolean; attachments: { id: string; path: string; name: string }[] } | null;
+  reportFieldPresets: { id: string; label: string }[];
   rating: { stars: number | null; comment: string | null; skipped: boolean } | null;
   caseThread: { id: string; archived: boolean } | null;
   caseMessages: CaseMessage[];
@@ -213,7 +216,9 @@ export default function CaseDetail({
           </button>
         )}
 
-        {request.phase === "started" && !report && <CompletionReportForm requestId={request.id} canSendDirectly={canSeeFinance} />}
+        {request.phase === "started" && !report && (
+          <CompletionReportForm requestId={request.id} orgId={orgId} canSendDirectly={canSeeFinance} presets={reportFieldPresets} />
+        )}
 
         {request.phase === "started" && report?.pending && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
@@ -229,6 +234,7 @@ export default function CaseDetail({
                 ))}
               </div>
             )}
+            <ReportAttachmentList attachments={report.attachments} orgId={orgId} />
             {report.noteToCustomer && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{report.noteToCustomer}</div>}
             {canSeeFinance && (
               <button onClick={handleApproveReport} disabled={busy} style={{ ...btn, alignSelf: "flex-start" }}>
@@ -268,6 +274,7 @@ export default function CaseDetail({
                 ))}
               </div>
             )}
+            <ReportAttachmentList attachments={report.attachments} orgId={orgId} />
             {report.noteToCustomer && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{report.noteToCustomer}</div>}
           </div>
         )}
@@ -298,22 +305,88 @@ export default function CaseDetail({
   );
 }
 
-function CompletionReportForm({ requestId, canSendDirectly }: { requestId: string; canSendDirectly: boolean }) {
+interface PendingReportAttachment {
+  path: string;
+  name: string;
+  mime: string | null;
+  bytes: number | null;
+}
+
+function isPdfFile(file: File): boolean {
+  return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+}
+function reportAttachmentIcon(name: string) {
+  return /\.pdf$/i.test(name) ? FilePdf : ImageIcon;
+}
+
+function CompletionReportForm({
+  requestId,
+  orgId,
+  canSendDirectly,
+  presets,
+}: {
+  requestId: string;
+  orgId: string;
+  canSendDirectly: boolean;
+  presets: { id: string; label: string }[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
-  const [deliverables, setDeliverables] = useState("");
-  const [delivery, setDelivery] = useState("");
+  const [rows, setRows] = useState<{ label: string; value: string }[]>([]);
   const [noteToCustomer, setNoteToCustomer] = useState("");
+  const [attachments, setAttachments] = useState<PendingReportAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  function addRow(label: string) {
+    setRows((r) => [...r, { label, value: "" }]);
+  }
+  function updateRow(i: number, patch: Partial<{ label: string; value: string }>) {
+    setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
+  }
+  function removeRow(i: number) {
+    setRows((r) => r.filter((_, idx) => idx !== i));
+  }
+
+  async function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0) return;
+    setUploadError("");
+    setUploading(true);
+    try {
+      const supabase = createClient(orgId);
+      for (const file of files) {
+        if (!file.type.startsWith("image/") && !isPdfFile(file)) {
+          setUploadError("画像またはPDFファイルのみ添付できます");
+          continue;
+        }
+        const path = `report-${requestId}/${crypto.randomUUID()}-${file.name}`;
+        const { error: upError } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
+        if (upError) {
+          setUploadError(upError.message);
+          continue;
+        }
+        setAttachments((a) => [...a, { path, name: file.name, mime: file.type, bytes: file.size }]);
+      }
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function removeAttachment(path: string) {
+    setAttachments((a) => a.filter((f) => f.path !== path));
+  }
 
   async function submit() {
     if (saving) return;
     setError("");
     setSaving(true);
     try {
-      await submitCaseReport(requestId, summary, noteToCustomer, deliverables, delivery);
+      await submitCaseReport(requestId, summary, noteToCustomer, rows, attachments);
       router.refresh();
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));
@@ -330,6 +403,8 @@ function CompletionReportForm({ requestId, canSendDirectly }: { requestId: strin
     );
   }
 
+  const unusedPresets = presets.filter((p) => !rows.some((r) => r.label === p.label));
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {!canSendDirectly && (
@@ -345,8 +420,50 @@ function CompletionReportForm({ requestId, canSendDirectly }: { requestId: strin
         className="vid-input"
         style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
       />
-      <input value={deliverables} onChange={(e) => setDeliverables(e.target.value)} placeholder="納品物（任意）" className="vid-input" style={inputStyle} />
-      <input value={delivery} onChange={(e) => setDelivery(e.target.value)} placeholder="受け渡し方法（任意）" className="vid-input" style={inputStyle} />
+
+      {rows.map((row, i) => (
+        <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            value={row.label}
+            onChange={(e) => updateRow(i, { label: e.target.value })}
+            placeholder="項目名"
+            className="vid-input"
+            style={{ ...inputStyle, width: 110, flex: "none" }}
+          />
+          <input
+            value={row.value}
+            onChange={(e) => updateRow(i, { value: e.target.value })}
+            placeholder="内容"
+            className="vid-input"
+            style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+          />
+          <button onClick={() => removeRow(i)} aria-label="削除" style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+      {unusedPresets.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {unusedPresets.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => addRow(p.label)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 28, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+            >
+              <Plus size={11} />
+              {p.label}
+            </button>
+          ))}
+          <button
+            onClick={() => addRow("")}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 28, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+          >
+            <Plus size={11} />
+            カスタム項目
+          </button>
+        </div>
+      )}
+
       <textarea
         value={noteToCustomer}
         onChange={(e) => setNoteToCustomer(e.target.value)}
@@ -355,6 +472,28 @@ function CompletionReportForm({ requestId, canSendDirectly }: { requestId: strin
         className="vid-input"
         style={{ ...inputStyle, height: "auto", padding: "8px 10px", resize: "none" }}
       />
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {attachments.map((a) => {
+          const Icon = reportAttachmentIcon(a.name);
+          return (
+            <div key={a.path} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
+              <Icon size={15} style={{ flex: "none", color: "var(--color-accent)" }} />
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{a.name}</span>
+              <button onClick={() => removeAttachment(a.path)} aria-label="削除" style={{ flex: "none", width: 24, height: 24, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
+                <X size={13} />
+              </button>
+            </div>
+          );
+        })}
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, alignSelf: "flex-start", height: 30, padding: "0 12px", cursor: uploading ? "wait" : "pointer", fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+          {uploading ? <CircleNotch size={13} style={{ animation: "vid-spin 0.7s linear infinite" }} /> : <Paperclip size={13} />}
+          画像・PDFを添付
+          <input type="file" accept="image/*,application/pdf" multiple onChange={handlePickFiles} disabled={uploading} style={{ display: "none" }} />
+        </label>
+        {uploadError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{uploadError}</span>}
+      </div>
+
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={submit} disabled={saving || !summary.trim()} style={btn}>
@@ -364,6 +503,43 @@ function CompletionReportForm({ requestId, canSendDirectly }: { requestId: strin
           キャンセル
         </button>
       </div>
+    </div>
+  );
+}
+
+function ReportAttachmentList({ attachments, orgId }: { attachments: { id: string; path: string; name: string }[]; orgId: string }) {
+  const [openingId, setOpeningId] = useState<string | null>(null);
+
+  async function open(path: string, id: string) {
+    if (openingId) return;
+    setOpeningId(id);
+    try {
+      const supabase = createClient(orgId);
+      const { data, error } = await supabase.storage.from("attachments").createSignedUrl(path, 60);
+      if (error || !data?.signedUrl) throw error ?? new Error("URLを発行できませんでした");
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } finally {
+      setOpeningId(null);
+    }
+  }
+
+  if (attachments.length === 0) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {attachments.map((a) => {
+        const Icon = reportAttachmentIcon(a.name);
+        return (
+          <button
+            key={a.id}
+            onClick={() => open(a.path, a.id)}
+            disabled={openingId === a.id}
+            style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, padding: "6px 8px", cursor: openingId === a.id ? "wait" : "pointer", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-bg)" }}
+          >
+            {openingId === a.id ? <CircleNotch size={14} style={{ flex: "none", color: "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} /> : <Icon size={14} style={{ flex: "none", color: "var(--color-accent)" }} />}
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{a.name}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

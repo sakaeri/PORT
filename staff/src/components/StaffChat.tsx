@@ -10,6 +10,7 @@ import StaffThreadPane from "@/components/StaffThreadPane";
 import Modal from "@/components/Modal";
 import RowKebabMenu from "@/components/RowKebabMenu";
 import { InviteAdmin, type Department } from "@/components/StaffAdmin";
+import DepartmentFilterDropdown from "@/components/DepartmentFilterDropdown";
 import type { StaffRole } from "@/lib/supabase/types";
 
 export interface StaffDirectoryRow {
@@ -64,7 +65,10 @@ export default function StaffChat({
   const [selectedId, setSelectedId] = useState<string | null>(canBrowseStaff ? null : currentUserId);
   const [showInvite, setShowInvite] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const departmentById = new Map(departments.map((d) => [d.id, d.name]));
+  const departmentFilterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "窓口未設定" }];
 
   // 一覧の最終メッセージ・未読はこのコンポーネント自身では再取得せず、
   // ページ全体(staff/page.tsx)を router.refresh() で再取得させる
@@ -89,7 +93,9 @@ export default function StaffChat({
     };
   }, [orgId, canBrowseStaff, router]);
 
-  const otherStaff = staff.filter((s) => s.id !== currentUserId);
+  const otherStaff = staff
+    .filter((s) => s.id !== currentUserId)
+    .filter((s) => departmentFilter === "all" || (departmentFilter === "none" ? s.departmentIds.length === 0 : s.departmentIds.includes(departmentFilter)));
   const archivedCount = otherStaff.filter((s) => s.archived).length;
   const visibleOtherStaff = otherStaff.filter((s) => !s.archived || showArchived);
   // マネージャーには、チーム一覧の先頭に「本部」＝本部と自分の1対1スレッドも
@@ -194,6 +200,7 @@ export default function StaffChat({
           />
         ) : (
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+            {departments.length > 0 && <DepartmentFilterDropdown options={departmentFilterOptions} value={departmentFilter} onChange={setDepartmentFilter} />}
             {canAdmin && archivedCount > 0 && (
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
                 <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
@@ -223,6 +230,11 @@ export default function StaffChat({
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <div style={{ fontSize: 14, fontWeight: e.unread ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.displayName}</div>
+                      {staffRow && staffRow.departmentIds.length > 0 && (
+                        <span style={{ flex: "none", fontSize: 10, color: "var(--color-neutral-500)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-sm)", padding: "1px 6px" }}>
+                          {staffRow.departmentIds.map((id) => departmentById.get(id)).filter(Boolean).join("・")}
+                        </span>
+                      )}
                       {e.unread && (
                         <span style={{ flex: "none", fontSize: 10, fontWeight: 700, color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: "var(--radius-sm)", padding: "1.5px 6px" }}>
                           未読

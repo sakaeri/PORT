@@ -77,7 +77,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  const MESSAGE_SELECT = "*, message_attachments(*), requests(*, request_items(*), completion_reports(*), ratings(*))";
+  const MESSAGE_SELECT = "*, message_attachments(*), requests(*, request_items(*), completion_reports(*), completion_report_attachments(*), ratings(*))";
 
   // 開いている間に届いた新着分だけを取りに行く（既に読み込んだ最古の時点以降のみ）。
   // 会話全体を毎回取り直すと、やり取りが長い依頼主ほどポーリングのたびに重くなるため。
@@ -253,6 +253,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
                   msg={m}
                   bundle={m.requestBundle}
                   balance={ctx.balance}
+                  orgId={ctx.orgId}
                   onPay={async (id) => {
                     await payFromBalance(id);
                     await refresh();

@@ -298,6 +298,37 @@ export async function deleteIntakeField(id: string) {
   if (error) throw error;
 }
 
+// 完了報告でよく使う項目名（プリセット）。スタッフが報告を書くとき、
+// ここから選んでワンタップで項目を追加できる（自由な項目追加もできるが、
+// 何を報告すべきか迷わないための定型的な選択肢）。
+export async function createReportFieldPreset(orgId: string, label: string) {
+  const ctx = await requireContext();
+  if (ctx.orgId !== orgId) throw new Error("権限がありません");
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("report_field_presets")
+    .insert({ org_id: orgId, label: label.trim() || "新しい項目", sort: 999 })
+    .select("id")
+    .single();
+  if (error || !data) throw error ?? new Error("作成できませんでした");
+  return data.id;
+}
+
+export async function updateReportFieldPreset(id: string, label: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const trimmed = label.trim();
+  if (!trimmed) throw new Error("項目名を入力してください");
+  const { error } = await supabase.from("report_field_presets").update({ label: trimmed }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteReportFieldPreset(id: string) {
+  await requireContextWithDelete();
+  const supabase = await createClient();
+  const { error } = await supabase.from("report_field_presets").delete().eq("id", id);
+  if (error) throw error;
+}
 
 // ============================================================
 // 新規事業者アカウント作成（PORT本部のみ）
@@ -357,6 +388,11 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
     .select("id")
     .single();
   if (orgErr || !org) throw orgErr ?? new Error("事業者を作成できませんでした");
+
+  await admin.from("report_field_presets").insert([
+    { org_id: org.id, label: "納品物", sort: 0 },
+    { org_id: org.id, label: "受け渡し方法", sort: 1 },
+  ]);
 
   return { orgId: org.id as string, slug };
 }
@@ -443,27 +479,6 @@ export async function convertCustomerToOrg(customerId: string, fields: OrgAccoun
 // 新しいログインを作らず、今ログイン中の自分をそのまま新しい事業者の
 // オーナーとして追加する。事業者を複数運営したい人向け。owner だけに許可
 // する（reception が勝手に窓口を増やせると困るため）。
-export async function createOrgForCurrentUser(fields: OrgFields) {
-  const ctx = await requireContext();
-  if (ctx.role !== "owner") throw new Error("この操作は本部メンバーのみ行えます");
-
-  const admin = createServiceRoleClient();
-  const result = await createOrgRow(fields, admin);
-
-  const { error } = await admin.from("staff_org_links").insert({
-    user_id: ctx.userId,
-    org_id: result.orgId,
-    role: "owner",
-    display_name: ctx.displayName,
-  });
-  if (error) {
-    await admin.from("organizations").delete().eq("id", result.orgId);
-    throw error;
-  }
-
-  return result;
-}
-
 // サイドバーの窓口切替。my_staff_orgs() に含まれる事業者かどうかはRLS側
 // （auth_role()/is_office() が該当なしなら null/false になる）で担保される
 // ため、ここでは単に選んだ事業者IDをCookieに保存するだけでよい。
@@ -596,20 +611,6 @@ export async function updateCustomerStaffLabel(customerId: string, label: string
 // 「自分のログインで追加した窓口」をセルフサービスで削除する。今のログイン
 // の本来の事業者（primary）は対象外（削除するとそのログイン自体が
 // プロフィールを失って詰む）。staff_org_links 経由で追加した分だけ許可。
-export async function removeMyOrgLink(orgId: string) {
-  const ctx = await requireContext();
-  const target = ctx.orgs.find((o) => o.orgId === orgId);
-  if (!target || target.isPrimary || target.role !== "owner") {
-    throw new Error("この窓口は削除できません");
-  }
-
-  const admin = createServiceRoleClient();
-  const { error } = await admin.from("organizations").delete().eq("id", orgId);
-  if (error) throw error;
-
-  await clearStaffOrgCookieIfCurrent(orgId);
-}
-
 // ============================================================
 // 依頼主とのトーク（受付側の閲覧・返信・整理）
 // ============================================================
@@ -752,6 +753,9 @@ export async function createCaseRequest(
     // 確定するまでは定期対応としては動き出さない
     // （pay_request_from_balance 側で有効化する）。
     cadence?: SubscriptionCadence;
+    // 曜日・日付の指定（任意）。無指定なら初回決済日からの単純な+7日／+1ヶ月。
+    anchorWeekday?: number;
+    anchorDayOfMonth?: number;
   },
 ) {
   const ctx = await requireContext();
@@ -824,6 +828,8 @@ export async function createCaseRequest(
         amount,
         items: items.map((it) => ({ label: it.label, price: it.price, payout: it.payout, qty: it.qty })),
         cadence: input.cadence,
+        anchor_weekday: input.cadence === "weekly" ? (input.anchorWeekday ?? null) : null,
+        anchor_day_of_month: input.cadence === "monthly" ? (input.anchorDayOfMonth ?? null) : null,
         created_by: ctx.userId,
       })
       .select("id")
@@ -935,8 +941,8 @@ export async function submitCaseReport(
   requestId: string,
   summary: string,
   noteToCustomer: string,
-  deliverables: string,
-  delivery: string,
+  details: { label: string; value: string }[],
+  attachments: { path: string; name: string; mime: string | null; bytes: number | null }[],
 ) {
   const ctx = await requireContext();
   const supabase = await createClient();
@@ -947,17 +953,21 @@ export async function submitCaseReport(
   if (!request) throw new Error("案件が見つかりません");
   if (request.phase !== "started") throw new Error("着手中の案件のみ完了報告できます");
 
-  const details = [
-    ...(deliverables.trim() ? [{ label: "納品物", value: deliverables.trim() }] : []),
-    ...(delivery.trim() ? [{ label: "受け渡し", value: delivery.trim() }] : []),
-  ];
+  const cleanDetails = details.filter((d) => d.label.trim() && d.value.trim()).map((d) => ({ label: d.label.trim(), value: d.value.trim() }));
+
+  if (attachments.length > 0) {
+    const { error: attError } = await supabase.from("completion_report_attachments").insert(
+      attachments.map((a) => ({ request_id: requestId, file_path: a.path, file_name: a.name, mime: a.mime, bytes: a.bytes })),
+    );
+    if (attError) throw attError;
+  }
 
   const canSendDirectly = ctx.role === "owner" || ctx.role === "dept_manager";
   const now = new Date().toISOString();
   const { error: reportError } = await supabase.from("completion_reports").insert({
     request_id: requestId,
     summary: trimmed,
-    details,
+    details: cleanDetails,
     note_to_customer: noteToCustomer.trim() || null,
     submitted_at: now,
     sent_at: canSendDirectly ? now : null,

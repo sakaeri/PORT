@@ -197,6 +197,7 @@ export function RequestCard({
   msg,
   bundle,
   balance,
+  orgId,
   onPay,
   onSubmitRating,
   onSkipRating,
@@ -204,6 +205,7 @@ export function RequestCard({
   msg: MessageWithExtras;
   bundle: RequestBundle;
   balance: number;
+  orgId: string;
   onPay: (id: string) => Promise<void>;
   onSubmitRating: (id: string, stars: number, comment: string) => void;
   onSkipRating: (id: string) => void;
@@ -214,6 +216,20 @@ export function RequestCard({
   const [comment, setComment] = useState("");
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+
+  async function openReportAttachment(path: string, id: string) {
+    if (openingAttachmentId) return;
+    setOpeningAttachmentId(id);
+    try {
+      const supabase = createClient(orgId);
+      const { data, error } = await supabase.storage.from("attachments").createSignedUrl(path, 60);
+      if (error || !data?.signedUrl) throw error ?? new Error("URLを発行できませんでした");
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } finally {
+      setOpeningAttachmentId(null);
+    }
+  }
 
   const showProgress = !["quoted", "declined"].includes(r.phase);
   const showReport = r.phase === "completed" && !!report?.sent_at;
@@ -364,6 +380,25 @@ export function RequestCard({
                 </div>
               ))}
             </div>
+            {report.attachments.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
+                {report.attachments.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => openReportAttachment(f.file_path, f.id)}
+                    disabled={openingAttachmentId === f.id}
+                    style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, padding: "6px 8px", cursor: openingAttachmentId === f.id ? "wait" : "pointer", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-bg)" }}
+                  >
+                    {openingAttachmentId === f.id ? (
+                      <CircleNotch size={15} style={{ flex: "none", color: "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} />
+                    ) : (
+                      <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 15, color: "var(--color-accent)" }} />
+                    )}
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{f.file_name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <p style={{ margin: "10px 0 0", paddingTop: 8, borderTop: "1px solid var(--color-divider)", fontSize: 12.5, opacity: 0.75 }}>
               このたびもご依頼いただきありがとうございました。ご不明な点や修正のご希望があれば、このまま返信ください。またのご依頼をお待ちしております。
             </p>

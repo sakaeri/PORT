@@ -323,6 +323,20 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["completion_reports"]["Row"]>;
         Relationships: [{ foreignKeyName: "completion_reports_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "requests"; referencedColumns: ["id"] }];
       };
+      completion_report_attachments: {
+        Row: {
+          id: string;
+          request_id: string;
+          file_path: string;
+          file_name: string;
+          mime: string | null;
+          bytes: number | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["completion_report_attachments"]["Row"]> & { request_id: string; file_path: string; file_name: string };
+        Update: Partial<Database["public"]["Tables"]["completion_report_attachments"]["Row"]>;
+        Relationships: [{ foreignKeyName: "completion_report_attachments_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "requests"; referencedColumns: ["id"] }];
+      };
       ratings: {
         Row: {
           id: string;

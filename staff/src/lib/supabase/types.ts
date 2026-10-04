@@ -446,6 +446,32 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["completion_reports"]["Row"]>;
         Relationships: [{ foreignKeyName: "completion_reports_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "requests"; referencedColumns: ["id"] }];
       };
+      completion_report_attachments: {
+        Row: {
+          id: string;
+          request_id: string;
+          file_path: string;
+          file_name: string;
+          mime: string | null;
+          bytes: number | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["completion_report_attachments"]["Row"]> & { request_id: string; file_path: string; file_name: string };
+        Update: Partial<Database["public"]["Tables"]["completion_report_attachments"]["Row"]>;
+        Relationships: [{ foreignKeyName: "completion_report_attachments_request_id_fkey"; columns: ["request_id"]; isOneToOne: false; referencedRelation: "requests"; referencedColumns: ["id"] }];
+      };
+      report_field_presets: {
+        Row: {
+          id: string;
+          org_id: string;
+          label: string;
+          sort: number;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["report_field_presets"]["Row"]> & { org_id: string; label: string };
+        Update: Partial<Database["public"]["Tables"]["report_field_presets"]["Row"]>;
+        Relationships: [{ foreignKeyName: "report_field_presets_org_id_fkey"; columns: ["org_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] }];
+      };
       ratings: {
         Row: {
           id: string;
@@ -559,6 +585,8 @@ export interface Database {
           cadence: SubscriptionCadence;
           active: boolean;
           next_due_at: string | null;
+          anchor_weekday: number | null;
+          anchor_day_of_month: number | null;
           last_insufficient_notice_at: string | null;
           created_by: string | null;
           created_at: string;

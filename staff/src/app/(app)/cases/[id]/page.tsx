@@ -23,11 +23,11 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   // タップしてからこの画面が出るまでの体感速度のため、全クエリを並列で投げる
   // （案件トークのメッセージは threads.id が要るが、messages を threads の
   // embed として一緒に取ることで、往復を1回減らしている）。
-  const [{ data: request }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }, { data: staffDepartments }] = await Promise.all([
+  const [{ data: request }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }, { data: staffDepartments }, { data: presetRows }] = await Promise.all([
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), completion_report_attachments(id, file_path, file_name), ratings(*), request_subscriptions(id, cadence, active, next_due_at)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -44,6 +44,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       .order("sent_at", { referencedTable: "messages", ascending: true })
       .maybeSingle(),
     isManagerAssigning ? supabase.from("staff_departments").select("profile_id, department_id") : Promise.resolve({ data: [] }),
+    supabase.from("report_field_presets").select("id, label").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
   ]);
   if (!request) notFound();
 
@@ -70,6 +71,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
 
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
+  const reportAttachments = request.completion_report_attachments ?? [];
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;
   const subscription = Array.isArray(request.request_subscriptions) ? request.request_subscriptions[0] : request.request_subscriptions;
   const reportPending = !!report && !report.sent_at;
@@ -95,7 +97,18 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         hourlyCap: canSeeFinance ? request.hourly_cap : null,
       }}
       customer={customer ? { id: customer.id, name: customer.staff_label ?? customer.name } : null}
-      report={report ? { summary: report.summary, noteToCustomer: report.note_to_customer, details: report.details ?? [], pending: reportPending } : null}
+      report={
+        report
+          ? {
+              summary: report.summary,
+              noteToCustomer: report.note_to_customer,
+              details: report.details ?? [],
+              pending: reportPending,
+              attachments: reportAttachments.map((a) => ({ id: a.id, path: a.file_path, name: a.file_name })),
+            }
+          : null
+      }
+      reportFieldPresets={(presetRows ?? []).map((p) => ({ id: p.id, label: p.label }))}
       rating={rating ? { stars: rating.stars, comment: rating.comment, skipped: rating.skipped } : null}
       caseThread={caseThread ? { id: caseThread.id, archived: !!caseThread.archived_at } : null}
       caseMessages={caseMessages}
