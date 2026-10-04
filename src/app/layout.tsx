@@ -17,8 +17,8 @@ const notoSansJp = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "動画制作の窓口",
-  description: "依頼主向けトーク画面",
+  title: "PORT",
+  description: "秘書とのやり取り画面",
 };
 
 // Runs before paint so the persisted theme choice applies with no flash of

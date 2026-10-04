@@ -306,7 +306,7 @@ export function RequestCard({
                     <div>残高：{yen(balance)}</div>
                     {r.cadence && (
                       <div style={{ color: "var(--color-neutral-500)" }}>
-                        確定すると、以降は{CADENCE_LABEL[r.cadence]}自動的に案件が作られ、残高から引き落とされます（今回以降、改めて確定いただく必要はありません）。
+                        確定すると、以降は{CADENCE_LABEL[r.cadence]}自動的に依頼が作られ、残高から引き落とされます（今回以降、改めて確定いただく必要はありません）。
                       </div>
                     )}
                     {balance < r.amount && (

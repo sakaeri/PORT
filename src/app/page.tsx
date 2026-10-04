@@ -6,7 +6,7 @@ import AccountGate from "@/components/chat/AccountGate";
 
 export async function generateMetadata(): Promise<Metadata> {
   const ctx = await getCustomerContext();
-  return { title: ctx?.orgDisplayName ?? "動画制作の窓口" };
+  return { title: ctx?.orgDisplayName ?? "PORT" };
 }
 
 export default async function Home() {

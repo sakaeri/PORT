@@ -1,7 +1,7 @@
 import type { RequestRow } from "@/lib/chat-types";
 import type { PaymentTiming } from "@/lib/supabase/types";
 
-export const STAGE_LABELS = ["見積もり・受付", "制作の着手", "制作中", "納品"] as const;
+export const STAGE_LABELS = ["お見積もり", "依頼確定", "対応中", "完了報告"] as const;
 
 export const PAYMENT_TIMING_LABEL: Record<PaymentTiming, string> = {
   prepay_full: "先払い",
@@ -89,7 +89,7 @@ export function stageInfoFor(r: RequestRow): StageInfo {
   const steps: StageStep[] = STAGE_LABELS.map((label, i) => {
     const reached = i < stageIndex;
     const current = i === stageIndex;
-    const displayLabel = current && i === 1 ? "着手前（素材と条件の確認中）" : label;
+    const displayLabel = current && i === 1 ? "依頼確定（着手前のご準備中）" : label;
     const at = i === 0 ? r.quoted_at : i === 1 ? r.paid_at : i === 2 ? r.started_at : i === 3 ? r.completed_at : null;
     return { label: displayLabel, state: reached ? "done" : current ? "current" : "todo", at: reached || (i === 3 && r.phase === "completed") ? at : null };
   });

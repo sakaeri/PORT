@@ -108,7 +108,7 @@ export function ProgressPanel({
                   </div>
                   {canCancel && (
                     <button onClick={() => onCancel(r.id)} style={{ height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--color-text)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                      この見積もりを断る
+                      この見積もりを見送る
                     </button>
                   )}
                 </div>
@@ -134,12 +134,12 @@ export function CancelDialog({
 }) {
   return (
     <Centered onBackdrop={onClose}>
-      <div style={dialogTitle}>見積もりを断りますか？</div>
-      <div style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.85 }}>まだ決済前のため、費用は発生しません。この見積もりを断ります。</div>
+      <div style={dialogTitle}>見積もりを見送りますか？</div>
+      <div style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.85 }}>まだ決済前のため、費用は発生しません。この見積もりを見送ります。</div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
         <button onClick={onClose} style={ghostBtn}>依頼を続ける</button>
         <button onClick={onConfirm} disabled={confirming} style={{ ...accentBtn, opacity: confirming ? 0.6 : 1 }}>
-          {confirming ? "処理中…" : "見積もりを断る"}
+          {confirming ? "処理中…" : "見積もりを見送る"}
         </button>
       </div>
     </Centered>
