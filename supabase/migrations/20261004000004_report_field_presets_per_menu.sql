@@ -2,6 +2,9 @@
 -- メニュー単位に変える。メニューによって報告すべき内容は違う
 -- （「はじめの質問」が menu_questions でメニュー単位なのと同じ考え方）。
 alter table report_field_presets add column menu_id uuid references menus(id) on delete cascade;
+-- 以降の一時的な引き継ぎ用insertでは org_id を埋めないため、先にNOT NULL制約を外す
+-- （org_id 自体はこのあとすぐ列ごと削除する）。
+alter table report_field_presets alter column org_id drop not null;
 
 -- 既存の事業者単位のプリセットは、その事業者の全メニューに複製して引き継ぐ
 -- （何も失われないようにするため）。
