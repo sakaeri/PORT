@@ -5,6 +5,17 @@ import { staffSenderLabel } from "@/lib/roles";
 import StaffChat from "@/components/StaffChat";
 import type { StaffRole } from "@/lib/supabase/types";
 
+// JSTでの「今月」の開始・終了（UTCのタイムスタンプ比較用）。日本には
+// サマータイムが無いので固定オフセット（+9時間）でよい。
+function jstMonthRange(): { start: string; end: string } {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+  const year = Number(parts.find((p) => p.type === "year")!.value);
+  const month = Number(parts.find((p) => p.type === "month")!.value);
+  const start = new Date(Date.UTC(year, month - 1, 1) - 9 * 60 * 60 * 1000).toISOString();
+  const end = new Date(Date.UTC(year, month, 1) - 9 * 60 * 60 * 1000).toISOString();
+  return { start, end };
+}
+
 export default async function StaffPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
@@ -16,7 +27,8 @@ export default async function StaffPage() {
   const canBrowseStaff = canAdmin;
   const rosterRoles: StaffRole[] = ctx.role === "dept_manager" ? ["dept_leader"] : ["owner", "dept_manager", "dept_leader"];
   const supabase = await createClient();
-  const [{ data: departments }, { data: profiles }, { data: staffDepartments }, { data: summaries }] = await Promise.all([
+  const { start: monthStart, end: monthEnd } = jstMonthRange();
+  const [{ data: departments }, { data: profiles }, { data: staffDepartments }, { data: summaries }, { data: reportRows }] = await Promise.all([
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
     supabase
       .from("profiles")
@@ -26,7 +38,22 @@ export default async function StaffPage() {
       .order("created_at", { ascending: true }),
     supabase.from("staff_departments").select("profile_id, department_id"),
     supabase.rpc("staff_thread_summaries", { p_org_id: ctx.orgId }),
+    // スタッフの「業績」は今のところ、今月に完了報告を提出した件数だけを見せる
+    // （報告を出した人＝creator_idで1件とカウント。payoutのような金額的な
+    // 取り分の概念はスタッフには無いので、シンプルな件数に留める）。
+    supabase
+      .from("completion_reports")
+      .select("creator_id, requests!inner(org_id)")
+      .eq("requests.org_id", ctx.orgId)
+      .gte("submitted_at", monthStart)
+      .lt("submitted_at", monthEnd),
   ]);
+
+  const reportCountByCreator = new Map<string, number>();
+  for (const r of reportRows ?? []) {
+    if (!r.creator_id) continue;
+    reportCountByCreator.set(r.creator_id, (reportCountByCreator.get(r.creator_id) ?? 0) + 1);
+  }
 
   const departmentIdsByProfile = new Map<string, string[]>();
   for (const row of staffDepartments ?? []) {
@@ -65,6 +92,7 @@ export default async function StaffPage() {
       archived: summary?.archived ?? false,
       lastMessagePreview: previewFor(summary),
       unread: summary?.unread ?? false,
+      monthlyReportCount: reportCountByCreator.get(p.id) ?? 0,
     };
   });
 

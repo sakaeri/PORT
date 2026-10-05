@@ -22,6 +22,7 @@ export interface StaffDirectoryRow {
   archived: boolean;
   lastMessagePreview: string | null;
   unread: boolean;
+  monthlyReportCount: number;
 }
 
 interface RosterEntry {
@@ -233,6 +234,11 @@ export default function StaffChat({
                       {staffRow && staffRow.departmentIds.length > 0 && (
                         <span style={{ flex: "none", fontSize: 10, color: "var(--color-neutral-500)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-sm)", padding: "1px 6px" }}>
                           {staffRow.departmentIds.map((id) => departmentById.get(id)).filter(Boolean).join("・")}
+                        </span>
+                      )}
+                      {staffRow && (
+                        <span style={{ flex: "none", fontSize: 10, color: "var(--color-neutral-500)" }}>
+                          今月の完了報告 {staffRow.monthlyReportCount}件
                         </span>
                       )}
                       {e.unread && (

@@ -888,6 +888,7 @@ export async function submitCaseReport(requestId: string, summary: string, detai
   const now = new Date().toISOString();
   const { error: reportError } = await supabase.from("completion_reports").insert({
     request_id: requestId,
+    creator_id: ctx.userId,
     summary: trimmed,
     details: cleanDetails,
     submitted_at: now,
