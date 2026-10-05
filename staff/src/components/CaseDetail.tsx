@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Archive, ArrowCounterClockwise, Star, Plus, X, Paperclip, CircleNotch, FilePdf, Image as ImageIcon } from "@phosphor-icons/react";
+import { ArrowLeft, Archive, ArrowCounterClockwise, Star, Plus, X, CircleNotch, FilePdf, Image as ImageIcon } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
@@ -221,7 +221,7 @@ export default function CaseDetail({
         )}
 
         {request.phase === "started" && !report && (
-          <CompletionReportForm requestId={request.id} orgId={orgId} canSendDirectly={canApprove} presets={reportFieldPresets} />
+          <CompletionReportForm requestId={request.id} canSendDirectly={canApprove} presets={reportFieldPresets} />
         )}
 
         {request.phase === "started" && report?.pending && (
@@ -307,43 +307,22 @@ export default function CaseDetail({
   );
 }
 
-interface PendingReportAttachment {
-  path: string;
-  name: string;
-  mime: string | null;
-  bytes: number | null;
-  label?: string;
-}
-
-type ReportRowKind = "text" | "url" | "image" | "pdf";
 interface ReportRow {
   label: string;
   value: string;
-  kind: ReportRowKind;
+  kind: "text" | "url";
 }
 
-function isPdfFile(file: File): boolean {
-  return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-}
-// Supabase Storageのキーは日本語など非ASCII文字を含むと "Invalid key" で
-// アップロードが失敗するため、キーには拡張子だけ残して元のファイル名は使わない
-// （表示用のファイル名はDBのfile_name列に別で保存される）。
-function safeFileExt(name: string): string {
-  const m = /\.[a-zA-Z0-9]{1,8}$/.exec(name);
-  return m ? m[0].toLowerCase() : "";
-}
 function reportAttachmentIcon(name: string) {
   return /\.pdf$/i.test(name) ? FilePdf : ImageIcon;
 }
 
 function CompletionReportForm({
   requestId,
-  orgId,
   canSendDirectly,
   presets,
 }: {
   requestId: string;
-  orgId: string;
   canSendDirectly: boolean;
   presets: { id: string; label: string; kind: string; required: boolean }[];
 }) {
@@ -351,16 +330,12 @@ function CompletionReportForm({
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState("");
   // 必須項目は、押さないと存在に気づかれにくいので最初から行を出しておく。
-  const [rows, setRows] = useState<ReportRow[]>(() => presets.filter((p) => p.required).map((p) => ({ label: p.label, value: "", kind: p.kind as ReportRowKind })));
-  const [attachments, setAttachments] = useState<PendingReportAttachment[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [rowUploading, setRowUploading] = useState<number | null>(null);
-  const [uploadError, setUploadError] = useState("");
+  const [rows, setRows] = useState<ReportRow[]>(() => presets.filter((p) => p.required).map((p) => ({ label: p.label, value: "", kind: p.kind === "url" ? "url" : "text" })));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   function addPresetRow(p: { label: string; kind: string }) {
-    setRows((r) => [...r, { label: p.label, value: "", kind: p.kind as ReportRowKind }]);
+    setRows((r) => [...r, { label: p.label, value: "", kind: p.kind === "url" ? "url" : "text" }]);
   }
   function addCustomRow() {
     setRows((r) => [...r, { label: "", value: "", kind: "text" }]);
@@ -369,79 +344,11 @@ function CompletionReportForm({
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
   }
   function removeRow(i: number) {
-    setRows((r) => {
-      const row = r[i];
-      if (row && (row.kind === "image" || row.kind === "pdf") && row.value) {
-        setAttachments((a) => a.filter((att) => !(att.label === row.label && att.name === row.value)));
-      }
-      return r.filter((_, idx) => idx !== i);
-    });
-  }
-
-  async function handlePickFileForRow(e: React.ChangeEvent<HTMLInputElement>, i: number) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    const row = rows[i];
-    setUploadError("");
-    setRowUploading(i);
-    try {
-      const supabase = createClient(orgId);
-      const path = `report-${requestId}/${crypto.randomUUID()}${safeFileExt(file.name)}`;
-      const { error: upError } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
-      if (upError) {
-        setUploadError(upError.message);
-        return;
-      }
-      setAttachments((a) => [...a, { path, name: file.name, mime: file.type, bytes: file.size, label: row.label }]);
-      updateRow(i, { value: file.name });
-    } finally {
-      setRowUploading(null);
-    }
-  }
-
-  async function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = "";
-    if (files.length === 0) return;
-    setUploadError("");
-    setUploading(true);
-    try {
-      const supabase = createClient(orgId);
-      for (const file of files) {
-        if (!file.type.startsWith("image/") && !isPdfFile(file)) {
-          setUploadError("画像またはPDFファイルのみ添付できます");
-          continue;
-        }
-        const path = `report-${requestId}/${crypto.randomUUID()}${safeFileExt(file.name)}`;
-        const { error: upError } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
-        if (upError) {
-          setUploadError(upError.message);
-          continue;
-        }
-        setAttachments((a) => [...a, { path, name: file.name, mime: file.type, bytes: file.size }]);
-      }
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function removeAttachment(path: string) {
-    setAttachments((a) => a.filter((f) => f.path !== path));
+    setRows((r) => r.filter((_, idx) => idx !== i));
   }
 
   function missingRequiredLabels(): string[] {
-    const missing: string[] = [];
-    for (const p of presets) {
-      if (!p.required) continue;
-      if (p.kind === "image" || p.kind === "pdf") {
-        if (!attachments.some((a) => a.label === p.label)) missing.push(p.label);
-      } else {
-        const row = rows.find((r) => r.label === p.label);
-        if (!row || !row.value.trim()) missing.push(p.label);
-      }
-    }
-    return missing;
+    return presets.filter((p) => p.required && !rows.find((r) => r.label === p.label)?.value.trim()).map((p) => p.label);
   }
 
   async function submit() {
@@ -454,8 +361,8 @@ function CompletionReportForm({
     }
     setSaving(true);
     try {
-      const details = rows.filter((r) => r.kind !== "image" && r.kind !== "pdf").map((r) => ({ label: r.label, value: r.value }));
-      await submitCaseReport(requestId, summary, details, attachments);
+      const details = rows.map((r) => ({ label: r.label, value: r.value }));
+      await submitCaseReport(requestId, summary, details);
       router.refresh();
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));
@@ -491,8 +398,7 @@ function CompletionReportForm({
       />
 
       {rows.map((row, i) => {
-        const isFile = row.kind === "image" || row.kind === "pdf";
-        const preset = presets.find((p) => p.label === row.label && p.kind === row.kind);
+        const preset = presets.find((p) => p.label === row.label && (p.kind === "url") === (row.kind === "url"));
         return (
           <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             {preset ? (
@@ -509,53 +415,14 @@ function CompletionReportForm({
                 style={{ ...inputStyle, width: 110, flex: "none" }}
               />
             )}
-            {isFile ? (
-              row.value ? (
-                <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6 }}>
-                  {(() => {
-                    const Icon = row.kind === "pdf" ? FilePdf : ImageIcon;
-                    return <Icon size={14} style={{ flex: "none", color: "var(--color-accent)" }} />;
-                  })()}
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{row.value}</span>
-                </div>
-              ) : (
-                <label
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    height: 30,
-                    padding: "0 10px",
-                    cursor: rowUploading === i ? "wait" : "pointer",
-                    fontSize: 11.5,
-                    color: "var(--color-neutral-400)",
-                    border: "1px dashed var(--color-divider)",
-                    borderRadius: "var(--radius-md)",
-                  }}
-                >
-                  {rowUploading === i ? <CircleNotch size={13} style={{ animation: "vid-spin 0.7s linear infinite" }} /> : <Paperclip size={13} />}
-                  {row.kind === "pdf" ? "PDFを選択" : "画像を選択"}
-                  <input
-                    type="file"
-                    accept={row.kind === "pdf" ? "application/pdf" : "image/*"}
-                    onChange={(e) => handlePickFileForRow(e, i)}
-                    disabled={rowUploading === i}
-                    style={{ display: "none" }}
-                  />
-                </label>
-              )
-            ) : (
-              <input
-                value={row.value}
-                onChange={(e) => updateRow(i, { value: e.target.value })}
-                placeholder={row.kind === "url" ? "URL（https://...）" : "内容"}
-                type={row.kind === "url" ? "url" : "text"}
-                className="vid-input"
-                style={{ ...inputStyle, flex: 1, minWidth: 0 }}
-              />
-            )}
+            <input
+              value={row.value}
+              onChange={(e) => updateRow(i, { value: e.target.value })}
+              placeholder={row.kind === "url" ? "URL（https://...）" : "内容"}
+              type={row.kind === "url" ? "url" : "text"}
+              className="vid-input"
+              style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+            />
             <button onClick={() => removeRow(i)} aria-label="削除" style={{ flex: "none", width: 30, height: 30, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
               <X size={14} />
             </button>
@@ -584,27 +451,6 @@ function CompletionReportForm({
           </button>
         </div>
       )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {attachments.filter((a) => !a.label).map((a) => {
-          const Icon = reportAttachmentIcon(a.name);
-          return (
-            <div key={a.path} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-              <Icon size={15} style={{ flex: "none", color: "var(--color-accent)" }} />
-              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{a.name}</span>
-              <button onClick={() => removeAttachment(a.path)} aria-label="削除" style={{ flex: "none", width: 24, height: 24, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
-                <X size={13} />
-              </button>
-            </div>
-          );
-        })}
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, alignSelf: "flex-start", height: 30, padding: "0 12px", cursor: uploading ? "wait" : "pointer", fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-          {uploading ? <CircleNotch size={13} style={{ animation: "vid-spin 0.7s linear infinite" }} /> : <Paperclip size={13} />}
-          画像・PDFを添付
-          <input type="file" accept="image/*,application/pdf" multiple onChange={handlePickFiles} disabled={uploading} style={{ display: "none" }} />
-        </label>
-        {uploadError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{uploadError}</span>}
-      </div>
 
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
       <div style={{ display: "flex", gap: 8 }}>

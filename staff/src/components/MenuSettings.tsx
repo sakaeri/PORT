@@ -665,8 +665,6 @@ function TermsCard({ orgId, initialContent, canEdit }: { orgId: string; initialC
 const PRESET_KINDS = [
   { value: "text", label: "テキスト" },
   { value: "url", label: "URL" },
-  { value: "image", label: "画像" },
-  { value: "pdf", label: "PDF" },
 ];
 
 function MenuReportFieldPresetsEditor({
