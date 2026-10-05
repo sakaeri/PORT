@@ -26,6 +26,7 @@ import {
 } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
+import HqFeedbackChat from "@/components/HqFeedbackChat";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
 import InfoTooltip from "@/components/InfoTooltip";
@@ -486,6 +487,9 @@ export default function CustomerThread({
   ratings,
   latestRequest,
   initialHasMoreOlder,
+  canSeeHqFeedback,
+  hqFeedbackThreadId,
+  hqFeedbackUnread,
 }: {
   customer: { id: string; name: string; staffLabel: string | null; memberNo: string | null; balance: number };
   thread: { id: string; archived: boolean; departmentId: string | null } | null;
@@ -501,6 +505,9 @@ export default function CustomerThread({
   memos: WorkMemo[];
   ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
+  canSeeHqFeedback: boolean;
+  hqFeedbackThreadId: string | null;
+  hqFeedbackUnread: boolean;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -701,7 +708,10 @@ export default function CustomerThread({
           社内表示名
         </button>
         {thread && departments.length > 0 && (
-          <ThreadDepartmentControl threadId={thread.id} departments={departments} initialDepartmentId={thread.departmentId} />
+          <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: "var(--color-neutral-400)" }}>担当秘書</span>
+            <ThreadDepartmentControl threadId={thread.id} departments={departments} initialDepartmentId={thread.departmentId} />
+          </div>
         )}
         {isMobile && (
           <button
@@ -879,6 +889,9 @@ export default function CustomerThread({
           )}
           {!isHq && <RatingsSummary ratings={ratings} />}
           <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
+          {canSeeHqFeedback && (
+            <HqFeedbackSection threadId={hqFeedbackThreadId} unread={hqFeedbackUnread} orgId={orgId} currentUserId={currentUserId} />
+          )}
           {!isHq && (
             <CaseSummarySection thread={thread} customerId={customer.id} menus={menus} latestRequest={latestRequest} />
           )}
@@ -912,6 +925,44 @@ function RatingsSummary({ ratings }: { ratings: { average: number | null; count:
               {r.comment && <div style={{ marginTop: 2 }}>{r.comment}</div>}
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 依頼主→本部の直接のご意見・ご要望（担当秘書には見えない）。以前は専用の
+// ナビ画面にまとめて一覧していたが、担当秘書を切り替える際にこの依頼主の
+// ものかどうか分かりにくかったため、この依頼主の詳細画面に埋め込む形にした。
+function HqFeedbackSection({
+  threadId,
+  unread,
+  orgId,
+  currentUserId,
+}: {
+  threadId: string | null;
+  unread: boolean;
+  orgId: string;
+  currentUserId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        disabled={!threadId}
+        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: threadId ? "pointer" : "default", padding: 0 }}
+      >
+        ご意見・ご要望{!threadId && "（まだありません）"}
+        {unread && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: "var(--radius-sm)", padding: "1.5px 6px" }}>
+            未読
+          </span>
+        )}
+      </button>
+      {open && threadId && (
+        <div style={{ padding: 10, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
+          <HqFeedbackChat threadId={threadId} orgId={orgId} currentUserId={currentUserId} />
         </div>
       )}
     </div>

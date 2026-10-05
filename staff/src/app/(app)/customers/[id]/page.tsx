@@ -48,6 +48,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: ratingRows },
     { data: latestRequestRow },
     { data: departmentRows },
+    { data: hqSummaries },
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -78,6 +79,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .limit(1)
       .maybeSingle(),
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
+    supabase.rpc("hq_thread_summaries", { p_org_id: ctx.orgId }),
   ]);
 
   if (!customer) notFound();
@@ -106,6 +108,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   };
   const latestRequest = latestRequestRow ? { id: latestRequestRow.id, title: latestRequestRow.title, amount: latestRequestRow.amount, phase: latestRequestRow.phase } : null;
 
+  // 依頼主→本部の直接のご意見・ご要望（担当秘書には見えない）。本部メンバー
+  // （owner）にだけ、この依頼主の詳細画面の社内情報パネルに埋め込む。
+  const canSeeHqFeedback = ctx.role === "owner";
+  const hqFeedbackRow = (hqSummaries ?? []).find((r) => r.customer_id === id) ?? null;
+
   let initialMessages: ThreadMessage[] = [];
   let hasMoreOlder = false;
   if (thread) {
@@ -131,6 +138,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       memos={memos}
       ratings={ratings}
       latestRequest={latestRequest}
+      canSeeHqFeedback={canSeeHqFeedback}
+      hqFeedbackThreadId={hqFeedbackRow?.thread_id ?? null}
+      hqFeedbackUnread={hqFeedbackRow?.unread ?? false}
     />
   );
 }
