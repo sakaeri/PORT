@@ -22,7 +22,6 @@ import {
   addIntakeField,
   updateIntakeField,
   deleteIntakeField,
-  adjustCustomerBalance,
   updateCustomerStaffLabel,
 } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
@@ -516,12 +515,7 @@ export default function CustomerThread({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const skipAutoScrollRef = useRef(false);
-  const [balance, setBalance] = useState(customer.balance);
-  const [adjustOpen, setAdjustOpen] = useState(false);
-  const [adjustAmount, setAdjustAmount] = useState("");
-  const [adjustNote, setAdjustNote] = useState("");
-  const [adjustSaving, setAdjustSaving] = useState(false);
-  const [adjustError, setAdjustError] = useState("");
+  const [balance] = useState(customer.balance);
 
   const [staffLabel, setStaffLabel] = useState(customer.staffLabel);
   const [labelOpen, setLabelOpen] = useState(false);
@@ -541,28 +535,6 @@ export default function CustomerThread({
       setLabelError(errorMessage(e, "変更できませんでした"));
     } finally {
       setLabelSaving(false);
-    }
-  }
-
-  async function submitAdjustment() {
-    if (adjustSaving) return;
-    const amount = Number(adjustAmount);
-    if (!Number.isInteger(amount) || amount === 0) {
-      setAdjustError("金額を入力してください（マイナスも可）");
-      return;
-    }
-    setAdjustSaving(true);
-    setAdjustError("");
-    try {
-      await adjustCustomerBalance(customer.id, amount, adjustNote);
-      setBalance((b) => b + amount);
-      setAdjustAmount("");
-      setAdjustNote("");
-      setAdjustOpen(false);
-    } catch (e) {
-      setAdjustError(errorMessage(e, "変更できませんでした"));
-    } finally {
-      setAdjustSaving(false);
     }
   }
 
@@ -771,38 +743,7 @@ export default function CustomerThread({
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>残高</span>
           <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>¥{balance.toLocaleString("ja-JP")}</span>
-          <button onClick={() => setAdjustOpen((v) => !v)} style={{ fontSize: 11, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-            調整
-          </button>
         </div>
-        {adjustOpen && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <input
-                value={adjustAmount}
-                onChange={(e) => setAdjustAmount(e.target.value)}
-                placeholder="金額（例：-5000、+3000）"
-                inputMode="numeric"
-                style={{ width: 160, height: 32, padding: "4px 8px", fontSize: 12.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
-              />
-              <input
-                value={adjustNote}
-                onChange={(e) => setAdjustNote(e.target.value)}
-                placeholder="理由（任意・依頼主にも通知されます）"
-                style={{ flex: 1, minWidth: 160, height: 32, padding: "4px 8px", fontSize: 12.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
-              />
-            </div>
-            {adjustError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{adjustError}</span>}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setAdjustOpen(false)} style={{ height: 30, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                閉じる
-              </button>
-              <button onClick={submitAdjustment} disabled={adjustSaving} style={{ height: 30, padding: "0 12px", cursor: "pointer", fontSize: 11.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-                {adjustSaving ? "処理中…" : "反映する"}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {isHq && (

@@ -532,45 +532,6 @@ export async function markHqFeedbackRead(feedbackId: string) {
   if (error) throw error;
 }
 
-// チャージ残高の手動調整。キャンセル時の返金（未着手・著しい遅延以外の、
-// 本部側の責任による個別対応）をチャージ残高へのクレジットとして戻したい
-// 時や、金額の訂正に使う。マイナスも可（誤加算の取り消しなど）。
-// 現金での返金ではなく残高への戻しにする（資金決済法上、前払い残高の
-// 現金払い戻しは原則できないため、ルール上もこの形が自然）。
-export async function adjustCustomerBalance(customerId: string, amount: number, note: string) {
-  const ctx = await requireManagerOrAbove();
-  if (!Number.isInteger(amount) || amount === 0) throw new Error("金額を入力してください");
-  const admin = createServiceRoleClient();
-
-  const { data: customer } = await admin.from("customers").select("balance").eq("id", customerId).eq("org_id", ctx.orgId).maybeSingle();
-  if (!customer) throw new Error("依頼主が見つかりません");
-
-  const { error: txError } = await admin.from("customer_balance_transactions").insert({
-    customer_id: customerId,
-    org_id: ctx.orgId,
-    amount,
-    kind: amount > 0 ? "refund_credit" : "deduction",
-  });
-  if (txError) throw txError;
-
-  const { error } = await admin.from("customers").update({ balance: customer.balance + amount }).eq("id", customerId).eq("org_id", ctx.orgId);
-  if (error) throw error;
-
-  if (note.trim()) {
-    const { data: thread } = await admin.from("threads").select("id").eq("customer_id", customerId).eq("kind", "customer").maybeSingle();
-    if (thread) {
-      await admin.from("messages").insert({
-        thread_id: thread.id,
-        sender_id: null,
-        sender_role: null,
-        kind: "notice",
-        body: `残高を調整しました（${amount > 0 ? "+" : ""}¥${amount.toLocaleString("ja-JP")}）：${note.trim()}`,
-      });
-      await admin.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", thread.id);
-    }
-  }
-}
-
 // staff_alias（スタッフ）と同じ発想：依頼主本人が自由に変えられる name とは
 // 独立して、本部・マネージャーが社内向けに付ける呼び方。null に戻せば
 // 依頼主本人の登録名の表示に戻る。
