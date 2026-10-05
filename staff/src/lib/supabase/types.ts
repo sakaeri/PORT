@@ -86,6 +86,7 @@ export interface Database {
           solo: boolean;
           sla_minutes: number;
           terms: Record<string, unknown>;
+          terms_content: string | null;
           plan_status: "trial" | "active" | "past_due" | "paused" | "cancelled";
           base_fee: number;
           seat_price: number;
@@ -195,7 +196,7 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["access_logs"]["Row"]> & { org_id: string; actor_id: string; action: string };
         Update: Partial<Database["public"]["Tables"]["access_logs"]["Row"]>;
-        Relationships: [];
+        Relationships: [{ foreignKeyName: "access_logs_actor_id_fkey"; columns: ["actor_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] }];
       };
       creators: {
         Row: {

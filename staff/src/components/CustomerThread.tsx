@@ -487,6 +487,7 @@ export default function CustomerThread({
   ratings,
   latestRequest,
   initialHasMoreOlder,
+  accessLog,
 }: {
   customer: { id: string; name: string; staffLabel: string | null; memberNo: string | null; balance: number };
   thread: { id: string; archived: boolean; departmentId: string | null } | null;
@@ -502,6 +503,8 @@ export default function CustomerThread({
   memos: WorkMemo[];
   ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
+  // トラブル調査用の閲覧履歴。本部（owner）以外にはサーバー側でnullにして渡す。
+  accessLog: { id: string; actorName: string; action: string; createdAt: string }[] | null;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -947,6 +950,7 @@ export default function CustomerThread({
           {!isHq && (
             <CaseSummarySection thread={thread} customerId={customer.id} menus={menus} latestRequest={latestRequest} />
           )}
+          {accessLog && <AccessLogSection entries={accessLog} />}
         </div>
       </>
     )}
@@ -975,6 +979,40 @@ function RatingsSummary({ ratings }: { ratings: { average: number | null; count:
                 ))}
               </div>
               {r.comment && <div style={{ marginTop: 2 }}>{r.comment}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ACCESS_ACTION_LABEL: Record<string, string> = {
+  view_customer: "依頼主詳細を閲覧",
+  view_case: "案件詳細を閲覧",
+};
+
+// トラブル対応（情報の不適切な閲覧など）があった時に調べられるよう、本部
+// にだけ「誰が・いつこの依頼主を見たか」を見せる。普段は折りたたんでおき、
+// 必要な時だけ開く（毎回目に入って邪魔にならないように）。
+function AccessLogSection({ entries }: { entries: { id: string; actorName: string; action: string; createdAt: string }[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+      >
+        閲覧履歴{entries.length > 0 ? `（直近${entries.length}件）` : "（まだありません）"}
+      </button>
+      {open && entries.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", maxHeight: 220, overflowY: "auto" }}>
+          {entries.map((e) => (
+            <div key={e.id} style={{ fontSize: 11.5, lineHeight: 1.6 }}>
+              <span style={{ color: "var(--color-neutral-500)" }}>
+                {new Date(e.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </span>
+              　{e.actorName}が{ACCESS_ACTION_LABEL[e.action] ?? e.action}
             </div>
           ))}
         </div>

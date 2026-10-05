@@ -78,6 +78,7 @@ export interface Database {
           solo: boolean;
           sla_minutes: number;
           terms: Record<string, unknown>;
+          terms_content: string | null;
           plan_status: "trial" | "active" | "past_due" | "paused" | "cancelled";
           base_fee: number;
           seat_price: number;

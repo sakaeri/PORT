@@ -1,12 +1,7 @@
-import type { Metadata } from "next";
-import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
-
-export const metadata: Metadata = { title: "利用規約" };
-
-// organizations.terms_content が未設定（本部がまだメニュー管理で編集して
-// いない）の間、ここに表示するたたき台。最終的な文面は専門家に確認して
-// もらうことを前提とした下書き。
+// 依頼主向け利用規約（/terms）のたたき台。organizations.terms_content が
+// 未設定の間、依頼主向けアプリ側ではこの文言が表示される
+// （src/app/terms/page.tsx に同じ内容を持つ）。メニュー管理の「利用規約」
+// タブを開いたときの初期値としても使う。
 export const DEFAULT_TERMS_CONTENT = `この利用規約（以下「本規約」）は、本サービスの提供者（以下「当方」）が本アプリを通じて提供するサービス（チャットでのご相談受付、見積もりの作成、業務の実施、完了報告の提出等。以下「本サービス」）の利用条件を定めるものです。本サービスにご登録・ご利用いただいた時点で、本規約にご同意いただいたものとみなします。
 
 1. サービス内容
@@ -35,31 +30,3 @@ export const DEFAULT_TERMS_CONTENT = `この利用規約（以下「本規約」
 
 9. 準拠法
 本規約の解釈にあたっては、日本法を準拠法とします。`;
-
-export default async function TermsPage() {
-  const h = await headers();
-  const orgId = h.get("x-vid-org");
-  let content = DEFAULT_TERMS_CONTENT;
-  if (orgId) {
-    const supabase = await createClient();
-    const { data } = await supabase.from("organizations").select("terms_content").eq("id", orgId).maybeSingle();
-    if (data?.terms_content?.trim()) content = data.terms_content;
-  }
-
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-bg)",
-        color: "var(--color-text)",
-        fontFamily: "var(--font-body)",
-        padding: "40px 20px 80px",
-      }}
-    >
-      <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 700 }}>利用規約</div>
-        <div style={{ fontSize: 13.5, lineHeight: 1.9, color: "var(--color-text)", whiteSpace: "pre-wrap" }}>{content}</div>
-      </div>
-    </main>
-  );
-}

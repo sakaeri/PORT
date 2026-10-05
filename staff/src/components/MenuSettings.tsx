@@ -61,6 +61,7 @@ import {
   createReportFieldPreset,
   updateReportFieldPreset,
   deleteReportFieldPreset,
+  updateOrgTerms,
 } from "@/app/actions";
 
 interface Menu {
@@ -237,11 +238,13 @@ export default function MenuSettings({
   orgId,
   initialMenus,
   initialTemplates,
+  initialTermsContent,
   canEdit,
 }: {
   orgId: string;
   initialMenus: Menu[];
   initialTemplates: IntakeForm[];
+  initialTermsContent: string;
   // 受付メニューはFC展開でのブランド・料金統一のため本部専用で、
   // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレは常に編集可。
   canEdit: boolean;
@@ -314,15 +317,17 @@ export default function MenuSettings({
 
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
+      {tab === "terms" && <TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} />}
     </div>
   );
 }
 
-type TabKey = "menu" | "templates";
+type TabKey = "menu" | "templates" | "terms";
 
 const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
   { key: "menu", label: "受付メニュー", mobileLabel: "メニュー" },
   { key: "templates", label: "返信テンプレ", mobileLabel: "テンプレ" },
+  { key: "terms", label: "利用規約", mobileLabel: "規約" },
 ];
 
 function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
@@ -604,6 +609,55 @@ function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemp
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function TermsCard({ orgId, initialContent, canEdit }: { orgId: string; initialContent: string; canEdit: boolean }) {
+  const [content, setContent] = useState(initialContent);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      await updateOrgTerms(orgId, content);
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "保存できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={card}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>利用規約</div>
+        <InfoTooltip text="依頼主が新規登録のときに同意する利用規約の本文です（/terms に表示されます）。ここで直すとすぐに反映されます。法的な内容は専門家に確認することをおすすめします。" />
+      </div>
+      {!canEdit && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>利用規約の編集は本部のみ行えます。</div>}
+      <textarea
+        value={content}
+        onChange={(e) => { setContent(e.target.value); setSaved(false); }}
+        disabled={!canEdit}
+        rows={24}
+        className="vid-input"
+        style={{ ...input, height: "auto", minHeight: 420, padding: "10px 12px", lineHeight: 1.7, resize: "vertical", fontFamily: "var(--font-body)" }}
+      />
+      {canEdit && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={save} disabled={saving} style={{ ...smallBtn, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
+            {saving ? "保存中…" : "保存する"}
+          </button>
+          {saved && <span style={{ fontSize: 12, color: "var(--color-accent-300)" }}>保存しました</span>}
+          {error && <span style={{ fontSize: 12, color: "var(--color-accent-200)" }}>{error}</span>}
+        </div>
+      )}
     </div>
   );
 }

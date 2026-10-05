@@ -302,6 +302,15 @@ export async function updateReportFieldPreset(id: string, patch: { label?: strin
   if (error) throw error;
 }
 
+// 依頼主向けの利用規約（/terms）の本文。契約書を個別に結ばない代わりに
+// 新規登録時の同意対象になる文章なので、編集は本部限定にする。
+export async function updateOrgTerms(orgId: string, content: string) {
+  await requireHqPrivileged();
+  const supabase = await createClient();
+  const { error } = await supabase.from("organizations").update({ terms_content: content }).eq("id", orgId);
+  if (error) throw error;
+}
+
 export async function deleteReportFieldPreset(id: string) {
   await requireHqPrivileged();
   const supabase = await createClient();
