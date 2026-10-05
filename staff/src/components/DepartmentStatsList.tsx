@@ -89,6 +89,9 @@ export default function DepartmentStatsList({
             >
               {expanded ? <CaretDown size={14} color="var(--color-neutral-500)" /> : <CaretRight size={14} color="var(--color-neutral-500)" />}
               <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
+              {d.monthRatingCount > 0 && (
+                <span style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>★{d.monthRatingAvg?.toFixed(1)}</span>
+              )}
               <span style={{ flex: "none", fontSize: 12.5, fontFamily: "var(--font-heading)" }}>{yen(d.monthRevenue)}</span>
             </button>
             {expanded && (
