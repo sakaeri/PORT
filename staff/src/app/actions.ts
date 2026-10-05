@@ -1141,12 +1141,17 @@ async function departmentIdsOf(admin: ReturnType<typeof createServiceRoleClient>
 }
 
 // 窓口（department）はもうユーザーが作成・命名するものではなく、マネージャー
-// 1人につき1つ自動でできるもの（「秘書：（表示名）」）。マネージャーに昇格
-// した時点で窓口が無ければ新規作成し、既にあれば（以前の手動運用の名残）
-// そのまま使う。
-async function ensureManagerDepartment(admin: ReturnType<typeof createServiceRoleClient>, orgId: string, profileId: string, alias: string) {
-  const existing = await departmentIdsOf(admin, profileId);
-  if (existing.length > 0) return existing;
+// 1人につき1つ自動でできるもの（「秘書：（表示名）」）。すでにマネージャー
+// だった人（表示名の変更など、昇格を伴わない保存）はそのまま自分の窓口を
+// 使う。新たに昇格する人は、スタッフ（dept_leader）として他の窓口の
+// 手伝いに割り当てられていた分（staff_departments）があってもそれとは
+// 無関係に、必ず新しい自分の窓口を作る（既存の誰かの窓口を誤って
+// 乗っ取ってしまわないように）。
+async function ensureManagerDepartment(admin: ReturnType<typeof createServiceRoleClient>, orgId: string, profileId: string, alias: string, wasAlreadyManager: boolean) {
+  if (wasAlreadyManager) {
+    const existing = await departmentIdsOf(admin, profileId);
+    if (existing.length > 0) return existing;
+  }
   const { data, error } = await admin.from("departments").insert({ org_id: orgId, name: `秘書：${alias}` }).select("id").single();
   if (error || !data) throw error ?? new Error("窓口を作成できませんでした");
   return [data.id as string];
@@ -1271,7 +1276,7 @@ export async function updateStaffMember(profileId: string, role: StaffRole, depa
   if (role === "owner") {
     resolvedDepartmentIds = [];
   } else if (role === "dept_manager") {
-    resolvedDepartmentIds = await ensureManagerDepartment(admin, ctx.orgId, profileId, trimmedAlias);
+    resolvedDepartmentIds = await ensureManagerDepartment(admin, ctx.orgId, profileId, trimmedAlias, previousRole === "dept_manager");
   } else {
     resolvedDepartmentIds = departmentIds;
   }

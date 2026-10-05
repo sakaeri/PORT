@@ -38,9 +38,13 @@ export default async function StatsPage() {
   // 売上・実績も見せない。直接URLで来ても弾く。
   if (ctx.role === "dept_leader") return null;
 
+  const { year, month } = nowJSTYearMonth();
+
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>売上・実績</div>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>
+        売上・実績　<span style={{ fontSize: 15, color: "var(--color-neutral-500)" }}>{`${year}年${month}月`}</span>
+      </div>
       {ctx.isHq ? <HqStats /> : <OrgStats orgId={ctx.orgId} viewerRole={ctx.role} viewerUserId={ctx.userId} />}
     </div>
   );
@@ -92,7 +96,7 @@ async function HqStats() {
 async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; viewerRole: StaffRole | "reception"; viewerUserId: string }) {
   const supabase = await createClient();
   const [{ data: requests, error }, { data: departmentRows }, { data: customerThreads }, { data: myDepartmentRows }] = await Promise.all([
-    supabase.from("requests").select("id, title, phase, amount, pay_status, paid_at, customer_id, customers(name)").eq("org_id", orgId),
+    supabase.from("requests").select("id, title, phase, amount, pay_status, paid_at, completed_at, customer_id, customers(name)").eq("org_id", orgId),
     supabase.from("departments").select("id, name, royalty_pct").eq("org_id", orgId).order("created_at", { ascending: true }),
     // 依頼主の窓口は、その依頼主の「customerトーク」が持つ department_id で決まる
     // （customersテーブル自体には窓口の列がない）。
@@ -114,13 +118,12 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
 
   // 窓口（マネージャー）ごとに集計する。支払いは残高払いに一本化されているので、
   // pay_status='paid'かどうかだけで入金済みを判定する（見積もり金額ではなく、
-  // 実際に支払われた金額）。月をまたいだ履歴は持たず「今月」だけを見せる
-  // （過去分は累計の入金額タイルで足りるため、複雑にしない）。
+  // 実際に支払われた金額）。累計ではなく「今月」だけを見せる
+  // （過去の月を遡って見る機能は今のところ無い）。
   function buildStat(matchDeptId: string | null, id: string, name: string, royaltyPct: number | null): DepartmentStat {
     const deptRows = rows.filter((r) => (departmentIdByCustomer.get(r.customer_id) ?? null) === matchDeptId);
-    const total = deptRows.reduce((s, r) => (r.pay_status === "paid" ? s + r.amount : s), 0);
     const quoted = deptRows.filter((r) => r.phase === "quoted").length;
-    const completed = deptRows.filter((r) => r.phase === "completed").length;
+    const monthCompleted = deptRows.filter((r) => r.phase === "completed" && r.completed_at && monthKeyJST(r.completed_at) === currentKey).length;
 
     const paidThisMonth: MonthRow[] = [];
     let monthRevenue = 0;
@@ -137,7 +140,7 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
 
     const months: MonthBreakdown[] = [{ key: currentKey, label: currentLabel, rows: [...pendingRows, ...paidThisMonth] }];
 
-    return { id, name, royaltyPct, total, quoted, completed, monthRevenue, months };
+    return { id, name, royaltyPct, quoted, monthCompleted, monthRevenue, months };
   }
 
   // マネージャーは自分の窓口だけ、オーナーは全窓口（＋窓口未設定分、
@@ -148,20 +151,20 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
 
   if (viewerRole !== "dept_manager") {
     const unassigned = buildStat(null, "unassigned", "担当秘書未設定", null);
-    if (unassigned.total > 0 || unassigned.quoted > 0 || unassigned.completed > 0 || unassigned.months.some((m) => m.rows.length > 0)) {
+    if (unassigned.monthRevenue > 0 || unassigned.quoted > 0 || unassigned.monthCompleted > 0 || unassigned.months.some((m) => m.rows.length > 0)) {
       stats.push(unassigned);
     }
   }
 
-  const grandTotal = stats.reduce((s, d) => s + d.total, 0);
+  const grandMonthRevenue = stats.reduce((s, d) => s + d.monthRevenue, 0);
   const grandQuoted = stats.reduce((s, d) => s + d.quoted, 0);
-  const grandCompleted = stats.reduce((s, d) => s + d.completed, 0);
+  const grandMonthCompleted = stats.reduce((s, d) => s + d.monthCompleted, 0);
 
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-        <StatTile label="累計入金額（確認済み）" value={yen(grandTotal)} />
-        <StatTile label="完了件数" value={`${grandCompleted}件`} />
+        <StatTile label="今月の入金額（確認済み）" value={yen(grandMonthRevenue)} />
+        <StatTile label="今月の完了件数" value={`${grandMonthCompleted}件`} />
         <StatTile label="見積もり回答待ち" value={`${grandQuoted}件`} />
       </div>
 

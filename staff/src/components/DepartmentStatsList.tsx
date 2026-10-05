@@ -12,9 +12,8 @@ export interface DepartmentStat {
   id: string;
   name: string;
   royaltyPct: number | null;
-  total: number;
   quoted: number;
-  completed: number;
+  monthCompleted: number;
   monthRevenue: number;
   months: MonthBreakdown[];
 }
@@ -89,12 +88,12 @@ export default function DepartmentStatsList({
             >
               {expanded ? <CaretDown size={14} color="var(--color-neutral-500)" /> : <CaretRight size={14} color="var(--color-neutral-500)" />}
               <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
-              <span style={{ flex: "none", fontSize: 12.5, fontFamily: "var(--font-heading)" }}>{yen(d.total)}</span>
+              <span style={{ flex: "none", fontSize: 12.5, fontFamily: "var(--font-heading)" }}>{yen(d.monthRevenue)}</span>
             </button>
             {expanded && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 14px 14px", borderTop: "1px solid var(--color-divider)", paddingTop: 12 }}>
                 <div style={{ display: "flex", gap: 14, fontSize: 12, color: "var(--color-neutral-500)" }}>
-                  <span>完了 {d.completed}件</span>
+                  <span>今月の完了 {d.monthCompleted}件</span>
                   <span>見積もり回答待ち {d.quoted}件</span>
                 </div>
 
@@ -118,11 +117,7 @@ export default function DepartmentStatsList({
                     ) : (
                       <span style={{ fontSize: 12.5 }}>{d.royaltyPct != null ? `${d.royaltyPct}%` : "未設定"}</span>
                     )}
-                    {royaltyAmount != null && (
-                      <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
-                        今月の売上 {yen(d.monthRevenue)}（ロイヤリティ {yen(royaltyAmount)}）
-                      </span>
-                    )}
+                    {royaltyAmount != null && <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>ロイヤリティ {yen(royaltyAmount)}</span>}
                   </div>
                 )}
 
