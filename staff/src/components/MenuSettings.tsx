@@ -52,9 +52,6 @@ import {
   createMenu,
   updateMenu,
   deleteMenu,
-  addMenuQuestion,
-  updateMenuQuestion,
-  deleteMenuQuestion,
   createIntakeForm,
   updateIntakeForm,
   deleteIntakeForm,
@@ -66,13 +63,6 @@ import {
   deleteReportFieldPreset,
 } from "@/app/actions";
 
-interface Question {
-  id: string;
-  menu_id: string;
-  label: string;
-  sort: number;
-}
-
 interface Menu {
   id: string;
   org_id: string;
@@ -83,7 +73,6 @@ interface Menu {
   lead_hours: number;
   active: boolean;
   department_id: string | null;
-  menu_questions: Question[];
   report_field_presets: ReportFieldPreset[];
 }
 
@@ -339,12 +328,11 @@ const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
 function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
   const [menus, setMenus] = useState(initialMenus);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [questionsMenuId, setQuestionsMenuId] = useState<string | null>(null);
   const [presetsMenuId, setPresetsMenuId] = useState<string | null>(null);
 
   async function handleAdd() {
     const id = await createMenu(orgId);
-    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: null, lead_hours: 24, active: true, department_id: null, menu_questions: [], report_field_presets: [] }]);
+    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: null, lead_hours: 24, active: true, department_id: null, report_field_presets: [] }]);
     setOpenId(id);
   }
 
@@ -493,9 +481,6 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                   )}
 
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
-                    <button onClick={() => setQuestionsMenuId(m.id)} style={smallBtn}>
-                      はじめの質問　{m.menu_questions.length}問
-                    </button>
                     <button onClick={() => setPresetsMenuId(m.id)} style={smallBtn}>
                       報告書の定型項目　{m.report_field_presets.length}件
                     </button>
@@ -512,20 +497,6 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                     )}
                   </div>
                 </div>
-              )}
-              {questionsMenuId === m.id && (
-                <Modal onClose={() => setQuestionsMenuId(null)} maxWidth={480}>
-                  <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>はじめの質問</div>
-                      <div style={{ flex: 1 }} />
-                      <button onClick={() => setQuestionsMenuId(null)} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
-                        <X size={18} />
-                      </button>
-                    </div>
-                    <QuestionsEditor menuId={m.id} questions={m.menu_questions} onChange={(qs) => patchLocal(m.id, { menu_questions: qs })} canEdit={canEdit} />
-                  </div>
-                </Modal>
               )}
               {presetsMenuId === m.id && (
                 <Modal onClose={() => setPresetsMenuId(null)} maxWidth={480}>
@@ -546,50 +517,6 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function QuestionsEditor({ menuId, questions, onChange, canEdit }: { menuId: string; questions: Question[]; onChange: (q: Question[]) => void; canEdit: boolean }) {
-  async function add() {
-    const id = await addMenuQuestion(menuId, "", questions.length);
-    onChange([...questions, { id, menu_id: menuId, label: "", sort: questions.length }]);
-  }
-  function patch(id: string, val: string) {
-    onChange(questions.map((q) => (q.id === id ? { ...q, label: val } : q)));
-  }
-  async function commit(id: string, val: string) {
-    await updateMenuQuestion(id, val);
-  }
-  async function remove(id: string) {
-    await deleteMenuQuestion(id);
-    onChange(questions.filter((q) => q.id !== id));
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {questions.map((q) => (
-        <div key={q.id} style={{ display: "flex", gap: 8 }}>
-          <input
-            value={q.label}
-            onChange={(e) => patch(q.id, e.target.value)}
-            onBlur={() => commit(q.id, q.label)}
-            disabled={!canEdit}
-            className="vid-input"
-            style={{ ...modalInput, flex: 1, height: 32 }}
-          />
-          {canEdit && (
-            <button onClick={() => remove(q.id)} aria-label="削除" style={{ flex: "none", width: 32, height: 32, cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-              <Trash size={13} />
-            </button>
-          )}
-        </div>
-      ))}
-      {canEdit && (
-        <button onClick={add} style={{ alignSelf: "flex-start", ...smallBtn, height: 30 }}>
-          ＋質問を追加
-        </button>
-      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, ArrowSquareOut, Trash, Lock, LockOpen, CaretDown, CaretRight, Star } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
-import { createOrgAccount, deleteOrgForHq, setOrgLockState, setOrgRoyaltyPct, markHqFeedbackRead } from "@/app/actions";
+import { createOrgAccount, deleteOrgForHq, setOrgLockState, markHqFeedbackRead } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 
 interface Feedback {
@@ -20,8 +20,6 @@ interface Org {
   display_name: string;
   slug: string | null;
   plan_status: string;
-  royalty_pct: number | null;
-  monthRevenue: number;
   avgRating: number | null;
   ratingCount: number;
   feedback: Feedback[];
@@ -69,28 +67,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [royaltyDraft, setRoyaltyDraft] = useState<Record<string, string>>({});
-  const [savingRoyaltyId, setSavingRoyaltyId] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
-
-  async function handleSaveRoyalty(o: Org) {
-    if (savingRoyaltyId) return;
-    const raw = royaltyDraft[o.id];
-    const pct = raw === undefined || raw.trim() === "" ? null : Number(raw);
-    if (pct != null && (Number.isNaN(pct) || pct < 0 || pct > 100)) {
-      alert("0〜100の範囲で入力してください");
-      return;
-    }
-    setSavingRoyaltyId(o.id);
-    try {
-      await setOrgRoyaltyPct(o.id, pct);
-      setOrgs((rows) => rows.map((r) => (r.id === o.id ? { ...r, royalty_pct: pct } : r)));
-    } catch (e) {
-      alert(errorMessage(e, "変更できませんでした"));
-    } finally {
-      setSavingRoyaltyId(null);
-    }
-  }
 
   async function handleMarkFeedbackRead(orgId: string, feedbackId: string) {
     if (markingId) return;
@@ -161,8 +138,6 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
           display_name: form.display_name,
           slug: result.slug,
           plan_status: "active",
-          royalty_pct: null,
-          monthRevenue: 0,
           avgRating: null,
           ratingCount: 0,
           feedback: [],
@@ -235,7 +210,6 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
         {orgs.map((o) => {
           const expanded = expandedId === o.id;
           const unreadFeedback = o.feedback.filter((f) => !f.read_at).length;
-          const royaltyAmount = o.royalty_pct != null ? Math.round((o.monthRevenue * o.royalty_pct) / 100) : null;
           return (
             <div key={o.id} style={{ borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
@@ -284,26 +258,6 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
 
               {expanded && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 14px 14px", borderTop: "1px solid var(--color-divider)", marginTop: 2, paddingTop: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>ロイヤリティ率</span>
-                    <input
-                      value={royaltyDraft[o.id] ?? (o.royalty_pct != null ? String(o.royalty_pct) : "")}
-                      onChange={(e) => setRoyaltyDraft((d) => ({ ...d, [o.id]: e.target.value }))}
-                      placeholder="未設定"
-                      inputMode="numeric"
-                      style={{ width: 56, height: 30, padding: "4px 8px", fontSize: 12.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
-                    />
-                    <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>%</span>
-                    <button onClick={() => handleSaveRoyalty(o)} disabled={savingRoyaltyId === o.id} style={{ ...smallBtn, height: 30, padding: "0 10px" }}>
-                      保存
-                    </button>
-                    {royaltyAmount != null && (
-                      <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
-                        今月の売上 ¥{o.monthRevenue.toLocaleString("ja-JP")}（ロイヤリティ ¥{royaltyAmount.toLocaleString("ja-JP")}）
-                      </span>
-                    )}
-                  </div>
-
                   <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-500)" }}>
                     <Star size={13} weight={o.avgRating != null ? "fill" : "regular"} style={{ color: "var(--color-accent)" }} />
                     {o.avgRating != null ? (
@@ -316,7 +270,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>ご意見・ご要望</span>
+                    <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>過去のご意見・ご要望（アーカイブ・新着はここには届きません）</span>
                     {o.feedback.length === 0 && <span style={{ fontSize: 12, color: "var(--color-neutral-600)" }}>まだありません</span>}
                     {o.feedback.map((f) => (
                       <div key={f.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", opacity: f.read_at ? 0.6 : 1 }}>

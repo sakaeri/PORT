@@ -30,8 +30,6 @@ export type MessageKind =
   | "intake_answer";
 
 export type ThreadKind = "customer" | "case" | "internal" | "hq";
-export type RefundStage = "prequote" | "accepted" | "started" | "delivered" | "terminate";
-export type RefundMode = "nocharge" | "full" | "partial" | "none";
 export type PaymentMethod = "card" | "bank";
 export type PaymentStatus = "unpaid" | "processing" | "paid" | "refunded" | "failed";
 export type PaymentTiming = "prepay_full" | "deposit" | "before_shipping" | "postpay" | "balance";
@@ -183,18 +181,6 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["menus"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["menus"]["Row"]>;
-        Relationships: [];
-      };
-      menu_questions: {
-        Row: { id: string; menu_id: string; label: string; sort: number };
-        Insert: Partial<Database["public"]["Tables"]["menu_questions"]["Row"]> & { menu_id: string; label: string };
-        Update: Partial<Database["public"]["Tables"]["menu_questions"]["Row"]>;
-        Relationships: [{ foreignKeyName: "menu_questions_menu_id_fkey"; columns: ["menu_id"]; isOneToOne: false; referencedRelation: "menus"; referencedColumns: ["id"] }];
-      };
-      refund_policies: {
-        Row: { org_id: string; stage: RefundStage; mode: RefundMode; pct: number };
-        Insert: Partial<Database["public"]["Tables"]["refund_policies"]["Row"]> & { org_id: string; stage: RefundStage; mode: RefundMode };
-        Update: Partial<Database["public"]["Tables"]["refund_policies"]["Row"]>;
         Relationships: [];
       };
       requests: {
@@ -407,8 +393,6 @@ export interface Database {
       request_phase: RequestPhase;
       message_kind: MessageKind;
       thread_kind: ThreadKind;
-      refund_stage: RefundStage;
-      refund_mode: RefundMode;
       payment_method: PaymentMethod;
       payment_status: PaymentStatus;
     };

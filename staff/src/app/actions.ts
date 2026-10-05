@@ -186,32 +186,6 @@ export async function deleteMenu(id: string) {
   if (error) throw error;
 }
 
-export async function addMenuQuestion(menuId: string, label: string, sort: number) {
-  await requireHqPrivileged();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("menu_questions")
-    .insert({ menu_id: menuId, label: label.trim() || "質問", sort })
-    .select("id")
-    .single();
-  if (error || !data) throw error ?? new Error("作成できませんでした");
-  return data.id;
-}
-
-export async function updateMenuQuestion(id: string, label: string) {
-  await requireHqPrivileged();
-  const supabase = await createClient();
-  const { error } = await supabase.from("menu_questions").update({ label: label.trim() }).eq("id", id);
-  if (error) throw error;
-}
-
-export async function deleteMenuQuestion(id: string) {
-  await requireHqPrivileged();
-  const supabase = await createClient();
-  const { error } = await supabase.from("menu_questions").delete().eq("id", id);
-  if (error) throw error;
-}
-
 // ============================================================
 // ログイン情報（この管理画面に入るためのメール・パスワード。書類には使わない）
 // ============================================================
@@ -298,8 +272,7 @@ export async function deleteIntakeField(id: string) {
   if (error) throw error;
 }
 
-// 完了報告でよく使う項目名（プリセット）。メニューごとに持つ
-// （menu_questions＝「はじめの質問」と同じ考え方）。スタッフが報告を
+// 完了報告でよく使う項目名（プリセット）。メニューごとに持つ。スタッフが報告を
 // 書くとき、ここから選んでワンタップで項目を追加できる（自由な項目追加
 // もできるが、何を報告すべきか迷わないための定型的な選択肢）。
 export async function createReportFieldPreset(menuId: string, label: string, sort: number) {
@@ -539,15 +512,6 @@ export async function setOrgLockState(orgId: string, locked: boolean) {
     .from("organizations")
     .update({ plan_status: locked ? "paused" : "active" })
     .eq("id", orgId);
-  if (error) throw error;
-}
-
-// マネージャー（FC加盟店）から本部が取るロイヤリティの率。nullなら対象外。
-export async function setOrgRoyaltyPct(orgId: string, pct: number | null) {
-  await requireHq();
-  if (pct != null && (pct < 0 || pct > 100)) throw new Error("0〜100の範囲で入力してください");
-  const admin = createServiceRoleClient();
-  const { error } = await admin.from("organizations").update({ royalty_pct: pct }).eq("id", orgId);
   if (error) throw error;
 }
 
