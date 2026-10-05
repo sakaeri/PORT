@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
-import { logAccess } from "@/lib/access-log";
 import CaseDetail from "@/components/CaseDetail";
 import type { AppRole } from "@/lib/supabase/types";
 
@@ -85,7 +84,6 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     }));
 
   const customer = Array.isArray(request.customers) ? request.customers[0] : request.customers;
-  void logAccess(ctx.orgId, ctx.userId, "view_case", customer?.id ?? null, request.id);
   const report = Array.isArray(request.completion_reports) ? request.completion_reports[0] : request.completion_reports;
   const reportAttachments: { id: string; file_path: string; file_name: string; label: string | null }[] = request.completion_report_attachments ?? [];
   const rating = Array.isArray(request.ratings) ? request.ratings[0] : request.ratings;

@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
-import { logAccess } from "@/lib/access-log";
 import CustomerThread, { MESSAGE_PAGE_SIZE, type ThreadMessage } from "@/components/CustomerThread";
 
 function mapMessageRows(data: NonNullable<Awaited<ReturnType<typeof fetchMessagePage>>["data"]>): ThreadMessage[] {
@@ -82,24 +81,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ]);
 
   if (!customer) notFound();
-  void logAccess(ctx.orgId, ctx.userId, "view_customer", customer.id, null);
   const convertedOrgRaw = Array.isArray(customer.converted_org) ? customer.converted_org[0] : customer.converted_org;
   const convertedOrg = convertedOrgRaw ? { displayName: convertedOrgRaw.display_name, slug: convertedOrgRaw.slug } : null;
-
-  // トラブル調査用の閲覧履歴は、情報を見る側を増やさないよう本部のみに絞る。
-  const canSeeAccessLog = ctx.role === "owner";
-  const { data: accessLogRows } = canSeeAccessLog
-    ? await supabase
-        .from("access_logs")
-        .select("id, action, created_at, profiles(display_name)")
-        .eq("customer_id", id)
-        .order("created_at", { ascending: false })
-        .limit(30)
-    : { data: [] as never[] };
-  const accessLog = (accessLogRows ?? []).map((r) => {
-    const actor = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
-    return { id: r.id, actorName: actor?.display_name ?? "（不明）", action: r.action, createdAt: r.created_at };
-  });
 
   const templates = (templateRows ?? []).map((t) => ({
     id: t.id,
@@ -148,7 +131,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       memos={memos}
       ratings={ratings}
       latestRequest={latestRequest}
-      accessLog={canSeeAccessLog ? accessLog : null}
     />
   );
 }
