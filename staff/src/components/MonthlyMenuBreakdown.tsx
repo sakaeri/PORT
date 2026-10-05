@@ -10,6 +10,9 @@ export interface MonthRow {
   title: string;
   amount: number;
   status: "paid" | "pending";
+  // 完了報告を出したのがスタッフ（dept_leader）だった場合のみ、その名前。
+  // 窓口のマネージャー自身が出した分や、まだ完了していない分はnull。
+  staffName: string | null;
 }
 
 export interface MonthBreakdown {
@@ -54,6 +57,9 @@ function Row({ r }: { r: MonthRow }) {
       {r.status === "pending" && (
         <span style={{ flex: "none", fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)" }}>入金待ち</span>
       )}
+      {r.staffName && (
+        <span style={{ flex: "none", fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)" }}>{r.staffName}</span>
+      )}
       <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>{yen(r.amount)}</div>
     </Link>
   );
@@ -83,7 +89,7 @@ export default function MonthlyMenuBreakdown({ months }: { months: MonthBreakdow
       </div>
 
       {month.rows.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>この月の入金確認実績はありません。</div>
+        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>この月の実績はありません。</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {pending.length > 0 && (
@@ -96,7 +102,7 @@ export default function MonthlyMenuBreakdown({ months }: { months: MonthBreakdow
           )}
           {paid.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {pending.length > 0 && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>入金済み</div>}
+              {pending.length > 0 && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>完了</div>}
               {paid.map((r) => (
                 <Row key={r.requestId} r={r} />
               ))}

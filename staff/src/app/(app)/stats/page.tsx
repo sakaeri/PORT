@@ -116,31 +116,53 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
   const currentKey = monthKeyFromYM(year, month);
   const currentLabel = `${year}年${month}月`;
 
-  // 窓口（マネージャー）ごとに集計する。支払いは残高払いに一本化されているので、
-  // pay_status='paid'かどうかだけで入金済みを判定する（見積もり金額ではなく、
-  // 実際に支払われた金額）。累計ではなく「今月」だけを見せる
-  // （過去の月を遡って見る機能は今のところ無い）。
+  // 今月完了した案件の「完了報告を出したのがスタッフ（dept_leader）だった
+  // 場合」はその名前を添える。窓口のマネージャー自身が出した分は、自分の
+  // 画面に自分の名前が出ても意味がないので添えない。
+  const completedThisMonthIds = rows
+    .filter((r) => r.phase === "completed" && r.completed_at && monthKeyJST(r.completed_at) === currentKey)
+    .map((r) => r.id);
+  const { data: reportRows } =
+    completedThisMonthIds.length > 0
+      ? await supabase.from("completion_reports").select("request_id, creator_id").in("request_id", completedThisMonthIds)
+      : { data: [] as { request_id: string; creator_id: string | null }[] };
+  const creatorIdByRequestId = new Map((reportRows ?? []).map((r) => [r.request_id, r.creator_id]));
+  const creatorIds = [...new Set((reportRows ?? []).map((r) => r.creator_id).filter((id): id is string => !!id))];
+  const { data: creatorProfiles } =
+    creatorIds.length > 0 ? await supabase.from("profiles").select("id, role, display_name, staff_alias").in("id", creatorIds) : { data: [] as { id: string; role: StaffRole; display_name: string; staff_alias: string | null }[] };
+  const staffNameById = new Map(
+    (creatorProfiles ?? []).filter((p) => p.role === "dept_leader").map((p) => [p.id, p.staff_alias ?? p.display_name]),
+  );
+  function staffNameFor(requestId: string): string | null {
+    const creatorId = creatorIdByRequestId.get(requestId);
+    return creatorId ? (staffNameById.get(creatorId) ?? null) : null;
+  }
+
+  // 窓口（マネージャー）ごとに集計する。支払いタイミングは案件によって違う
+  // （前払い・着手後払いなど）ので「入金日」基準だと完了件数とずれて分かり
+  // にくい。実績としては「完了報告を出した（＝完了した）月」を基準に、
+  // その月に完了した案件の金額を積み上げる。累計ではなく「今月」だけを
+  // 見せる（過去の月を遡って見る機能は今のところ無い）。
   function buildStat(matchDeptId: string | null, id: string, name: string, royaltyPct: number | null): DepartmentStat {
     const deptRows = rows.filter((r) => (departmentIdByCustomer.get(r.customer_id) ?? null) === matchDeptId);
     const quoted = deptRows.filter((r) => r.phase === "quoted").length;
-    const monthCompleted = deptRows.filter((r) => r.phase === "completed" && r.completed_at && monthKeyJST(r.completed_at) === currentKey).length;
 
-    const paidThisMonth: MonthRow[] = [];
+    const completedThisMonth: MonthRow[] = [];
     let monthRevenue = 0;
     for (const r of deptRows) {
-      if (r.pay_status === "paid" && r.paid_at && monthKeyJST(r.paid_at) === currentKey) {
-        paidThisMonth.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid" });
+      if (r.phase === "completed" && r.completed_at && monthKeyJST(r.completed_at) === currentKey) {
+        completedThisMonth.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid", staffName: staffNameFor(r.id) });
         monthRevenue += r.amount;
       }
     }
     const pendingRows: MonthRow[] = deptRows
       .filter((r) => r.pay_status !== "paid" && !["draft", "cancelled", "declined"].includes(r.phase))
-      .map((r) => ({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "pending" as const }))
+      .map((r) => ({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "pending" as const, staffName: null }))
       .filter((r) => r.amount > 0);
 
-    const months: MonthBreakdown[] = [{ key: currentKey, label: currentLabel, rows: [...pendingRows, ...paidThisMonth] }];
+    const months: MonthBreakdown[] = [{ key: currentKey, label: currentLabel, rows: [...pendingRows, ...completedThisMonth] }];
 
-    return { id, name, royaltyPct, quoted, monthCompleted, monthRevenue, months };
+    return { id, name, royaltyPct, quoted, monthCompleted: completedThisMonth.length, monthRevenue, months };
   }
 
   // マネージャーは自分の窓口だけ、オーナーは全窓口（＋窓口未設定分、
@@ -163,7 +185,7 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-        <StatTile label="今月の入金額（確認済み）" value={yen(grandMonthRevenue)} />
+        <StatTile label="今月の実績金額" value={yen(grandMonthRevenue)} />
         <StatTile label="今月の完了件数" value={`${grandMonthCompleted}件`} />
         <StatTile label="見積もり回答待ち" value={`${grandQuoted}件`} />
       </div>
@@ -171,7 +193,7 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
       <DepartmentStatsList departments={stats} canEditRoyalty={viewerRole === "owner"} />
 
       <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        入金額は、依頼主が「依頼を確定する」を押して残高から支払いが完了した分を反映しています。行をタップするとその案件トークに移動します。
+        実績金額は、入金日ではなく完了報告を出した（完了した）月を基準に集計しています。行をタップするとその案件トークに移動します。
       </div>
     </>
   );
