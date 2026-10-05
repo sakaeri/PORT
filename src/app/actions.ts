@@ -241,6 +241,27 @@ export async function declineQuote(requestId: string) {
   }
 }
 
+// 完了した単発の依頼について、依頼主から「次回も定期でお願いしたい」という
+// 意思表示だけを秘書に伝える。金額はここでは一切確定しない（単発より安く
+// 出す、といった金額の判断は常に秘書側に残すため）。秘書はこれを見て、
+// 改めて定期の見積もりを作って送り返す。
+export async function requestRecurringFollowup(requestId: string) {
+  const ctx = await requireContext();
+  const admin = createServiceRoleClient();
+
+  const { data: r, error } = await admin.from("requests").select("phase, cadence").eq("id", requestId).eq("customer_id", ctx.customerId).single();
+  if (error || !r) throw new Error("依頼が見つかりません");
+  if (r.phase !== "completed") throw new Error("完了した依頼のみ申し込めます");
+  if (r.cadence) throw new Error("すでに定期の依頼です");
+
+  const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
+  if (caseThread) {
+    const now = new Date().toISOString();
+    await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body: "依頼主が「次回からも定期でお願いしたい」と伝えています" });
+    await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
+  }
+}
+
 // チャージ残高の入金。Stripeのホスト型Checkoutページへ飛ばし、支払い完了は
 // Webhook（route.ts）側で検知して残高に反映する。ここでは決済ページのURLを
 // 用意するだけで、残高はまだ一切動かさない（決済が実際に成立するまで反映

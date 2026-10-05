@@ -27,11 +27,11 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   // タップしてからこの画面が出るまでの体感速度のため、全クエリを並列で投げる
   // （案件トークのメッセージは threads.id が要るが、messages を threads の
   // embed として一緒に取ることで、往復を1回減らしている）。
-  const [{ data: request }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }, { data: staffDepartments }] = await Promise.all([
+  const [{ data: request }, { data: caseStaffRows }, { data: staffPool }, { data: caseThread }, { data: staffDepartments }, { data: menuRows }] = await Promise.all([
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), completion_report_attachments(id, file_path, file_name, label), ratings(*), request_subscriptions(id, cadence, active, next_due_at), request_items(menu_id)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), completion_report_attachments(id, file_path, file_name, label), ratings(*), request_subscriptions(id, cadence, active, next_due_at), request_items(menu_id, label, price, qty)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -48,8 +48,16 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       .order("sent_at", { referencedTable: "messages", ascending: true })
       .maybeSingle(),
     isManagerAssigning ? supabase.from("staff_departments").select("profile_id, department_id") : Promise.resolve({ data: [] }),
+    supabase.from("menus").select("id, label, note, price, payout, lead_hours").eq("org_id", ctx.orgId).eq("active", true).order("sort", { ascending: true }),
   ]);
   if (!request) notFound();
+
+  const customerForThread = Array.isArray(request.customers) ? request.customers[0] : request.customers;
+  // 完了した単発案件から「この内容で定期を提案」する時に見積もりを送る先の
+  // 依頼主トーク（kind='customer'）。
+  const { data: customerThread } = customerForThread
+    ? await supabase.from("threads").select("id").eq("org_id", ctx.orgId).eq("kind", "customer").eq("customer_id", customerForThread.id).maybeSingle()
+    : { data: null };
 
   // 完了報告の定型項目はメニュー単位なので、この案件で使われたメニュー
   // （複数ありうる）の分をまとめて集める。同じ項目名が複数メニューに
@@ -133,6 +141,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       canSeeFinance={canSeeFinance}
       canApprove={canApprove}
       subscription={canApprove && subscription ? { id: subscription.id, cadence: subscription.cadence, active: subscription.active, nextDueAt: subscription.next_due_at } : null}
+      customerThreadId={customerThread?.id ?? null}
+      menus={(menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, payout: m.payout, leadHours: m.lead_hours }))}
+      requestItems={(request.request_items ?? []).map((it) => ({ label: it.label, price: it.price, qty: it.qty, leadHours: null }))}
     />
   );
 }

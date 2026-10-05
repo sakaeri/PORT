@@ -21,6 +21,7 @@ import {
 import type { PaymentTiming, RequestPhase, SubscriptionCadence } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
 import CaseThreadChat, { type CaseMessage } from "@/components/CaseThreadChat";
+import QuoteDialog, { type MenuOption, type CustomItem } from "@/components/QuoteDialog";
 
 const card: React.CSSProperties = {
   padding: 16,
@@ -70,6 +71,9 @@ export default function CaseDetail({
   canSeeFinance,
   canApprove,
   subscription,
+  customerThreadId,
+  menus,
+  requestItems,
 }: {
   request: {
     id: string;
@@ -105,10 +109,17 @@ export default function CaseDetail({
   canApprove: boolean;
   // この案件が定期対応（毎週・毎月）から生まれたものなら、その定期対応自体の情報。
   subscription: { id: string; cadence: SubscriptionCadence; active: boolean; nextDueAt: string | null } | null;
+  // 完了した単発案件から「この内容で定期を提案」する時に使う。依頼主の
+  // 窓口トーク（threadId）が無い＝依頼主アカウントが削除済みなどの場合は
+  // 提案できない。
+  customerThreadId: string | null;
+  menus: MenuOption[];
+  requestItems: CustomItem[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [showRecurringDialog, setShowRecurringDialog] = useState(false);
 
   async function runAction(action: () => Promise<void>, confirmMessage?: string) {
     if (busy) return;
@@ -278,7 +289,31 @@ export default function CaseDetail({
               </div>
             )}
             <ReportAttachmentList attachments={report.attachments} orgId={orgId} />
+            {canApprove && !subscription && customerThreadId && customer && (
+              <button
+                onClick={() => setShowRecurringDialog(true)}
+                style={{ alignSelf: "flex-start", height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+              >
+                この内容で定期を提案
+              </button>
+            )}
           </div>
+        )}
+
+        {showRecurringDialog && customerThreadId && customer && (
+          <QuoteDialog
+            threadId={customerThreadId}
+            customerId={customer.id}
+            menus={menus}
+            title="この内容で定期を提案"
+            description="今回と同じ内容を引き継いだ見積もりです。頻度（毎週・毎月）を選び、金額を見直してから送ってください。"
+            initialCustomItems={requestItems}
+            onClose={() => setShowRecurringDialog(false)}
+            onCreated={(newRequestId) => {
+              setShowRecurringDialog(false);
+              router.push(`/cases/${newRequestId}`);
+            }}
+          />
         )}
 
         <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>

@@ -8,7 +8,7 @@ import { yen, timeLabel } from "@/lib/format";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
-import { submitInfoRequestAnswer } from "@/app/actions";
+import { submitInfoRequestAnswer, requestRecurringFollowup } from "@/app/actions";
 
 function fileIconClass(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
@@ -217,6 +217,23 @@ export function RequestCard({
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+  const [recurringRequesting, setRecurringRequesting] = useState(false);
+  const [recurringRequested, setRecurringRequested] = useState(false);
+  const [recurringError, setRecurringError] = useState("");
+
+  async function handleRequestRecurring() {
+    if (recurringRequesting || recurringRequested) return;
+    setRecurringRequesting(true);
+    setRecurringError("");
+    try {
+      await requestRecurringFollowup(r.id);
+      setRecurringRequested(true);
+    } catch (e) {
+      setRecurringError(errorMessage(e, "送信できませんでした"));
+    } finally {
+      setRecurringRequesting(false);
+    }
+  }
 
   async function openReportAttachment(path: string, id: string) {
     if (openingAttachmentId) return;
@@ -452,6 +469,28 @@ export function RequestCard({
                       ? "ご評価ありがとうございました。いただいたひとことは運営が確認します。"
                       : "ご評価ありがとうございました。"}
                 </span>
+              </div>
+            )}
+
+            {!r.cadence && (
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
+                {recurringRequested ? (
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+                    <CheckCircle weight="fill" size={14} color="var(--color-neutral-500)" style={{ flex: "none", marginTop: 1 }} />
+                    <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>お伝えしました。秘書から改めてご連絡します。</span>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleRequestRecurring}
+                      disabled={recurringRequesting}
+                      style={{ height: 34, padding: "0 14px", cursor: recurringRequesting ? "default" : "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+                    >
+                      {recurringRequesting ? "送信中…" : "次回からも定期でお願いしたい"}
+                    </button>
+                    {recurringError && <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--color-accent-200)" }}>{recurringError}</div>}
+                  </>
+                )}
               </div>
             )}
           </div>
