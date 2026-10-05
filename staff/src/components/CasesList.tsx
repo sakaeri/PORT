@@ -46,7 +46,7 @@ export default function CasesList({
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const departmentById = new Map(departments.map((d) => [d.id, d.name]));
-  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "窓口未設定" }];
+  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "担当秘書未設定" }];
   const byDepartment = rows.filter((r) => departmentFilter === "all" || (departmentFilter === "none" ? r.departmentId === null : r.departmentId === departmentFilter));
   const active = byDepartment.filter((r) => !r.archived);
   const archivedCount = byDepartment.filter((r) => r.archived).length;

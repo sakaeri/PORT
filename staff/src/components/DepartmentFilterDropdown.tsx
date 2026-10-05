@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CaretDown } from "@phosphor-icons/react";
 
-// 依頼主一覧・案件トーク・スタッフ一覧で共通の「窓口で絞り込む」ドロップダウン。
+// 依頼主一覧・案件トーク・スタッフ一覧で共通の「担当秘書で絞り込む」ドロップダウン。
 export default function DepartmentFilterDropdown({
   options,
   value,
@@ -34,7 +34,7 @@ export default function DepartmentFilterDropdown({
           borderRadius: "var(--radius-md)",
         }}
       >
-        窓口：{label}
+        {label}
         <CaretDown size={12} color="var(--color-neutral-500)" />
       </button>
       {open && (

@@ -745,7 +745,7 @@ export default function CustomerThread({
       {labelOpen && (
         <div style={{ margin: "14px 20px 0", display: "flex", flexDirection: "column", gap: 6, padding: 10, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
           <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>
-            本部・マネージャーが社内向けに付ける呼び方です。依頼主本人が登録した名前とは別に持てます（未入力に戻すと本人の登録名を表示します）。
+            本部・秘書が社内向けに付ける呼び方です。依頼主本人が登録した名前とは別に持てます（未入力に戻すと本人の登録名を表示します）。
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <input
@@ -1076,7 +1076,7 @@ function ThreadDepartmentControl({
       value={departmentId}
       onChange={(e) => change(e.target.value)}
       disabled={saving}
-      aria-label="担当窓口"
+      aria-label="担当秘書"
       className="vid-input"
       style={{
         flex: "none",
@@ -1090,7 +1090,7 @@ function ThreadDepartmentControl({
         outline: "none",
       }}
     >
-      <option value="">窓口未設定</option>
+      <option value="">担当秘書未設定</option>
       {departments.map((d) => (
         <option key={d.id} value={d.id}>
           {d.name}

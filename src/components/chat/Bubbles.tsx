@@ -33,10 +33,10 @@ const senderRow: React.CSSProperties = { display: "flex", gap: 6 };
 const timeStyle: React.CSSProperties = { fontSize: 10.5, color: "var(--color-neutral-700)" };
 const senderStyle: React.CSSProperties = { fontSize: 10.5, whiteSpace: "nowrap", color: "var(--color-neutral-600)" };
 
-function Meta({ isSelf, time }: { isSelf: boolean; time: string }) {
+function Meta({ isSelf, time, senderName }: { isSelf: boolean; time: string; senderName?: string | null }) {
   return (
     <div style={{ ...senderRow, alignSelf: isSelf ? "flex-end" : "flex-start" }}>
-      {!isSelf && <span style={senderStyle}>受付 ・</span>}
+      {!isSelf && <span style={senderStyle}>{senderName ? `秘書：${senderName}` : "秘書"} ・</span>}
       <span style={timeStyle}>{time}</span>
     </div>
   );
@@ -62,7 +62,7 @@ export function TextBubble({ msg, highlight }: { msg: MessageWithExtras; highlig
       >
         {msg.body}
       </div>
-      <Meta isSelf={isSelf} time={timeLabel(msg.sent_at)} />
+      <Meta isSelf={isSelf} time={timeLabel(msg.sent_at)} senderName={msg.senderName} />
     </div>
   );
 }
@@ -134,7 +134,7 @@ export function FilesBubble({ msg, highlight, orgId }: { msg: MessageWithExtras;
           </div>
         ))}
       </div>
-      <Meta isSelf={isSelf} time={timeLabel(msg.sent_at)} />
+      <Meta isSelf={isSelf} time={timeLabel(msg.sent_at)} senderName={msg.senderName} />
     </div>
   );
 }
@@ -259,7 +259,7 @@ export function RequestCard({
                 {CADENCE_LABEL[r.cadence]}
               </span>
             )}
-            <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--color-neutral-500)", whiteSpace: "nowrap" }}>受付が作成</span>
+            <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--color-neutral-500)", whiteSpace: "nowrap" }}>秘書が作成</span>
           </div>
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, lineHeight: 1.2, marginTop: 2 }}>
             {payload.title ?? r.title}
@@ -402,7 +402,7 @@ export function RequestCard({
             <p style={{ margin: "10px 0 0", paddingTop: 8, borderTop: "1px solid var(--color-divider)", fontSize: 12.5, opacity: 0.75 }}>
               このたびもご依頼いただきありがとうございました。ご不明な点や修正のご希望があれば、このまま返信ください。またのご依頼をお待ちしております。
             </p>
-            <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-neutral-500)" }}>受付</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-neutral-500)" }}>秘書</div>
 
             {!rating && (
               <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -543,7 +543,7 @@ export function IntakeCard({ msg }: { msg: MessageWithExtras }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 4, fontSize: 12.5, color: "var(--color-neutral-500)" }}>送信しました。</div>
         )}
       </div>
-      <Meta isSelf={false} time={timeLabel(msg.sent_at)} />
+      <Meta isSelf={false} time={timeLabel(msg.sent_at)} senderName={msg.senderName} />
     </div>
   );
 }

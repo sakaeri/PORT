@@ -147,7 +147,7 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
   const stats: DepartmentStat[] = visibleDepartments.map((d) => buildStat(d.id, d.id, d.name, d.royalty_pct));
 
   if (viewerRole !== "dept_manager") {
-    const unassigned = buildStat(null, "unassigned", "窓口未設定", null);
+    const unassigned = buildStat(null, "unassigned", "担当秘書未設定", null);
     if (unassigned.total > 0 || unassigned.quoted > 0 || unassigned.completed > 0 || unassigned.months.some((m) => m.rows.length > 0)) {
       stats.push(unassigned);
     }

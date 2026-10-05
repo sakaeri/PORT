@@ -366,7 +366,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>受付メニュー</div>
-        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの担当（窓口）が対応するかは、依頼主一覧の画面からその場で割り当てます。FC展開でのブランド・料金統一のため、編集は本部限定です" />
+        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの秘書が対応するかは、依頼主一覧の画面からその場で割り当てます。FC展開でのブランド・料金統一のため、編集は本部限定です" />
         <div style={{ flex: 1 }} />
         {canEdit && (
           <button onClick={handleAdd} style={smallBtn}>

@@ -124,7 +124,7 @@ export async function getThreadMessages(threadId: string): Promise<{ messages: M
   const { data, error } = await supabase
     .from("messages")
     .select(
-      "*, message_attachments(*), requests(*, request_items(*), completion_reports(*), completion_report_attachments(*), ratings(*))",
+      "*, message_attachments(*), profiles(display_name), requests(*, request_items(*), completion_reports(*), completion_report_attachments(*), ratings(*))",
     )
     .eq("thread_id", threadId)
     .is("deleted_at", null)

@@ -68,7 +68,7 @@ export default function StaffChat({
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const departmentById = new Map(departments.map((d) => [d.id, d.name]));
-  const departmentFilterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "窓口未設定" }];
+  const departmentFilterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "担当秘書未設定" }];
 
   // 一覧の最終メッセージ・未読はこのコンポーネント自身では再取得せず、
   // ページ全体(staff/page.tsx)を router.refresh() で再取得させる

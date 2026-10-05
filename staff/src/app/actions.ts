@@ -29,7 +29,7 @@ async function requireHq() {
 // 削除は案件自体の完全削除につながるため）。
 function requireDeletePermission(ctx: { role: string }) {
   if (ctx.role === "dept_leader") {
-    throw new Error("削除はスタッフには許可されていません。本部メンバーまたはマネージャーにご依頼ください。");
+    throw new Error("削除はスタッフには許可されていません。本部メンバーまたは秘書にご依頼ください。");
   }
 }
 
@@ -974,7 +974,7 @@ export async function submitCaseReport(
   if (reportError) throw reportError;
 
   if (!canSendDirectly) {
-    await postCaseNotice(supabase, requestId, "完了報告を提出しました（マネージャーの確認待ち）");
+    await postCaseNotice(supabase, requestId, "完了報告を提出しました（秘書の確認待ち）");
     return;
   }
 
@@ -992,7 +992,7 @@ export async function submitCaseReport(
 // 依頼主に送る。
 export async function approveCaseReport(requestId: string) {
   const ctx = await requireContext();
-  if (ctx.role !== "owner" && ctx.role !== "dept_manager") throw new Error("この操作は本部メンバー・マネージャーのみ行えます");
+  if (ctx.role !== "owner" && ctx.role !== "dept_manager") throw new Error("この操作は本部メンバー・秘書のみ行えます");
   const supabase = await createClient();
 
   const { data: request } = await supabase.from("requests").select("id, phase, customer_id").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
@@ -1182,7 +1182,7 @@ async function requireHqPrivileged() {
 async function requireManagerOrAbove() {
   const ctx = await requireContext();
   if (ctx.role !== "owner" && ctx.role !== "dept_manager") {
-    throw new Error("この操作はマネージャー以上のみ行えます");
+    throw new Error("この操作は秘書以上のみ行えます");
   }
   return ctx;
 }

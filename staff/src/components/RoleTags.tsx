@@ -13,8 +13,8 @@ const TAG_STYLE: Record<Tag, React.CSSProperties> = {
 };
 
 const ROLE_PERMISSIONS: Record<StaffRole, { scope: string; tags: Tag[]; note?: string }> = {
-  owner: { scope: "全ての窓口", tags: ["閲覧", "対応", "設定", "削除"] },
-  dept_manager: { scope: "担当する窓口", tags: ["閲覧", "対応", "削除"] },
+  owner: { scope: "全体", tags: ["閲覧", "対応", "設定", "削除"] },
+  dept_manager: { scope: "自分の担当分", tags: ["閲覧", "対応", "削除"] },
   // dept_leader はDB上の名残の値。表示・実際の役割は「スタッフ」
   // （依頼主とは直接やり取りせず、個別に割り当てられた案件の社内トーク
   // での作業だけを行う。窓口には所属しない）。

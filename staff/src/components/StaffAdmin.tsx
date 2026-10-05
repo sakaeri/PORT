@@ -82,7 +82,7 @@ function InviteLinkCard() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5, flex: 1 }}>
           <span style={{ fontSize: 12.5, color: "var(--color-text)" }}>リンクを発行してURLを本人に送ってください。</span>
-          <InfoTooltip text="ログイン情報は本人が自分で設定します。役職はあとから何度でも変更できるので、まずは一番権限の小さい「スタッフ」として参加してもらい、必要になったらチャット画面から権限を上げてください。窓口（担当マネージャー）が未設定の間は何も見えない状態になるので安全です。参加すると、そのままスタッフ一覧に表示されます。" />
+          <InfoTooltip text="ログイン情報は本人が自分で設定します。役職はあとから何度でも変更できるので、まずは一番権限の小さい「スタッフ」として参加してもらい、必要になったらチャット画面から権限を上げてください。担当秘書が未設定の間は何も見えない状態になるので安全です。参加すると、そのままスタッフ一覧に表示されます。" />
         </div>
         <button onClick={create} disabled={creating} style={{ ...primaryBtn, flex: "none" }}>
           {creating ? "作成中…" : "招待リンクを作成"}

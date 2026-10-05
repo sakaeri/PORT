@@ -49,7 +49,7 @@ export default function CustomersList({
     .filter((c) => c.active || showArchived)
     .filter((c) => departmentFilter === "all" || (departmentFilter === "none" ? c.departmentId === null : c.departmentId === departmentFilter));
   const archivedCount = rows.filter((c) => !c.active).length;
-  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "窓口未設定" }];
+  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "担当秘書未設定" }];
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a server-refetched prop (router.refresh()), not state derived from other client state

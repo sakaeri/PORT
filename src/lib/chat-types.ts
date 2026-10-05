@@ -18,10 +18,13 @@ export interface RequestBundle {
 export interface MessageWithExtras extends MessageRow {
   attachments: AttachmentRow[];
   requestBundle: RequestBundle | null;
+  // 送信者（秘書）の表示名。依頼主自身の発言やシステム発言ではnull。
+  senderName: string | null;
 }
 
 export type RawMessageRow = MessageRow & {
   message_attachments: AttachmentRow[] | null;
+  profiles: { display_name: string } | { display_name: string }[] | null;
   requests:
     | (RequestRow & {
         request_items: RequestItemRow[] | null;
@@ -36,7 +39,7 @@ export type RawMessageRow = MessageRow & {
 export const MESSAGE_PAGE_SIZE = 60;
 
 export function mapMessageRow(row: RawMessageRow): MessageWithExtras {
-  const { message_attachments, requests, ...msg } = row;
+  const { message_attachments, requests, profiles, ...msg } = row;
   const reportRaw = requests ? (Array.isArray(requests.completion_reports) ? requests.completion_reports[0] : requests.completion_reports) : null;
   const report = reportRaw ? { ...reportRaw, attachments: requests?.completion_report_attachments ?? [] } : null;
   const requestBundle: RequestBundle | null = requests
@@ -47,7 +50,8 @@ export function mapMessageRow(row: RawMessageRow): MessageWithExtras {
         rating: (Array.isArray(requests.ratings) ? requests.ratings[0] : requests.ratings) ?? null,
       }
     : null;
-  return { ...msg, attachments: message_attachments ?? [], requestBundle };
+  const senderProfile = Array.isArray(profiles) ? profiles[0] : profiles;
+  return { ...msg, attachments: message_attachments ?? [], requestBundle, senderName: senderProfile?.display_name ?? null };
 }
 
 export interface CustomerContext {

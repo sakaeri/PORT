@@ -313,7 +313,7 @@ function StaffEditPanel({
         </div>
         {role === "dept_manager" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 4, justifyContent: "flex-end" }}>
-            <span style={editLabel}>窓口（自動）</span>
+            <span style={editLabel}>担当（自動）</span>
             <span style={{ fontSize: 13, height: 36, display: "flex", alignItems: "center" }}>
               {editable.departments.find((d) => departmentIds.includes(d.id))?.name ?? "保存時に自動で作成されます"}
             </span>
@@ -321,7 +321,7 @@ function StaffEditPanel({
         )}
         {isDeptScoped(role) && (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={editLabel}>所属窓口（複数選択可・未設定も可）</span>
+            <span style={editLabel}>担当秘書（複数選択可・未設定も可）</span>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 320, maxHeight: 92, overflowY: "auto", paddingRight: 2 }}>
               {editable.departments.map((d) => {
                 const on = departmentIds.includes(d.id);
