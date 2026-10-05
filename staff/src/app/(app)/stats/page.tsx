@@ -95,13 +95,14 @@ async function HqStats() {
 
 async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; viewerRole: StaffRole | "reception"; viewerUserId: string }) {
   const supabase = await createClient();
-  const [{ data: requests, error }, { data: departmentRows }, { data: customerThreads }, { data: myDepartmentRows }] = await Promise.all([
+  const [{ data: requests, error }, { data: departmentRows }, { data: customerThreads }, { data: myDepartmentRows }, { data: ratingRows }] = await Promise.all([
     supabase.from("requests").select("id, title, phase, amount, pay_status, paid_at, completed_at, customer_id, customers(name)").eq("org_id", orgId),
     supabase.from("departments").select("id, name, royalty_pct").eq("org_id", orgId).order("created_at", { ascending: true }),
     // 依頼主の窓口は、その依頼主の「customerトーク」が持つ department_id で決まる
     // （customersテーブル自体には窓口の列がない）。
     supabase.from("threads").select("customer_id, department_id").eq("org_id", orgId).eq("kind", "customer"),
     viewerRole === "dept_manager" ? supabase.from("staff_departments").select("department_id").eq("profile_id", viewerUserId) : Promise.resolve({ data: [] as { department_id: string }[] }),
+    supabase.from("ratings").select("customer_id, stars, created_at, skipped").eq("skipped", false).not("stars", "is", null),
   ]);
 
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
@@ -143,9 +144,13 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
   // にくい。実績としては「完了報告を出した（＝完了した）月」を基準に、
   // その月に完了した案件の金額を積み上げる。累計ではなく「今月」だけを
   // 見せる（過去の月を遡って見る機能は今のところ無い）。
+  const monthRatings = (ratingRows ?? []).filter((r) => monthKeyJST(r.created_at) === currentKey);
+
   function buildStat(matchDeptId: string | null, id: string, name: string, royaltyPct: number | null): DepartmentStat {
     const deptRows = rows.filter((r) => (departmentIdByCustomer.get(r.customer_id) ?? null) === matchDeptId);
-    const quoted = deptRows.filter((r) => r.phase === "quoted").length;
+    const deptRatings = monthRatings.filter((r) => (departmentIdByCustomer.get(r.customer_id) ?? null) === matchDeptId);
+    const monthRatingCount = deptRatings.length;
+    const monthRatingAvg = monthRatingCount > 0 ? deptRatings.reduce((s, r) => s + (r.stars ?? 0), 0) / monthRatingCount : null;
 
     const completedThisMonth: MonthRow[] = [];
     let monthRevenue = 0;
@@ -162,7 +167,7 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
 
     const months: MonthBreakdown[] = [{ key: currentKey, label: currentLabel, rows: [...pendingRows, ...completedThisMonth] }];
 
-    return { id, name, royaltyPct, quoted, monthCompleted: completedThisMonth.length, monthRevenue, months };
+    return { id, name, royaltyPct, monthRatingAvg, monthRatingCount, monthCompleted: completedThisMonth.length, monthRevenue, months };
   }
 
   // マネージャーは自分の窓口だけ、オーナーは全窓口（＋窓口未設定分、
@@ -173,21 +178,23 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
 
   if (viewerRole !== "dept_manager") {
     const unassigned = buildStat(null, "unassigned", "担当秘書未設定", null);
-    if (unassigned.monthRevenue > 0 || unassigned.quoted > 0 || unassigned.monthCompleted > 0 || unassigned.months.some((m) => m.rows.length > 0)) {
+    if (unassigned.monthRevenue > 0 || unassigned.monthRatingCount > 0 || unassigned.monthCompleted > 0 || unassigned.months.some((m) => m.rows.length > 0)) {
       stats.push(unassigned);
     }
   }
 
   const grandMonthRevenue = stats.reduce((s, d) => s + d.monthRevenue, 0);
-  const grandQuoted = stats.reduce((s, d) => s + d.quoted, 0);
   const grandMonthCompleted = stats.reduce((s, d) => s + d.monthCompleted, 0);
+  const grandRatingCount = stats.reduce((s, d) => s + d.monthRatingCount, 0);
+  const grandRatingSum = stats.reduce((s, d) => s + (d.monthRatingAvg ?? 0) * d.monthRatingCount, 0);
+  const grandRatingAvg = grandRatingCount > 0 ? grandRatingSum / grandRatingCount : null;
 
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         <StatTile label="今月の実績金額" value={yen(grandMonthRevenue)} />
         <StatTile label="今月の完了件数" value={`${grandMonthCompleted}件`} />
-        <StatTile label="見積もり回答待ち" value={`${grandQuoted}件`} />
+        <StatTile label="今月の評価" value={grandRatingCount > 0 ? `★${grandRatingAvg?.toFixed(1)}（${grandRatingCount}件）` : "まだありません"} />
       </div>
 
       <DepartmentStatsList departments={stats} canEditRoyalty={viewerRole === "owner"} />

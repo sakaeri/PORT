@@ -12,7 +12,8 @@ export interface DepartmentStat {
   id: string;
   name: string;
   royaltyPct: number | null;
-  quoted: number;
+  monthRatingAvg: number | null;
+  monthRatingCount: number;
   monthCompleted: number;
   monthRevenue: number;
   months: MonthBreakdown[];
@@ -94,7 +95,7 @@ export default function DepartmentStatsList({
               <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 14px 14px", borderTop: "1px solid var(--color-divider)", paddingTop: 12 }}>
                 <div style={{ display: "flex", gap: 14, fontSize: 12, color: "var(--color-neutral-500)" }}>
                   <span>今月の完了 {d.monthCompleted}件</span>
-                  <span>見積もり回答待ち {d.quoted}件</span>
+                  <span>今月の評価 {d.monthRatingCount > 0 ? `★${d.monthRatingAvg?.toFixed(1)}（${d.monthRatingCount}件）` : "まだありません"}</span>
                 </div>
 
                 {isRealDepartment && (
