@@ -135,14 +135,16 @@ export async function updateCustomerName(name: string) {
   if (error) throw error;
 }
 
-export async function setInitialProfile(name: string, email: string, phone: string) {
+export async function setInitialProfile(name: string, email: string, phone: string, agreedToTerms: boolean) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const trimmedName = name.trim();
   const trimmedEmail = email.trim();
   if (!trimmedName || !trimmedEmail) throw new Error("お名前とメールアドレスをご入力ください");
+  // クライアント側のチェックボックスだけに頼らず、サーバー側でも必ず確認する。
+  if (!agreedToTerms) throw new Error("利用規約への同意が必要です");
 
-  await supabase.from("customers").update({ name: trimmedName }).eq("id", ctx.customerId);
+  await supabase.from("customers").update({ name: trimmedName, terms_accepted_at: new Date().toISOString() }).eq("id", ctx.customerId);
 
   const { error: emailErr } = await supabase.auth.updateUser({ email: trimmedEmail });
   if (emailErr) {

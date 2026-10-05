@@ -126,6 +126,7 @@ export interface Database {
           auto_recharge_threshold: number | null;
           auto_recharge_amount: number | null;
           auto_recharge_fail_count: number;
+          terms_accepted_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["customers"]["Row"]>;

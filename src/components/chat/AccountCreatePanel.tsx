@@ -10,6 +10,7 @@ import { setInitialProfile } from "@/app/actions";
 export default function AccountCreatePanel({ onRequestClose }: { onRequestClose: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
@@ -19,10 +20,14 @@ export default function AccountCreatePanel({ onRequestClose }: { onRequestClose:
       setError("お名前とメールアドレスをご入力ください");
       return;
     }
+    if (!agreed) {
+      setError("利用規約への同意が必要です");
+      return;
+    }
     setSending(true);
     setError("");
     try {
-      await setInitialProfile(name, email, "");
+      await setInitialProfile(name, email, "", agreed);
       setSent(true);
     } catch (e) {
       setError(errorMessage(e, "作成できませんでした"));
@@ -58,9 +63,18 @@ export default function AccountCreatePanel({ onRequestClose }: { onRequestClose:
         className="vid-input"
         style={{ width: "100%", height: 36, padding: "6px 10px", fontSize: 13.5, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
       />
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: 11, lineHeight: 1.6, color: "var(--color-neutral-500)", cursor: "pointer" }}>
+        <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
+        <span>
+          <a href="/terms" target="_blank" rel="noreferrer" style={{ color: "var(--color-accent)" }}>
+            利用規約
+          </a>
+          に同意する
+        </span>
+      </label>
       {error && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</span>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={submit} disabled={sending} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+        <button onClick={submit} disabled={sending || !agreed} style={{ flex: 1, height: 36, cursor: sending || !agreed ? "not-allowed" : "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending || !agreed ? 0.6 : 1 }}>
           {sending ? "作成中…" : "作成する"}
         </button>
         <button onClick={onRequestClose} style={{ flex: "none", height: 36, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>

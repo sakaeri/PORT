@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
+import { logAccess } from "@/lib/access-log";
 import CustomerThread, { MESSAGE_PAGE_SIZE, type ThreadMessage } from "@/components/CustomerThread";
 
 function mapMessageRows(data: NonNullable<Awaited<ReturnType<typeof fetchMessagePage>>["data"]>): ThreadMessage[] {
@@ -81,6 +82,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ]);
 
   if (!customer) notFound();
+  void logAccess(ctx.orgId, ctx.userId, "view_customer", customer.id, null);
   const convertedOrgRaw = Array.isArray(customer.converted_org) ? customer.converted_org[0] : customer.converted_org;
   const convertedOrg = convertedOrgRaw ? { displayName: convertedOrgRaw.display_name, slug: convertedOrgRaw.slug } : null;
 

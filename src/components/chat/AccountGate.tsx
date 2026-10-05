@@ -41,6 +41,7 @@ export default function AccountGate({ orgDisplayName }: { orgDisplayName: string
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [sending, setSending] = useState(false);
   const [sentTo, setSentTo] = useState("");
   const [error, setError] = useState("");
@@ -50,10 +51,14 @@ export default function AccountGate({ orgDisplayName }: { orgDisplayName: string
       setError("お名前とメールアドレスをご入力ください");
       return;
     }
+    if (!agreed) {
+      setError("利用規約への同意が必要です");
+      return;
+    }
     setSending(true);
     setError("");
     try {
-      await setInitialProfile(name, email, "");
+      await setInitialProfile(name, email, "", agreed);
       setSentTo(email);
     } catch (e) {
       setError(errorMessage(e, "作成できませんでした"));
@@ -145,11 +150,20 @@ export default function AccountGate({ orgDisplayName }: { orgDisplayName: string
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <input value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前" className="vid-input" style={input} />
                     <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="メールアドレス" className="vid-input" style={input} />
+                    <label style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: 11.5, lineHeight: 1.6, color: "var(--color-neutral-400)", cursor: "pointer" }}>
+                      <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
+                      <span>
+                        <a href="/terms" target="_blank" rel="noreferrer" style={{ color: "var(--color-accent)" }}>
+                          利用規約
+                        </a>
+                        に同意する
+                      </span>
+                    </label>
                     {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
                     <button
                       onClick={submitNew}
-                      disabled={sending}
-                      style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending ? 0.6 : 1 }}
+                      disabled={sending || !agreed}
+                      style={{ height: 40, cursor: sending || !agreed ? "not-allowed" : "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending || !agreed ? 0.6 : 1 }}
                     >
                       {sending ? "送信中…" : "はじめる"}
                     </button>

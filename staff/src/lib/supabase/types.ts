@@ -173,6 +173,7 @@ export interface Database {
           auto_recharge_amount: number | null;
           auto_recharge_fail_count: number;
           converted_org_id: string | null;
+          terms_accepted_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
@@ -181,6 +182,20 @@ export interface Database {
           { foreignKeyName: "customers_creator_fk"; columns: ["creator_id"]; isOneToOne: false; referencedRelation: "creators"; referencedColumns: ["id"] },
           { foreignKeyName: "customers_converted_org_id_fkey"; columns: ["converted_org_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
         ];
+      };
+      access_logs: {
+        Row: {
+          id: string;
+          org_id: string;
+          actor_id: string | null;
+          customer_id: string | null;
+          request_id: string | null;
+          action: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["access_logs"]["Row"]> & { org_id: string; actor_id: string; action: string };
+        Update: Partial<Database["public"]["Tables"]["access_logs"]["Row"]>;
+        Relationships: [];
       };
       creators: {
         Row: {
