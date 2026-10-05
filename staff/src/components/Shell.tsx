@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X, PencilSimple } from "@phosphor-icons/react";
+import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X, PencilSimple, ListChecks } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { headingWeight } from "@/lib/style";
@@ -18,6 +18,7 @@ import type { StaffContext } from "@/lib/data";
 // 依頼主一覧・売上実績・メニュー管理は隠す。案件トークと、本部との連絡用の
 // スタッフ画面はそのまま使える。
 const NAV = [
+  { href: "/today", label: "今日やること", icon: ListChecks, hideWhenStaff: true },
   { href: "/customers", label: "依頼主", icon: Users, hideWhenStaff: true },
   { href: "/cases", label: "案件トーク", icon: ChatsCircle },
   { href: "/staff", label: "スタッフ", icon: UsersThree },
@@ -267,7 +268,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   if (isMobile) {
     return (
       <div style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)" }}>
-        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, height: 52, padding: "0 var(--space-4)", background: "var(--color-nav-bg)", borderBottom: "1px solid var(--color-nav-border)" }}>
+        <div className="app-shell-chrome" style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, height: 52, padding: "0 var(--space-4)", background: "var(--color-nav-bg)", borderBottom: "1px solid var(--color-nav-border)" }}>
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="メニューを開く"
@@ -318,7 +319,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
         )}
 
         <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          {billingBanner}
+          <div className="app-shell-chrome">{billingBanner}</div>
           <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
         </main>
         {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
@@ -341,6 +342,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   return (
     <div style={{ height: "100vh", display: "flex", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)" }}>
       <aside
+        className="app-shell-chrome"
         style={{
           flex: "none",
           width: 220,
@@ -356,7 +358,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {billingBanner}
+        <div className="app-shell-chrome">{billingBanner}</div>
         <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
       </main>
       {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}

@@ -165,3 +165,12 @@ button:disabled {
     transform: rotate(360deg);
   }
 }
+
+/* 「今日やること」など、印刷・PDF保存用のページから、サイドバーや
+   操作ボタンなど印刷に不要な部分を消す。 */
+@media print {
+  .app-shell-chrome,
+  .no-print {
+    display: none !important;
+  }
+}
