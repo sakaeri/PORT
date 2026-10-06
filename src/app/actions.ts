@@ -135,9 +135,12 @@ export async function setInitialProfile(name: string, email: string, phone: stri
 
   const { error: emailErr } = await supabase.auth.updateUser({ email: trimmedEmail });
   if (emailErr) {
-    // Supabaseのバージョンによって "email_exists" と "user_already_exists" の
-    // どちらで返ってくるかが変わるため、両方とも同じ案内文にする。
-    if (emailErr.code === "email_exists" || emailErr.code === "user_already_exists") {
+    // Supabaseのバージョンによってエラーコードの付き方が変わり、コードが
+    // 付かない場合もあるため、コードに加えて英語メッセージ中の
+    // "already"（already registered / already exists 等）も拾う。
+    // こうしないと素通りして、意味の分からない汎用エラーになってしまう。
+    const code = emailErr.code ?? "";
+    if (code === "email_exists" || code === "user_already_exists" || code.includes("already") || /already/i.test(emailErr.message)) {
       throw new Error("このメールアドレスは既に登録されています。すでにご利用の方は「ログイン」をお試しください。");
     }
     throw emailErr;
