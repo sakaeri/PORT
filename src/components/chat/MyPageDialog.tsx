@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/errors";
-import { X, CheckCircle, Sun, MoonStars, SignOut } from "@phosphor-icons/react";
+import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
 import { updateCustomerName, changeEmail, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
-import { createClient } from "@/lib/supabase/client";
 import LoginPanel from "@/components/chat/LoginPanel";
 import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
 import AvatarPicker from "@/components/chat/AvatarPicker";
 import HqChatPanel from "@/components/chat/HqChatPanel";
+import SignOutButton from "@/components/chat/SignOutButton";
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 60 };
 const dialogBox: React.CSSProperties = {
@@ -74,7 +73,6 @@ export default function MyPageDialog({
   balance: number;
   autoRecharge: { enabled: boolean; threshold: number | null; amount: number | null; hasCard: boolean };
 }) {
-  const router = useRouter();
   const [name, setName] = useState(customerName);
   const nameIsPlaceholder = name === NAME_PLACEHOLDER;
 
@@ -152,15 +150,6 @@ export default function MyPageDialog({
   }
 
   const [authView, setAuthView] = useState<"none" | "login" | "create">("none");
-  const [signingOut, setSigningOut] = useState(false);
-
-  async function handleSignOut() {
-    if (signingOut) return;
-    setSigningOut(true);
-    await createClient().auth.signOut();
-    onClose();
-    router.refresh();
-  }
 
   async function saveName() {
     const trimmed = nameDraft.trim();
@@ -414,14 +403,9 @@ export default function MyPageDialog({
             {/* 担当マネージャーには見えない、本部との直接のやり取り */}
             <HqChatPanel />
 
-            <button
-              onClick={handleSignOut}
-              disabled={signingOut}
-              style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 6, height: 30, padding: 0, cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
-            >
-              <SignOut size={13} />
-              {signingOut ? "処理中…" : "ログアウト"}
-            </button>
+            <div>
+              <SignOutButton onSignedOut={onClose} />
+            </div>
           </div>
         </div>
       </div>

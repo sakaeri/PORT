@@ -3,6 +3,7 @@ import { getCustomerContext, getThreadMessages, hasAuthSession } from "@/lib/dat
 import ChatScreen from "@/components/chat/ChatScreen";
 import VerifyGate from "@/components/chat/VerifyGate";
 import AccountGate from "@/components/chat/AccountGate";
+import SignOutButton from "@/components/chat/SignOutButton";
 
 export async function generateMetadata(): Promise<Metadata> {
   const ctx = await getCustomerContext();
@@ -21,8 +22,11 @@ export default async function Home() {
   const ctx = await getCustomerContext();
 
   if (!ctx) {
-    // 認証は済んでいるのにここに来た＝env設定漏れやDB側のトリガー未適用など
-    // の異常。
+    // 認証は済んでいるのにここに来た＝env設定漏れやDB側のトリガー未適用、
+    // または事業者の削除・統合などでセッションと紐づくデータが無くなった
+    // 異常。後者はログアウトして最初からやり直せば直るので、この画面でも
+    // 操作できるようにしておく（チャット画面より手前で止まるため、
+    // マイページのログアウトには辿り着けない）。
     return (
       <main
         style={{
@@ -36,11 +40,14 @@ export default async function Home() {
           textAlign: "center",
         }}
       >
-        <div style={{ maxWidth: 360, fontSize: 13.5, lineHeight: 1.7, opacity: 0.85 }}>
-          読み込みに失敗しました。しばらくして再度お試しください。
-          <br />
-          （開発者向け: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY が設定され、
-          supabase/migrations が適用されているか確認してください）
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, maxWidth: 360 }}>
+          <div style={{ fontSize: 13.5, lineHeight: 1.7, opacity: 0.85 }}>
+            読み込みに失敗しました。しばらくして再度お試しください。
+            <br />
+            （開発者向け: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY が設定され、
+            supabase/migrations が適用されているか確認してください）
+          </div>
+          <SignOutButton label="ログアウトしてやり直す" />
         </div>
       </main>
     );
