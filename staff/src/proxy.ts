@@ -43,10 +43,14 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getUser();
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
   // /join: スタッフの招待リンク（招待された本人はまだログインしていない）。
+  // /auth/confirm: パスワード再設定リンクの着地点（まだセッションが無い状態で来る）。
+  // /reset-password: 再設定リンクを踏んだ直後の、新しいパスワードを設定する画面。
   // /api/stripe-webhook: Stripeサーバーからの通知（ログインセッションを持たない）。
   const isPublicRoute =
     isLoginRoute ||
     request.nextUrl.pathname.startsWith("/join") ||
+    request.nextUrl.pathname.startsWith("/auth/confirm") ||
+    request.nextUrl.pathname.startsWith("/reset-password") ||
     request.nextUrl.pathname.startsWith("/api/stripe-webhook");
 
   if (!data.user && !isPublicRoute) {

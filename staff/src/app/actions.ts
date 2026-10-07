@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
@@ -199,6 +199,30 @@ export async function updateLoginEmail(newEmail: string) {
     }
     throw error;
   }
+}
+
+// パスワードを忘れたログイン前の人向け（↔ updateLoginPassword はログイン済み・
+// 現在のパスワードを知っている人向け）。メールが存在するかどうかはSupabase側が
+// 意図的に教えてくれない仕様なので、成功・失敗に関わらず同じ案内文にする。
+export async function requestPasswordReset(email: string) {
+  const trimmed = email.trim();
+  if (!trimmed) throw new Error("メールアドレスをご入力ください");
+  const supabase = await createClient();
+  const h = await headers();
+  const host = h.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  await supabase.auth.resetPasswordForEmail(trimmed, { redirectTo: `${protocol}://${host}/auth/confirm` });
+}
+
+// /auth/confirm 経由でrecoveryトークンを確認した直後（まだ仮のセッションの
+// 状態）に呼ぶ。新しいパスワードを設定して、本来のログインを完了させる。
+export async function completePasswordReset(newPassword: string) {
+  if (newPassword.length < 8) throw new Error("パスワードは8文字以上にしてください");
+  const supabase = await createClient();
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData.user) throw new Error("セッションの有効期限が切れました。もう一度パスワード再設定をお試しください。");
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
 }
 
 export async function updateLoginPassword(currentPassword: string, newPassword: string) {
