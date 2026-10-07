@@ -143,7 +143,7 @@ export default function AccountGate({ orgDisplayName }: { orgDisplayName: string
                     はじめてご利用の方
                   </button>
                   <button onClick={() => setMode("existing")} style={tabBtn(mode === "existing")}>
-                    ご利用いただいたことがある方
+                    ログイン
                   </button>
                 </div>
                 {mode === "new" ? (
