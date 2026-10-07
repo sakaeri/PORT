@@ -141,21 +141,22 @@ export function FilesBubble({ msg, highlight, orgId }: { msg: MessageWithExtras;
 
 export function NoticeBubble({ msg }: { msg: MessageWithExtras }) {
   return (
-    <div style={{ alignSelf: "center" }}>
+    <div style={{ alignSelf: "center", maxWidth: "min(420px, 100%)" }}>
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           gap: 6,
           fontSize: 11.5,
-          whiteSpace: "nowrap",
+          whiteSpace: "pre-wrap",
           color: "var(--color-neutral-500)",
-          padding: "2px 10px",
+          padding: "6px 10px",
           borderRadius: "var(--radius-md)",
           background: "var(--color-surface)",
+          textAlign: "center",
         }}
       >
-        <BellRinging size={12} />
+        <BellRinging size={12} style={{ flex: "none", marginTop: 2 }} />
         {msg.body}
       </div>
     </div>

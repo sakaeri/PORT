@@ -68,12 +68,29 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
   }, []);
   const [avatarUrl, setAvatarUrl] = useState(ctx.avatarUrl);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // 4秒おきのポーリングやリアルタイム通知のたびに messages の参照が更新され、
+  // 内容が同じでも useEffect が走ってしまう。過去ログを読もうとスクロールを
+  // 上げている最中に毎回最下部へ戻されるのを防ぐため、「下端付近にいる時だけ
+  // 自動スクロールする」ようにする。
+  const isNearBottomRef = useRef(true);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    function handleScroll() {
+      if (!el) return;
+      isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    }
+    el.addEventListener("scroll", handleScroll);
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     if (skipAutoScrollRef.current) {
       skipAutoScrollRef.current = false;
       return;
     }
+    if (!isNearBottomRef.current) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
