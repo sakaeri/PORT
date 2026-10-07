@@ -38,7 +38,7 @@ function previewBody(m: PreviewMessage): string {
     case "rating":
       return "［評価］";
     case "notice":
-      return `［お知らせ］${m.body ?? ""}`;
+      return m.body ?? "";
     case "off_choice":
       return `［選択］${m.body ?? ""}`;
     case "intake_request":
