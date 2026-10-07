@@ -26,6 +26,7 @@ import {
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import HqFeedbackChat from "@/components/HqFeedbackChat";
+import Avatar, { avatarInitial } from "@/components/Avatar";
 import QuoteDialog, { type MenuOption } from "@/components/QuoteDialog";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
@@ -57,6 +58,7 @@ export interface ThreadMessage {
   requestPhase?: RequestPhase | null;
   requestAmount?: number | null;
   report?: ThreadReport | null;
+  avatarUrl?: string | null;
 }
 
 type Message = ThreadMessage;
@@ -521,6 +523,7 @@ export default function CustomerThread({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const skipAutoScrollRef = useRef(false);
+  const isNearBottomRef = useRef(true);
   const [balance] = useState(customer.balance);
 
   const [staffLabel, setStaffLabel] = useState(customer.staffLabel);
@@ -550,14 +553,26 @@ export default function CustomerThread({
   }, [thread?.id]);
 
   useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    function handleScroll() {
+      if (!el) return;
+      isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    }
+    el.addEventListener("scroll", handleScroll);
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
     if (skipAutoScrollRef.current) {
       skipAutoScrollRef.current = false;
       return;
     }
+    if (!isNearBottomRef.current) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  const MESSAGE_SELECT = "*, message_attachments(*), requests(phase, amount, completion_reports(summary, details))";
+  const MESSAGE_SELECT = "*, message_attachments(*), profiles!messages_sender_id_fkey(avatar_url), requests(phase, amount, completion_reports(summary, details))";
 
   // 開いている間に届いた新着分だけを取りに行く（既に読み込んだ最古の時点以降のみ）。
   // 会話全体を毎回取り直すと、履歴が長い依頼主ほどポーリングのたびに重くなるため。
@@ -573,12 +588,14 @@ export default function CustomerThread({
         rows.map((m) => {
           const req = Array.isArray(m.requests) ? m.requests[0] : m.requests;
           const reportRaw = req ? (Array.isArray(req.completion_reports) ? req.completion_reports[0] : req.completion_reports) : null;
+          const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
           return {
             ...m,
             attachments: m.message_attachments ?? [],
             requestPhase: req?.phase ?? null,
             requestAmount: req?.amount ?? null,
             report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [] } : null,
+            avatarUrl: profile?.avatar_url ?? null,
           };
         }),
       );
@@ -608,12 +625,14 @@ export default function CustomerThread({
           .map((m) => {
             const req = Array.isArray(m.requests) ? m.requests[0] : m.requests;
             const reportRaw = req ? (Array.isArray(req.completion_reports) ? req.completion_reports[0] : req.completion_reports) : null;
+            const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
             return {
               ...m,
               attachments: m.message_attachments ?? [],
               requestPhase: req?.phase ?? null,
               requestAmount: req?.amount ?? null,
               report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [] } : null,
+              avatarUrl: profile?.avatar_url ?? null,
             };
           });
         const container = scrollRef.current;
@@ -788,7 +807,9 @@ export default function CustomerThread({
           const isStaff = m.sender_role !== "client" && m.sender_role !== "creator" && m.sender_role !== null;
           const isOwn = m.sender_id === currentUserId;
           return (
-            <div key={m.id} style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: isStaff ? "flex-end" : "flex-start" }}>
+            <div key={m.id} style={{ display: "flex", flexDirection: isStaff ? "row-reverse" : "row", gap: 8, alignItems: "flex-end" }}>
+              {!isStaff && <Avatar url={m.avatarUrl} initial={avatarInitial(customer.name)} size={28} />}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: isStaff ? "flex-end" : "flex-start" }}>
               {m.deleted_at ? (
                 <div style={{ maxWidth: "70%", padding: "9px 13px", fontSize: 12.5, fontStyle: "italic", color: "var(--color-neutral-500)" }}>
                   削除されました
@@ -828,6 +849,7 @@ export default function CustomerThread({
                   )}
                 </div>
               )}
+              </div>
             </div>
           );
         })}

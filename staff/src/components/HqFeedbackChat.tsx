@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { sendInternalMessage, markThreadRead } from "@/app/actions";
 import TextComposer from "@/components/TextComposer";
+import Avatar, { avatarInitial } from "@/components/Avatar";
 import type { AppRole } from "@/lib/supabase/types";
 
 interface HqMessage {
@@ -14,6 +15,7 @@ interface HqMessage {
   body: string | null;
   sent_at: string;
   deleted_at: string | null;
+  avatarUrl?: string | null;
 }
 
 // 依頼主から本部への直接のご意見・ご要望（担当秘書には見えない）。
@@ -24,15 +26,23 @@ export default function HqFeedbackChat({ threadId, orgId, currentUserId }: { thr
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
 
   const refresh = useCallback(async () => {
     const supabase = createClient(orgId);
     const { data } = await supabase
       .from("messages")
-      .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at")
+      .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at, profiles!messages_sender_id_fkey(avatar_url)")
       .eq("thread_id", threadId)
       .order("sent_at", { ascending: true });
-    if (data) setMessages(data);
+    if (data) {
+      setMessages(
+        data.map((m) => {
+          const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+          return { ...m, avatarUrl: profile?.avatar_url ?? null };
+        }),
+      );
+    }
   }, [threadId, orgId]);
 
   useEffect(() => {
@@ -42,6 +52,18 @@ export default function HqFeedbackChat({ threadId, orgId, currentUserId }: { thr
   }, [threadId, refresh]);
 
   useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    function handleScroll() {
+      if (!el) return;
+      isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    }
+    el.addEventListener("scroll", handleScroll);
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!isNearBottomRef.current) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
@@ -84,7 +106,9 @@ export default function HqFeedbackChat({ threadId, orgId, currentUserId }: { thr
         {messages.map((m) => {
           const isOwn = m.sender_id === currentUserId;
           return (
-            <div key={m.id} style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isOwn ? "flex-end" : "flex-start" }}>
+            <div key={m.id} style={{ display: "flex", flexDirection: isOwn ? "row-reverse" : "row", gap: 6, alignItems: "flex-end" }}>
+              {!isOwn && <Avatar url={m.avatarUrl} initial={avatarInitial(m.sender_role === "client" ? "依頼主" : "本部")} size={22} />}
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isOwn ? "flex-end" : "flex-start" }}>
               {m.deleted_at ? (
                 <div style={{ fontSize: 11.5, fontStyle: "italic", color: "var(--color-neutral-500)" }}>削除されました</div>
               ) : (
@@ -108,6 +132,7 @@ export default function HqFeedbackChat({ threadId, orgId, currentUserId }: { thr
                 {m.sender_role === "client" ? "依頼主" : "本部"}・
                 {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
               </span>
+              </div>
             </div>
           );
         })}

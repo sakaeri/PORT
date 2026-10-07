@@ -42,7 +42,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       : Promise.resolve({ data: [] }),
     supabase
       .from("threads")
-      .select("id, archived_at, messages(id, sender_id, sender_role, kind, body, sent_at, deleted_at)")
+      .select("id, archived_at, messages(id, sender_id, sender_role, kind, body, sent_at, deleted_at, profiles!messages_sender_id_fkey(avatar_url))")
       .eq("kind", "case")
       .eq("request_id", id)
       .order("sent_at", { referencedTable: "messages", ascending: true })
@@ -98,7 +98,10 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const subscription = Array.isArray(request.request_subscriptions) ? request.request_subscriptions[0] : request.request_subscriptions;
   const reportPending = !!report && !report.sent_at;
 
-  const caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null }[] = caseThread?.messages ?? [];
+  const caseMessages: { id: string; sender_id: string | null; sender_role: AppRole | null; kind: string; body: string | null; sent_at: string; deleted_at: string | null; avatarUrl: string | null }[] = (caseThread?.messages ?? []).map((m) => {
+    const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+    return { ...m, avatarUrl: profile?.avatar_url ?? null };
+  });
 
   return (
     <CaseDetail

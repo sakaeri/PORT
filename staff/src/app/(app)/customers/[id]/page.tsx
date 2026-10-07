@@ -7,12 +7,14 @@ function mapMessageRows(data: NonNullable<Awaited<ReturnType<typeof fetchMessage
   return data.map((m) => {
     const req = Array.isArray(m.requests) ? m.requests[0] : m.requests;
     const reportRaw = req ? (Array.isArray(req.completion_reports) ? req.completion_reports[0] : req.completion_reports) : null;
+    const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
     return {
       ...m,
       attachments: m.message_attachments ?? [],
       requestPhase: req?.phase ?? null,
       requestAmount: req?.amount ?? null,
       report: reportRaw ? { summary: reportRaw.summary, details: reportRaw.details ?? [] } : null,
+      avatarUrl: profile?.avatar_url ?? null,
     };
   });
 }
@@ -22,7 +24,7 @@ function fetchMessagePage(supabase: Awaited<ReturnType<typeof createClient>>, th
   // 昇順で表示するため、直近N件を降順で取ってから並べ替える。
   return supabase
     .from("messages")
-    .select("*, message_attachments(*), requests(phase, amount, completion_reports(summary, details))")
+    .select("*, message_attachments(*), profiles!messages_sender_id_fkey(avatar_url), requests(phase, amount, completion_reports(summary, details))")
     .eq("thread_id", threadId)
     .order("sent_at", { ascending: false })
     .limit(MESSAGE_PAGE_SIZE);

@@ -10,6 +10,7 @@ import { ROLE_LABEL, INVITE_ROLES, isDeptScoped, staffSenderLabel } from "@/lib/
 import RoleTags from "@/components/RoleTags";
 import TextComposer from "@/components/TextComposer";
 import Modal from "@/components/Modal";
+import Avatar, { avatarInitial } from "@/components/Avatar";
 import type { AppRole, StaffRole } from "@/lib/supabase/types";
 import type { Department } from "@/components/StaffAdmin";
 
@@ -32,6 +33,7 @@ interface InternalMessage {
   body: string | null;
   sent_at: string;
   deleted_at: string | null;
+  avatarUrl?: string | null;
 }
 
 export default function StaffThreadPane({
@@ -57,16 +59,24 @@ export default function StaffThreadPane({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
 
   const refresh = useCallback(
     async (id: string) => {
       const supabase = createClient(orgId);
       const { data } = await supabase
         .from("messages")
-        .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at")
+        .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at, profiles!messages_sender_id_fkey(avatar_url)")
         .eq("thread_id", id)
         .order("sent_at", { ascending: true });
-      if (data) setMessages(data);
+      if (data) {
+        setMessages(
+          data.map((m) => {
+            const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+            return { ...m, avatarUrl: profile?.avatar_url ?? null };
+          }),
+        );
+      }
     },
     [orgId],
   );
@@ -78,6 +88,7 @@ export default function StaffThreadPane({
     setMessages([]);
     setError("");
     setShowEdit(false);
+    isNearBottomRef.current = true;
     (async () => {
       try {
         const id = await ensureStaffThread(staffProfileId);
@@ -95,6 +106,18 @@ export default function StaffThreadPane({
   }, [staffProfileId, refresh]);
 
   useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    function handleScroll() {
+      if (!el) return;
+      isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    }
+    el.addEventListener("scroll", handleScroll);
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!isNearBottomRef.current) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
@@ -183,7 +206,9 @@ export default function StaffThreadPane({
         {messages.map((m) => {
           const isOwn = m.sender_id === currentUserId;
           return (
-            <div key={m.id} style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isOwn ? "flex-end" : "flex-start" }}>
+            <div key={m.id} style={{ display: "flex", flexDirection: isOwn ? "row-reverse" : "row", gap: 8, alignItems: "flex-end" }}>
+              {!isOwn && <Avatar url={m.avatarUrl} initial={avatarInitial(title)} size={26} />}
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isOwn ? "flex-end" : "flex-start" }}>
               {m.deleted_at ? (
                 <div style={{ fontSize: 12, fontStyle: "italic", color: "var(--color-neutral-500)" }}>削除されました</div>
               ) : (
@@ -216,6 +241,7 @@ export default function StaffThreadPane({
                   )}
                 </div>
               )}
+              </div>
             </div>
           );
         })}
