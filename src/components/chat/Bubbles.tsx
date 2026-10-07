@@ -153,7 +153,7 @@ export function NoticeBubble({ msg }: { msg: MessageWithExtras }) {
           padding: "6px 10px",
           borderRadius: "var(--radius-md)",
           background: "var(--color-surface)",
-          textAlign: "center",
+          textAlign: "left",
         }}
       >
         <BellRinging size={12} style={{ flex: "none", marginTop: 2 }} />
