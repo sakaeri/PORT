@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, CircleNotch } from "@phosphor-icons/react";
-import { updateMyDisplayName, updateOrgDisplayName, updateLoginEmail, updateLoginPassword, updateMyAvatar, removeMyAvatar } from "@/app/actions";
+import { updateMyDisplayName, updateOrgDisplayName, updateLoginEmail, updateLoginPassword, updateMyAvatar } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
@@ -121,20 +121,6 @@ export default function AccountSettingsPanel({
     }
   }
 
-  async function handleAvatarRemove() {
-    if (uploadingAvatar) return;
-    setUploadingAvatar(true);
-    setError("");
-    try {
-      await removeMyAvatar();
-      onAvatarSaved(null);
-    } catch (e) {
-      setError(errorMessage(e, "削除できませんでした"));
-    } finally {
-      setUploadingAvatar(false);
-    }
-  }
-
   async function saveName() {
     const trimmed = name.trim();
     if (saving || !trimmed) return;
@@ -219,26 +205,14 @@ export default function AccountSettingsPanel({
           aria-label="プロフィール画像を変更"
           style={{ position: "relative", padding: 0, border: "none", background: "transparent", borderRadius: "50%", cursor: uploadingAvatar ? "wait" : "pointer" }}
         >
-          <Avatar url={avatarUrl} initial={avatarInitial(currentName)} size={52} />
+          <Avatar url={avatarUrl} initial={avatarInitial(currentName)} size={52} editable />
           {uploadingAvatar && (
             <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.4)", borderRadius: "50%" }}>
               <CircleNotch size={18} color="#fff" style={{ animation: "vid-spin 0.7s linear infinite" }} />
             </span>
           )}
         </button>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={fieldLabel}>プロフィール画像（チャットの吹き出し横に表示されます）</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => fileInputRef.current?.click()} disabled={uploadingAvatar} style={smallBtn}>
-              画像を変更
-            </button>
-            {avatarUrl && (
-              <button onClick={handleAvatarRemove} disabled={uploadingAvatar} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-                削除
-              </button>
-            )}
-          </div>
-        </div>
+        <span style={{ fontSize: 15 }}>{name || currentName}</span>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { errorMessage } from "@/lib/errors";
-import { UserCircle, CircleNotch } from "@phosphor-icons/react";
+import { UserCircle, CircleNotch, PencilSimple } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { updateAvatar, removeAvatar } from "@/app/actions";
 
@@ -30,29 +30,49 @@ export function avatarInitial(customerName: string): string {
   return customerName && customerName !== NAME_PLACEHOLDER ? customerName.trim().charAt(0) : "";
 }
 
-export function Avatar({ url, initial, size }: { url: string | null; initial: string; size: number }) {
+export function Avatar({ url, initial, size, editable }: { url: string | null; initial: string; size: number; editable?: boolean }) {
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        flex: "none",
-        borderRadius: "50%",
-        overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: url ? "transparent" : "var(--color-accent)",
-        border: "1px solid var(--color-divider)",
-      }}
-    >
-      {url ? (
-        // eslint-disable-next-line @next/next/no-img-element -- 任意サイズの外部ストレージ画像のため plain img
-        <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-      ) : initial ? (
-        <span style={{ fontFamily: "var(--font-heading)", fontSize: size * 0.42, color: "#fff" }}>{initial}</span>
-      ) : (
-        <UserCircle size={size * 0.6} color="#fff" />
+    <div style={{ position: "relative", flex: "none", width: size, height: size }}>
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: url ? "transparent" : "var(--color-accent)",
+          border: "1px solid var(--color-divider)",
+        }}
+      >
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- 任意サイズの外部ストレージ画像のため plain img
+          <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : initial ? (
+          <span style={{ fontFamily: "var(--font-heading)", fontSize: size * 0.42, color: "#fff" }}>{initial}</span>
+        ) : (
+          <UserCircle size={size * 0.6} color="#fff" />
+        )}
+      </div>
+      {editable && (
+        <span
+          style={{
+            position: "absolute",
+            top: -2,
+            right: -2,
+            width: size * 0.42,
+            height: size * 0.42,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "50%",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-divider)",
+          }}
+        >
+          <PencilSimple size={size * 0.24} color="var(--color-neutral-400)" />
+        </span>
       )}
     </div>
   );
@@ -121,7 +141,7 @@ export default function AvatarPicker({
         aria-label="プロフィール画像を変更"
         style={{ position: "relative", padding: 0, border: "none", background: "transparent", borderRadius: "50%", cursor: uploading ? "wait" : "pointer" }}
       >
-        <Avatar url={avatarUrl} initial={avatarInitial(customerName)} size={52} />
+        <Avatar url={avatarUrl} initial={avatarInitial(customerName)} size={52} editable />
         {uploading && (
           <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.4)", borderRadius: "50%" }}>
             <CircleNotch size={18} color="#fff" style={{ animation: "vid-spin 0.7s linear infinite" }} />
