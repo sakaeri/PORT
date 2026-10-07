@@ -60,11 +60,12 @@ export default function CaseThreadChat({
 
   const refresh = useCallback(async () => {
     const supabase = createClient(orgId);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("messages")
       .select("id, sender_id, sender_role, kind, body, sent_at, deleted_at, profiles!messages_sender_id_fkey(avatar_url)")
       .eq("thread_id", threadId)
       .order("sent_at", { ascending: true });
+    if (error) console.error("CaseThreadChat refresh failed", error);
     if (data) {
       setMessages(
         data.map((m) => {

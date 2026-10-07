@@ -579,9 +579,10 @@ export default function CustomerThread({
   const refresh = useCallback(async () => {
     if (!thread) return;
     const supabase = createClient(orgId);
-    const { data } = oldestLoadedAt
+    const { data, error } = oldestLoadedAt
       ? await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", thread.id).gte("sent_at", oldestLoadedAt).order("sent_at", { ascending: true })
       : await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", thread.id).order("sent_at", { ascending: false }).limit(MESSAGE_PAGE_SIZE);
+    if (error) console.error("CustomerThread refresh failed", error);
     if (data) {
       const rows = oldestLoadedAt ? data : data.slice().reverse();
       setMessages(
@@ -610,13 +611,14 @@ export default function CustomerThread({
     setLoadingOlder(true);
     try {
       const supabase = createClient(orgId);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("messages")
         .select(MESSAGE_SELECT)
         .eq("thread_id", thread.id)
         .lt("sent_at", oldestLoadedAt)
         .order("sent_at", { ascending: false })
         .limit(MESSAGE_PAGE_SIZE);
+      if (error) console.error("CustomerThread loadOlder failed", error);
       const rows = data ?? [];
       if (rows.length > 0) {
         const older = rows

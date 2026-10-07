@@ -119,7 +119,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
     setLoadingOlder(true);
     try {
       const supabase = createClient(ctx.orgId);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("messages")
         .select(MESSAGE_SELECT)
         .eq("thread_id", ctx.threadId)
@@ -127,6 +127,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
         .lt("sent_at", oldestLoadedAt)
         .order("sent_at", { ascending: false })
         .limit(MESSAGE_PAGE_SIZE);
+      if (error) console.error("ChatScreen loadOlderMessages failed", error);
       const rows = (data ?? []) as RawMessageRow[];
       if (rows.length > 0) {
         const older = rows.slice().reverse().map(mapMessageRow);
