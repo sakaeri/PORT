@@ -33,16 +33,20 @@ const senderRow: React.CSSProperties = { display: "flex", gap: 6 };
 const timeStyle: React.CSSProperties = { fontSize: 10.5, color: "var(--color-neutral-700)" };
 const senderStyle: React.CSSProperties = { fontSize: 10.5, whiteSpace: "nowrap", color: "var(--color-neutral-600)" };
 
-function Meta({ isSelf, time, senderName }: { isSelf: boolean; time: string; senderName?: string | null }) {
+// 担当スタッフが未アサインの自動メッセージ（最初の案内など）は、個人名の
+// 代わりに事業所名で名乗らせる。部署・担当者が増えても「なんであの人が
+// 担当じゃないの」問題にならないよう、個人名を出すのは実際に担当者が
+// ついているメッセージだけにする。
+function Meta({ isSelf, time, senderName, orgDisplayName }: { isSelf: boolean; time: string; senderName?: string | null; orgDisplayName?: string }) {
   return (
     <div style={{ ...senderRow, alignSelf: isSelf ? "flex-end" : "flex-start" }}>
-      {!isSelf && <span style={senderStyle}>{senderName ? `秘書：${senderName}` : "秘書"} ・</span>}
+      {!isSelf && <span style={senderStyle}>{senderName ? `秘書：${senderName}` : (orgDisplayName ?? "秘書")} ・</span>}
       <span style={timeStyle}>{time}</span>
     </div>
   );
 }
 
-export function TextBubble({ msg, highlight }: { msg: MessageWithExtras; highlight: boolean }) {
+export function TextBubble({ msg, highlight, orgDisplayName }: { msg: MessageWithExtras; highlight: boolean; orgDisplayName: string }) {
   const isSelf = msg.sender_role === "client";
   return (
     <div style={{ ...bubbleShell, alignSelf: isSelf ? "flex-end" : "flex-start", outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
@@ -62,7 +66,7 @@ export function TextBubble({ msg, highlight }: { msg: MessageWithExtras; highlig
       >
         {msg.body}
       </div>
-      <Meta isSelf={isSelf} time={timeLabel(msg.sent_at)} senderName={msg.senderName} />
+      <Meta isSelf={isSelf} time={timeLabel(msg.sent_at)} senderName={msg.senderName} orgDisplayName={orgDisplayName} />
     </div>
   );
 }

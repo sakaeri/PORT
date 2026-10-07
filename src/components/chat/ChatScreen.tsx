@@ -255,7 +255,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
           const highlight = !!q;
           switch (m.kind) {
             case "text":
-              return <TextBubble key={m.id} msg={m} highlight={highlight} />;
+              return <TextBubble key={m.id} msg={m} highlight={highlight} orgDisplayName={ctx.orgDisplayName} />;
             case "files":
               return <FilesBubble key={m.id} msg={m} highlight={highlight} orgId={ctx.orgId} />;
             case "notice":
