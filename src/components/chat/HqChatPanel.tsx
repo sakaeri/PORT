@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChatCircleDots } from "@phosphor-icons/react";
 import { errorMessage } from "@/lib/errors";
 import { getHqThread, sendHqMessage } from "@/app/actions";
 
@@ -75,8 +76,9 @@ export default function HqChatPanel() {
       {!open ? (
         <button
           onClick={() => setOpen(true)}
-          style={{ fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
         >
+          <ChatCircleDots size={15} />
           ご意見・ご要望はこちら
         </button>
       ) : (
