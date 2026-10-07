@@ -112,6 +112,7 @@ export default function AvatarPicker({
       await updateAvatar(data.publicUrl);
       onChange(data.publicUrl);
     } catch (e) {
+      console.error("avatar upload failed", e);
       setError(errorMessage(e, "アップロードできませんでした"));
     } finally {
       setUploading(false);

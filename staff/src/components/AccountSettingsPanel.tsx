@@ -89,6 +89,7 @@ export default function AccountSettingsPanel({
   const [name, setName] = useState(currentName);
   const [orgName, setOrgName] = useState(orgDisplayName);
   const [email, setEmail] = useState(loginEmail);
+  const [editingName, setEditingName] = useState(false);
   const [editingEmail, setEditingEmail] = useState(false);
   const [editingPw, setEditingPw] = useState(false);
   const [curPw, setCurPw] = useState("");
@@ -115,6 +116,7 @@ export default function AccountSettingsPanel({
       await updateMyAvatar(data.publicUrl);
       onAvatarSaved(data.publicUrl);
     } catch (e) {
+      console.error("avatar upload failed", e);
       setError(errorMessage(e, "アップロードできませんでした"));
     } finally {
       setUploadingAvatar(false);
@@ -129,6 +131,7 @@ export default function AccountSettingsPanel({
     try {
       await updateMyDisplayName(trimmed);
       onNameSaved(trimmed);
+      setEditingName(false);
     } catch (e) {
       setError(errorMessage(e, "変更できませんでした"));
     } finally {
@@ -212,18 +215,42 @@ export default function AccountSettingsPanel({
             </span>
           )}
         </button>
-        <span style={{ fontSize: 15 }}>{name || currentName}</span>
+        <span style={{ flex: 1, fontSize: 15 }}>{name || currentName}</span>
+        <button
+          onClick={() => {
+            setEditingName((v) => !v);
+            setEditingEmail(false);
+            setEditingPw(false);
+            setError("");
+            setDone("");
+          }}
+          style={smallBtn}
+        >
+          変更
+        </button>
       </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        <span style={fieldLabel}>表示名（社内で表示される呼び方）</span>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input value={name} onChange={(e) => setName(e.target.value)} className="vid-input" style={{ ...input, flex: 1 }} />
-          <button onClick={saveName} disabled={saving === "name" || !name.trim()} style={smallBtn}>
-            {saving === "name" ? "保存中…" : "保存"}
-          </button>
+      {editingName && (
+        <div style={editBox}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={fieldLabel}>表示名（社内で表示される呼び方）</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="vid-input" style={input} />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={saveName} disabled={saving === "name" || !name.trim()} style={{ ...smallBtn, height: 34 }}>
+              {saving === "name" ? "保存中…" : "変更を保存"}
+            </button>
+            <button
+              onClick={() => {
+                setEditingName(false);
+                setName(currentName);
+              }}
+              style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}
+            >
+              キャンセル
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {isOwner && (
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -247,6 +274,7 @@ export default function AccountSettingsPanel({
             onClick={() => {
               setEditingEmail((v) => !v);
               setEditingPw(false);
+              setEditingName(false);
               setError("");
               setDone("");
             }}
@@ -278,6 +306,7 @@ export default function AccountSettingsPanel({
             onClick={() => {
               setEditingPw((v) => !v);
               setEditingEmail(false);
+              setEditingName(false);
               setError("");
               setDone("");
             }}
