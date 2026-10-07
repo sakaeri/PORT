@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/errors";
 import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
 import { updateCustomerName, changeEmail, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge } from "@/app/actions";
@@ -10,6 +11,7 @@ import AccountCreatePanel from "@/components/chat/AccountCreatePanel";
 import AvatarPicker from "@/components/chat/AvatarPicker";
 import HqChatPanel from "@/components/chat/HqChatPanel";
 import SignOutButton from "@/components/chat/SignOutButton";
+import ChargeCheckoutDialog from "@/components/chat/ChargeCheckoutDialog";
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 60 };
 const dialogBox: React.CSSProperties = {
@@ -89,23 +91,32 @@ export default function MyPageDialog({
   const [emDone, setEmDone] = useState(false);
   const [emSaving, setEmSaving] = useState(false);
 
+  const router = useRouter();
   const CHARGE_AMOUNTS = [10000, 30000, 50000, 100000];
   const [chargeOpen, setChargeOpen] = useState(false);
   const [chargeAmount, setChargeAmount] = useState(CHARGE_AMOUNTS[0]);
   const [chargeStarting, setChargeStarting] = useState(false);
   const [chargeError, setChargeError] = useState("");
+  const [chargeClientSecret, setChargeClientSecret] = useState<string | null>(null);
 
   async function startCharge() {
     if (chargeStarting) return;
     setChargeStarting(true);
     setChargeError("");
     try {
-      const url = await startBalanceCharge(chargeAmount);
-      window.location.href = url;
+      const clientSecret = await startBalanceCharge(chargeAmount);
+      setChargeClientSecret(clientSecret);
     } catch (e) {
       setChargeError(errorMessage(e, "決済ページを開けませんでした"));
+    } finally {
       setChargeStarting(false);
     }
+  }
+
+  function handleChargeComplete() {
+    setChargeClientSecret(null);
+    setChargeOpen(false);
+    router.refresh();
   }
 
   const [arEnabledOverride, setArEnabledOverride] = useState<boolean | null>(null);
@@ -186,6 +197,7 @@ export default function MyPageDialog({
   }
 
   return (
+    <>
     <div style={{ ...scrim, display: "grid", placeItems: "center", padding: "var(--space-4)" }} onClick={onClose}>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={dialogBox}>
           <button onClick={onClose} aria-label="閉じる" style={{ position: "absolute", top: 14, right: 14, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
@@ -409,5 +421,9 @@ export default function MyPageDialog({
           </div>
         </div>
       </div>
+      {chargeClientSecret && (
+        <ChargeCheckoutDialog clientSecret={chargeClientSecret} onClose={() => setChargeClientSecret(null)} onComplete={handleChargeComplete} />
+      )}
+    </>
   );
 }

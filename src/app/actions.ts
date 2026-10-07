@@ -273,23 +273,19 @@ export async function requestRecurringFollowup(requestId: string) {
   }
 }
 
-// チャージ残高の入金。Stripeのホスト型Checkoutページへ飛ばし、支払い完了は
-// Webhook（route.ts）側で検知して残高に反映する。ここでは決済ページのURLを
-// 用意するだけで、残高はまだ一切動かさない（決済が実際に成立するまで反映
-// しないことで、二重加算や未払いの加算を防ぐ）。
+// チャージ残高の入金。Stripeの埋め込み型Checkout（ui_mode: "embedded"）用の
+// client_secretを用意するだけで、残高はまだ一切動かさない。支払い完了は
+// Webhook（route.ts）側のcheckout.session.completedで検知して残高に反映する
+// （決済が実際に成立するまで反映しないことで、二重加算や未払いの加算を防ぐ）。
 export async function startBalanceCharge(amountYen: number): Promise<string> {
   const ctx = await requireContext();
   if (!Number.isInteger(amountYen) || amountYen < 1000) throw new Error("チャージ額は1,000円以上で指定してください");
-
-  const h = await headers();
-  const host = h.get("host");
-  const protocol = host?.startsWith("localhost") ? "http" : "https";
-  const origin = `${protocol}://${host}`;
 
   const stripe = getStripe();
   let session;
   try {
     session = await stripe.checkout.sessions.create({
+      ui_mode: "embedded",
       mode: "payment",
       payment_method_types: ["card"],
       line_items: [
@@ -303,8 +299,7 @@ export async function startBalanceCharge(amountYen: number): Promise<string> {
         },
       ],
       metadata: { customer_id: ctx.customerId, org_id: ctx.orgId },
-      success_url: `${origin}/?charge=success`,
-      cancel_url: `${origin}/?charge=cancel`,
+      redirect_on_completion: "never",
     });
   } catch (e) {
     // Stripe側のエラー（無効なAPIキー等）はそのまま出すと英語になってしまうため、
@@ -312,8 +307,8 @@ export async function startBalanceCharge(amountYen: number): Promise<string> {
     console.error("startBalanceCharge: stripe.checkout.sessions.create failed:", e);
     throw new Error("決済ページを作成できませんでした");
   }
-  if (!session.url) throw new Error("決済ページを作成できませんでした");
-  return session.url;
+  if (!session.client_secret) throw new Error("決済ページを作成できませんでした");
+  return session.client_secret;
 }
 
 // 残高の自動チャージを設定する（有効化・変更は常にここを通る）。Stripeの
