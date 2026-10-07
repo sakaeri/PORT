@@ -13,6 +13,34 @@ import HqChatPanel from "@/components/chat/HqChatPanel";
 import SignOutButton from "@/components/chat/SignOutButton";
 import ChargeCheckoutDialog from "@/components/chat/ChargeCheckoutDialog";
 
+function ToggleSwitch({ on, onToggle, disabled }: { on: boolean; onToggle: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onToggle}
+      disabled={disabled}
+      role="switch"
+      aria-checked={on}
+      style={{
+        flex: "none",
+        width: 36,
+        height: 20,
+        padding: 2,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: on ? "flex-end" : "flex-start",
+        cursor: disabled ? "wait" : "pointer",
+        background: on ? "var(--color-accent)" : "var(--color-divider)",
+        border: "none",
+        borderRadius: 999,
+        opacity: disabled ? 0.6 : 1,
+        transition: "justify-content 0.15s, background 0.15s",
+      }}
+    >
+      <span style={{ width: 16, height: 16, borderRadius: "50%", background: "#fff" }} />
+    </button>
+  );
+}
+
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 60 };
 const dialogBox: React.CSSProperties = {
   width: "min(440px, 100%)",
@@ -370,22 +398,11 @@ export default function MyPageDialog({
 
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px" }}>
                 <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-500)" }}>自動チャージ</span>
-                <span style={{ fontSize: 11, color: arEnabled ? "var(--color-accent-300)" : "var(--color-neutral-500)" }}>{arEnabled ? "オン" : "オフ"}</span>
-                {!arOpen && (
-                  <>
-                    <button onClick={() => setArOpen(true)} style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-                      {arEnabled ? "変更" : "設定"}
-                    </button>
-                    {arEnabled && (
-                      <button
-                        onClick={turnOffAutoRecharge}
-                        disabled={arDisabling}
-                        style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", opacity: arDisabling ? 0.6 : 1 }}
-                      >
-                        {arDisabling ? "…" : "オフ"}
-                      </button>
-                    )}
-                  </>
+                <ToggleSwitch on={arEnabled} disabled={arDisabling} onToggle={() => (arEnabled ? turnOffAutoRecharge() : setArOpen(true))} />
+                {arEnabled && !arOpen && (
+                  <button onClick={() => setArOpen(true)} style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, whiteSpace: "nowrap", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
+                    変更
+                  </button>
                 )}
               </div>
               {arEnabled && !arOpen && (
