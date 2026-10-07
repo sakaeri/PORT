@@ -83,9 +83,13 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
   // 会話全体を毎回取り直すと、やり取りが長い依頼主ほどポーリングのたびに重くなるため。
   const refresh = useCallback(async () => {
     const supabase = createClient(ctx.orgId);
-    const { data } = oldestLoadedAt
+    const { data, error } = oldestLoadedAt
       ? await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", ctx.threadId).is("deleted_at", null).gte("sent_at", oldestLoadedAt).order("sent_at", { ascending: true })
       : await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", ctx.threadId).is("deleted_at", null).order("sent_at", { ascending: false }).limit(MESSAGE_PAGE_SIZE);
+    if (error) {
+      console.error("ChatScreen refresh failed", error);
+      return;
+    }
     if (data) {
       const rows = (oldestLoadedAt ? data : data.slice().reverse()) as RawMessageRow[];
       setMessages(rows.map(mapMessageRow));

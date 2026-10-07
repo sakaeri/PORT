@@ -130,7 +130,10 @@ export async function getThreadMessages(threadId: string): Promise<{ messages: M
     .is("deleted_at", null)
     .order("sent_at", { ascending: false })
     .limit(MESSAGE_PAGE_SIZE);
-  if (error || !data) return { messages: [], hasMoreOlder: false };
+  if (error || !data) {
+    console.error("getThreadMessages failed", { threadId, error });
+    return { messages: [], hasMoreOlder: false };
+  }
   const rows = (data as RawMessageRow[]).slice().reverse();
   return { messages: rows.map(mapMessageRow), hasMoreOlder: data.length === MESSAGE_PAGE_SIZE };
 }
