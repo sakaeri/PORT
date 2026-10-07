@@ -133,7 +133,12 @@ export async function setInitialProfile(name: string, email: string, phone: stri
 
   await supabase.from("customers").update({ name: trimmedName, terms_accepted_at: new Date().toISOString() }).eq("id", ctx.customerId);
 
-  const { error: emailErr } = await supabase.auth.updateUser({ email: trimmedEmail });
+  const h = await headers();
+  const host = h.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  // リダイレクト先を明示しないと、Supabaseプロジェクト共通の既定（Site URL）に
+  // 飛んでしまい、今アクセスしているドメインと食い違うことがある。
+  const { error: emailErr } = await supabase.auth.updateUser({ email: trimmedEmail }, { emailRedirectTo: `${protocol}://${host}/auth/confirm` });
   if (emailErr) {
     // Supabaseのバージョンによってエラーコードの付き方が変わり、コードが
     // 付かない場合もあるため、コードに加えて英語メッセージ中の
@@ -174,7 +179,10 @@ export async function removeAvatar() {
 
 export async function changeEmail(newEmail: string) {
   const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+  const h = await headers();
+  const host = h.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  const { error } = await supabase.auth.updateUser({ email: newEmail.trim() }, { emailRedirectTo: `${protocol}://${host}/auth/confirm` });
   if (error) {
     if (error.code === "email_exists" || error.code === "user_already_exists") {
       throw new Error("このメールアドレスは既に登録されています。");

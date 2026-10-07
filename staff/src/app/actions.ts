@@ -192,7 +192,12 @@ export async function deleteMenu(id: string) {
 export async function updateLoginEmail(newEmail: string) {
   await requireContext();
   const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+  const h = await headers();
+  const host = h.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  // リダイレクト先を指定しないと、プロジェクト共通の既定（依頼主用アプリの
+  // ドメイン）に飛んでしまう。スタッフ用アプリ自身の確認ページに戻す。
+  const { error } = await supabase.auth.updateUser({ email: newEmail.trim() }, { emailRedirectTo: `${protocol}://${host}/auth/confirm` });
   if (error) {
     if (error.code === "email_exists" || error.code === "user_already_exists") {
       throw new Error("このメールアドレスは既に登録されています。");
