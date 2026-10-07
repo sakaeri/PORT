@@ -9,6 +9,7 @@ import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
 import { submitInfoRequestAnswer, requestRecurringFollowup } from "@/app/actions";
+import { Avatar, avatarInitial } from "@/components/chat/AvatarPicker";
 
 function fileIconClass(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
@@ -49,29 +50,32 @@ function Meta({ isSelf, time, senderName, orgDisplayName }: { isSelf: boolean; t
 export function TextBubble({ msg, highlight, orgDisplayName }: { msg: MessageWithExtras; highlight: boolean; orgDisplayName: string }) {
   const isSelf = msg.sender_role === "client";
   return (
-    <div style={{ ...bubbleShell, alignSelf: isSelf ? "flex-end" : "flex-start", outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
-      <div
-        style={{
-          width: "max-content",
-          maxWidth: "100%",
-          background: isSelf ? "var(--color-bubble-self-bg)" : "var(--color-bubble-other-bg)",
-          color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-bubble-other-text)",
-          border: isSelf ? "none" : "1px solid var(--color-divider)",
-          padding: "10px 14px",
-          borderRadius: "var(--radius-lg)",
-          fontSize: 14,
-          lineHeight: 1.55,
-          whiteSpace: "pre-wrap",
-        }}
-      >
-        {msg.body}
+    <div style={{ display: "flex", flexDirection: isSelf ? "row-reverse" : "row", gap: 8, alignItems: "flex-end", maxWidth: "82%", alignSelf: isSelf ? "flex-end" : "flex-start" }}>
+      {!isSelf && <Avatar url={msg.senderAvatarUrl} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} />}
+      <div style={{ ...bubbleShell, maxWidth: "100%", minWidth: 0, outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
+        <div
+          style={{
+            width: "max-content",
+            maxWidth: "100%",
+            background: isSelf ? "var(--color-bubble-self-bg)" : "var(--color-bubble-other-bg)",
+            color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-bubble-other-text)",
+            border: isSelf ? "none" : "1px solid var(--color-divider)",
+            padding: "10px 14px",
+            borderRadius: "var(--radius-lg)",
+            fontSize: 14,
+            lineHeight: 1.55,
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {msg.body}
+        </div>
+        <Meta isSelf={isSelf} time={timeLabel(msg.sent_at)} senderName={msg.senderName} orgDisplayName={orgDisplayName} />
       </div>
-      <Meta isSelf={isSelf} time={timeLabel(msg.sent_at)} senderName={msg.senderName} orgDisplayName={orgDisplayName} />
     </div>
   );
 }
 
-export function FilesBubble({ msg, highlight, orgId }: { msg: MessageWithExtras; highlight: boolean; orgId: string }) {
+export function FilesBubble({ msg, highlight, orgId, orgDisplayName }: { msg: MessageWithExtras; highlight: boolean; orgId: string; orgDisplayName: string }) {
   const isSelf = msg.sender_role === "client";
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
@@ -93,7 +97,9 @@ export function FilesBubble({ msg, highlight, orgId }: { msg: MessageWithExtras;
   }
 
   return (
-    <div style={{ ...bubbleShell, alignSelf: isSelf ? "flex-end" : "flex-start", outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
+    <div style={{ display: "flex", flexDirection: isSelf ? "row-reverse" : "row", gap: 8, alignItems: "flex-end", maxWidth: "82%", alignSelf: isSelf ? "flex-end" : "flex-start" }}>
+      {!isSelf && <Avatar url={msg.senderAvatarUrl} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} />}
+      <div style={{ ...bubbleShell, maxWidth: "100%", minWidth: 0, outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
       <div
         style={{
           width: "min(300px, 100%)",
@@ -139,6 +145,7 @@ export function FilesBubble({ msg, highlight, orgId }: { msg: MessageWithExtras;
         ))}
       </div>
       <Meta isSelf={isSelf} time={timeLabel(msg.sent_at)} senderName={msg.senderName} />
+      </div>
     </div>
   );
 }

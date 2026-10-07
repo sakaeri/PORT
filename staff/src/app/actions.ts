@@ -1359,3 +1359,19 @@ export async function updateMyDisplayName(displayName: string) {
   const { error: linkError } = await admin.from("staff_org_links").update({ display_name: trimmed }).eq("user_id", ctx.userId).eq("org_id", ctx.orgId);
   if (linkError) throw linkError;
 }
+
+// プロフィール画像は「この人自身の顔写真」なので、表示名と違って事業者ごとに
+// 分ける必要はない（profiles.avatar_url 一本で良い）。
+export async function updateMyAvatar(url: string) {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", ctx.userId);
+  if (error) throw error;
+}
+
+export async function removeMyAvatar() {
+  const ctx = await requireContext();
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", ctx.userId);
+  if (error) throw error;
+}

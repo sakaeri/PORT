@@ -106,15 +106,15 @@ export default function HqFeedbackChat({ threadId, orgId, currentUserId }: { thr
         {messages.map((m) => {
           const isOwn = m.sender_id === currentUserId;
           return (
-            <div key={m.id} style={{ display: "flex", flexDirection: isOwn ? "row-reverse" : "row", gap: 6, alignItems: "flex-end" }}>
+            <div key={m.id} style={{ display: "flex", flexDirection: isOwn ? "row-reverse" : "row", gap: 6, alignItems: "flex-end", maxWidth: "88%", alignSelf: isOwn ? "flex-end" : "flex-start" }}>
               {!isOwn && <Avatar url={m.avatarUrl} initial={avatarInitial(m.sender_role === "client" ? "依頼主" : "本部")} size={22} />}
-              <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isOwn ? "flex-end" : "flex-start" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isOwn ? "flex-end" : "flex-start", minWidth: 0 }}>
               {m.deleted_at ? (
                 <div style={{ fontSize: 11.5, fontStyle: "italic", color: "var(--color-neutral-500)" }}>削除されました</div>
               ) : (
                 <div
                   style={{
-                    maxWidth: "88%",
+                    maxWidth: "100%",
                     padding: "7px 10px",
                     borderRadius: "var(--radius-md)",
                     fontSize: 12.5,

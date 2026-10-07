@@ -18,6 +18,7 @@ export interface StaffContext {
   orgDisplayName: string;
   role: StaffRole | "reception";
   displayName: string;
+  avatarUrl: string | null;
   isHq: boolean;
   orgs: StaffOrgOption[];
   planStatus: "trial" | "active" | "past_due" | "paused" | "cancelled";
@@ -42,9 +43,10 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return null;
 
-  const [{ data: rawCtx }, { data: orgs }] = await Promise.all([
+  const [{ data: rawCtx }, { data: orgs }, { data: profileRow }] = await Promise.all([
     supabase.rpc("staff_context").maybeSingle(),
     supabase.rpc("my_staff_orgs"),
+    supabase.from("profiles").select("avatar_url").eq("id", auth.user.id).maybeSingle(),
   ]);
 
   let ctx = rawCtx;
@@ -71,6 +73,7 @@ export const getStaffContext = cache(async (): Promise<StaffContext | null> => {
     orgDisplayName: ctx.org_display_name ?? "窓口",
     role: ctx.role as StaffRole | "reception",
     displayName: ctx.display_name ?? "スタッフ",
+    avatarUrl: profileRow?.avatar_url ?? null,
     isHq,
     orgs: (orgs ?? []).map((o) => ({ orgId: o.org_id, displayName: o.display_name, role: o.role as "owner" | "reception", isPrimary: o.is_primary, slug: o.slug })),
     planStatus,

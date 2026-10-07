@@ -807,11 +807,11 @@ export default function CustomerThread({
           const isStaff = m.sender_role !== "client" && m.sender_role !== "creator" && m.sender_role !== null;
           const isOwn = m.sender_id === currentUserId;
           return (
-            <div key={m.id} style={{ display: "flex", flexDirection: isStaff ? "row-reverse" : "row", gap: 8, alignItems: "flex-end" }}>
+            <div key={m.id} style={{ display: "flex", flexDirection: isStaff ? "row-reverse" : "row", gap: 8, alignItems: "flex-end", maxWidth: "76%", alignSelf: isStaff ? "flex-end" : "flex-start" }}>
               {!isStaff && <Avatar url={m.avatarUrl} initial={avatarInitial(customer.name)} size={28} />}
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: isStaff ? "flex-end" : "flex-start" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: isStaff ? "flex-end" : "flex-start", minWidth: 0 }}>
               {m.deleted_at ? (
-                <div style={{ maxWidth: "70%", padding: "9px 13px", fontSize: 12.5, fontStyle: "italic", color: "var(--color-neutral-500)" }}>
+                <div style={{ maxWidth: "100%", padding: "9px 13px", fontSize: 12.5, fontStyle: "italic", color: "var(--color-neutral-500)" }}>
                   削除されました
                 </div>
               ) : m.kind === "quote" ? (
@@ -823,7 +823,7 @@ export default function CustomerThread({
               ) : (
                 <div
                   style={{
-                    maxWidth: "70%",
+                    maxWidth: "100%",
                     padding: "9px 13px",
                     borderRadius: "var(--radius-lg)",
                     fontSize: 13.5,

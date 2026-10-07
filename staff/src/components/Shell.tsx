@@ -33,6 +33,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [myName, setMyName] = useState(ctx.displayName);
+  const [myAvatarUrl, setMyAvatarUrl] = useState(ctx.avatarUrl);
   const [showMyName, setShowMyName] = useState(false);
   // 事業者ごとの未読件数。今開いている事業者だけでなく、リンクしている
   // 他の事業者の分もまとめて持っておき、事業者切替の▼に出す（is_staff_of()の
@@ -330,7 +331,11 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
               orgDisplayName={ctx.orgDisplayName}
               loginEmail={ctx.email}
               isOwner={ctx.role === "owner"}
+              userId={ctx.userId}
+              orgId={ctx.orgId}
+              avatarUrl={myAvatarUrl}
               onNameSaved={setMyName}
+              onAvatarSaved={setMyAvatarUrl}
               onClose={() => setShowMyName(false)}
             />
           </Modal>
@@ -369,7 +374,11 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
             orgDisplayName={ctx.orgDisplayName}
             loginEmail={ctx.email}
             isOwner={ctx.role === "owner"}
+            userId={ctx.userId}
+            orgId={ctx.orgId}
+            avatarUrl={myAvatarUrl}
             onNameSaved={setMyName}
+            onAvatarSaved={setMyAvatarUrl}
             onClose={() => setShowMyName(false)}
           />
         </Modal>

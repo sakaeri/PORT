@@ -94,7 +94,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  const MESSAGE_SELECT = "*, message_attachments(*), profiles!messages_sender_id_fkey(display_name), requests(*, request_items(*), completion_reports(*), completion_report_attachments(*), ratings(*))";
+  const MESSAGE_SELECT = "*, message_attachments(*), profiles!messages_sender_id_fkey(display_name, avatar_url), requests(*, request_items(*), completion_reports(*), completion_report_attachments(*), ratings(*))";
 
   // 開いている間に届いた新着分だけを取りに行く（既に読み込んだ最古の時点以降のみ）。
   // 会話全体を毎回取り直すと、やり取りが長い依頼主ほどポーリングのたびに重くなるため。
@@ -257,7 +257,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
             case "text":
               return <TextBubble key={m.id} msg={m} highlight={highlight} orgDisplayName={ctx.orgDisplayName} />;
             case "files":
-              return <FilesBubble key={m.id} msg={m} highlight={highlight} orgId={ctx.orgId} />;
+              return <FilesBubble key={m.id} msg={m} highlight={highlight} orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} />;
             case "notice":
             case "system":
               return <NoticeBubble key={m.id} msg={m} />;

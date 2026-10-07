@@ -206,15 +206,15 @@ export default function StaffThreadPane({
         {messages.map((m) => {
           const isOwn = m.sender_id === currentUserId;
           return (
-            <div key={m.id} style={{ display: "flex", flexDirection: isOwn ? "row-reverse" : "row", gap: 8, alignItems: "flex-end" }}>
+            <div key={m.id} style={{ display: "flex", flexDirection: isOwn ? "row-reverse" : "row", gap: 8, alignItems: "flex-end", maxWidth: "85%", alignSelf: isOwn ? "flex-end" : "flex-start" }}>
               {!isOwn && <Avatar url={m.avatarUrl} initial={avatarInitial(title)} size={26} />}
-              <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isOwn ? "flex-end" : "flex-start" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isOwn ? "flex-end" : "flex-start", minWidth: 0 }}>
               {m.deleted_at ? (
                 <div style={{ fontSize: 12, fontStyle: "italic", color: "var(--color-neutral-500)" }}>削除されました</div>
               ) : (
                 <div
                   style={{
-                    maxWidth: "85%",
+                    maxWidth: "100%",
                     padding: "8px 12px",
                     borderRadius: "var(--radius-md)",
                     fontSize: 13.5,

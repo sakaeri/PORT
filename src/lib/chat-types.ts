@@ -20,11 +20,13 @@ export interface MessageWithExtras extends MessageRow {
   requestBundle: RequestBundle | null;
   // 送信者（秘書）の表示名。依頼主自身の発言やシステム発言ではnull。
   senderName: string | null;
+  // 送信者のプロフィール画像。未設定ならnull。
+  senderAvatarUrl: string | null;
 }
 
 export type RawMessageRow = MessageRow & {
   message_attachments: AttachmentRow[] | null;
-  profiles: { display_name: string } | { display_name: string }[] | null;
+  profiles: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
   requests:
     | (RequestRow & {
         request_items: RequestItemRow[] | null;
@@ -51,7 +53,13 @@ export function mapMessageRow(row: RawMessageRow): MessageWithExtras {
       }
     : null;
   const senderProfile = Array.isArray(profiles) ? profiles[0] : profiles;
-  return { ...msg, attachments: message_attachments ?? [], requestBundle, senderName: senderProfile?.display_name ?? null };
+  return {
+    ...msg,
+    attachments: message_attachments ?? [],
+    requestBundle,
+    senderName: senderProfile?.display_name ?? null,
+    senderAvatarUrl: senderProfile?.avatar_url ?? null,
+  };
 }
 
 export interface CustomerContext {
