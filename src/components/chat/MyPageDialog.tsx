@@ -127,6 +127,7 @@ export default function MyPageDialog({
   const [arStarting, setArStarting] = useState(false);
   const [arDisabling, setArDisabling] = useState(false);
   const [arError, setArError] = useState("");
+  const [arClientSecret, setArClientSecret] = useState<string | null>(null);
 
   async function startAutoRecharge() {
     if (arStarting) return;
@@ -139,12 +140,20 @@ export default function MyPageDialog({
     setArStarting(true);
     setArError("");
     try {
-      const url = await startAutoRechargeSetup(threshold, amount);
-      window.location.href = url;
+      const clientSecret = await startAutoRechargeSetup(threshold, amount);
+      setArClientSecret(clientSecret);
     } catch (e) {
       setArError(errorMessage(e, "設定ページを開けませんでした"));
+    } finally {
       setArStarting(false);
     }
+  }
+
+  function handleAutoRechargeComplete() {
+    setArClientSecret(null);
+    setArOpen(false);
+    setArEnabledOverride(true);
+    router.refresh();
   }
 
   async function turnOffAutoRecharge() {
@@ -423,6 +432,9 @@ export default function MyPageDialog({
       </div>
       {chargeClientSecret && (
         <ChargeCheckoutDialog clientSecret={chargeClientSecret} onClose={() => setChargeClientSecret(null)} onComplete={handleChargeComplete} />
+      )}
+      {arClientSecret && (
+        <ChargeCheckoutDialog clientSecret={arClientSecret} title="カードの登録" onClose={() => setArClientSecret(null)} onComplete={handleAutoRechargeComplete} />
       )}
     </>
   );

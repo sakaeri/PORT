@@ -273,7 +273,7 @@ export async function requestRecurringFollowup(requestId: string) {
   }
 }
 
-// チャージ残高の入金。Stripeの埋め込み型Checkout（ui_mode: "embedded"）用の
+// チャージ残高の入金。Stripeの埋め込み型Checkout（ui_mode: "embedded_page"）用の
 // client_secretを用意するだけで、残高はまだ一切動かさない。支払い完了は
 // Webhook（route.ts）側のcheckout.session.completedで検知して残高に反映する
 // （決済が実際に成立するまで反映しないことで、二重加算や未払いの加算を防ぐ）。
@@ -285,7 +285,7 @@ export async function startBalanceCharge(amountYen: number): Promise<string> {
   let session;
   try {
     session = await stripe.checkout.sessions.create({
-      ui_mode: "embedded",
+      ui_mode: "embedded_page",
       mode: "payment",
       payment_method_types: ["card"],
       line_items: [
@@ -324,15 +324,11 @@ export async function startAutoRechargeSetup(thresholdYen: number, amountYen: nu
   const supabase = await createClient();
   const { data: customer } = await supabase.from("customers").select("stripe_customer_id").eq("id", ctx.customerId).maybeSingle();
 
-  const h = await headers();
-  const host = h.get("host");
-  const protocol = host?.startsWith("localhost") ? "http" : "https";
-  const origin = `${protocol}://${host}`;
-
   const stripe = getStripe();
   let session;
   try {
     session = await stripe.checkout.sessions.create({
+      ui_mode: "embedded_page",
       mode: "setup",
       payment_method_types: ["card"],
       customer: customer?.stripe_customer_id ?? undefined,
@@ -343,15 +339,14 @@ export async function startAutoRechargeSetup(thresholdYen: number, amountYen: nu
         auto_recharge_threshold: String(thresholdYen),
         auto_recharge_amount: String(amountYen),
       },
-      success_url: `${origin}/?autorecharge=success`,
-      cancel_url: `${origin}/?autorecharge=cancel`,
+      redirect_on_completion: "never",
     });
   } catch (e) {
     console.error("startAutoRechargeSetup: stripe.checkout.sessions.create failed:", e);
     throw new Error("設定ページを作成できませんでした");
   }
-  if (!session.url) throw new Error("設定ページを作成できませんでした");
-  return session.url;
+  if (!session.client_secret) throw new Error("設定ページを作成できませんでした");
+  return session.client_secret;
 }
 
 export async function disableAutoRecharge() {

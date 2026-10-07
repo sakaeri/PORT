@@ -27,12 +27,12 @@ const dialogBox: React.CSSProperties = {
 // "embedded"）をアプリ内のダイアログに表示する。支払い完了の検知自体は
 // Webhook側（checkout.session.completed）で残高に反映するので、ここでの
 // onComplete は「画面を閉じて残高を再取得する」という表示上の後始末だけ。
-export default function ChargeCheckoutDialog({ clientSecret, onClose, onComplete }: { clientSecret: string; onClose: () => void; onComplete: () => void }) {
+export default function ChargeCheckoutDialog({ clientSecret, title = "お支払い", onClose, onComplete }: { clientSecret: string; title?: string; onClose: () => void; onComplete: () => void }) {
   return (
     <div style={{ ...scrim, display: "grid", placeItems: "center", padding: "var(--space-4)" }} onClick={onClose}>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={dialogBox}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>お支払い</div>
+          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>{title}</div>
           <div style={{ flex: 1 }} />
           <button onClick={onClose} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
             <X size={18} />
