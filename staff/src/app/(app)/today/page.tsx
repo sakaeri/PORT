@@ -141,7 +141,7 @@ export default async function TodayPage() {
           dueList.map((r) => (
             <Link key={r.id} href={`/cases/${r.id}`} style={card}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="print-checkbox">☑</span>
+                <span className="print-checkbox">☐</span>
                 <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{customerNameOf(r.customers)}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
                 <span style={{ flex: "none", fontSize: 11.5, color: r.due_at! < new Date().toISOString() ? "var(--color-accent-200)" : "var(--color-neutral-500)" }}>
@@ -164,7 +164,7 @@ export default async function TodayPage() {
           pendingReports.map((r) => (
             <Link key={r.requestId} href={`/cases/${r.requestId}`} style={card}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="print-checkbox">☑</span>
+                <span className="print-checkbox">☐</span>
                 <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{r.customerName}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
                 <span style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>提出 {fmtTime(r.submittedAt)}</span>
@@ -182,7 +182,7 @@ export default async function TodayPage() {
           quotedList.map((r) => (
             <Link key={r.id} href={`/cases/${r.id}`} style={card}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="print-checkbox">☑</span>
+                <span className="print-checkbox">☐</span>
                 <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{customerNameOf(r.customers)}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
                 <span style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>{yen(r.amount)}</span>
