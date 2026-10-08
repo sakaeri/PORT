@@ -720,6 +720,9 @@ export async function createCaseRequest(
     // 曜日・日付の指定（任意）。無指定なら初回決済日からの単純な+7日／+1ヶ月。
     anchorWeekday?: number;
     anchorDayOfMonth?: number;
+    // 毎月「月末」指定（任意・anchorDayOfMonthとは排他）。28日以降は月によって
+    // 無い日になるため、実際の最終日を都度計算するフラグとして別で持つ。
+    anchorLastDayOfMonth?: boolean;
   },
 ) {
   const ctx = await requireContext();
@@ -793,7 +796,8 @@ export async function createCaseRequest(
         items: items.map((it) => ({ label: it.label, price: it.price, payout: it.payout, qty: it.qty })),
         cadence: input.cadence,
         anchor_weekday: input.cadence === "weekly" ? (input.anchorWeekday ?? null) : null,
-        anchor_day_of_month: input.cadence === "monthly" ? (input.anchorDayOfMonth ?? null) : null,
+        anchor_day_of_month: input.cadence === "monthly" && !input.anchorLastDayOfMonth ? (input.anchorDayOfMonth ?? null) : null,
+        anchor_last_day_of_month: input.cadence === "monthly" && !!input.anchorLastDayOfMonth,
         created_by: ctx.userId,
       })
       .select("id")

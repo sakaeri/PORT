@@ -134,6 +134,7 @@ export default function QuoteDialog({
   const [cadence, setCadence] = useState<SubscriptionCadence | "">(initialCadence ?? "");
   const [anchorWeekday, setAnchorWeekday] = useState<number | null>(null);
   const [anchorDayOfMonth, setAnchorDayOfMonth] = useState("");
+  const [anchorLastDayOfMonth, setAnchorLastDayOfMonth] = useState(false);
   const [estimatedHours, setEstimatedHours] = useState("");
   const [hourlyLabel, setHourlyLabel] = useState("");
   const [saving, setSaving] = useState(false);
@@ -188,7 +189,8 @@ export default function QuoteDialog({
         hourly: isHourly ? { rate: HOURLY_RATE_PER_HOUR, cap: hourlyCap, label: hourlyLabel } : undefined,
         cadence: !isHourly && cadence ? cadence : undefined,
         anchorWeekday: !isHourly && cadence === "weekly" && anchorWeekday != null ? anchorWeekday : undefined,
-        anchorDayOfMonth: !isHourly && cadence === "monthly" && anchorDayOfMonth.trim() ? Number(anchorDayOfMonth) : undefined,
+        anchorDayOfMonth: !isHourly && cadence === "monthly" && !anchorLastDayOfMonth && anchorDayOfMonth.trim() ? Number(anchorDayOfMonth) : undefined,
+        anchorLastDayOfMonth: !isHourly && cadence === "monthly" && anchorLastDayOfMonth ? true : undefined,
       });
       onCreated(requestId);
     } catch (e) {
@@ -351,19 +353,35 @@ export default function QuoteDialog({
               </div>
             )}
             {cadence === "monthly" && (
-              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: "var(--color-neutral-600)" }}>
-                日付を指定（任意・1〜28。無指定なら初回決済日から1ヶ月ごと）
-                <input
-                  value={anchorDayOfMonth}
-                  onChange={(e) => setAnchorDayOfMonth(e.target.value)}
-                  type="number"
-                  min={1}
-                  max={28}
-                  placeholder="例）25"
-                  className="vid-input"
-                  style={{ ...inputStyle, width: 90 }}
-                />
-              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)" }}>日付を指定（任意。無指定なら初回決済日から1ヶ月ごと）</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    value={anchorDayOfMonth}
+                    onChange={(e) => {
+                      setAnchorDayOfMonth(e.target.value);
+                      setAnchorLastDayOfMonth(false);
+                    }}
+                    disabled={anchorLastDayOfMonth}
+                    type="number"
+                    min={1}
+                    max={28}
+                    placeholder="例）25"
+                    className="vid-input"
+                    style={{ ...inputStyle, width: 90, opacity: anchorLastDayOfMonth ? 0.5 : 1 }}
+                  />
+                  <button
+                    onClick={() => {
+                      setAnchorLastDayOfMonth((v) => !v);
+                      setAnchorDayOfMonth("");
+                    }}
+                    style={{ ...pillStyle(anchorLastDayOfMonth), minWidth: 56 }}
+                  >
+                    月末
+                  </button>
+                </div>
+                {!anchorLastDayOfMonth && <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>29〜31日は月によって無いため、「月末」を使ってください</span>}
+              </div>
             )}
           </div>
         )}

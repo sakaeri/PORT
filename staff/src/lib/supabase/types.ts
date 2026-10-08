@@ -577,6 +577,7 @@ export interface Database {
           next_due_at: string | null;
           anchor_weekday: number | null;
           anchor_day_of_month: number | null;
+          anchor_last_day_of_month: boolean;
           last_insufficient_notice_at: string | null;
           created_by: string | null;
           created_at: string;

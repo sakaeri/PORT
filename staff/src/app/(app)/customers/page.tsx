@@ -8,6 +8,7 @@ import type { RequestPhase } from "@/lib/supabase/types";
 
 const ACTIVE_PHASES: RequestPhase[] = ["draft", "quoted", "preparing", "started"];
 const VOID_PHASES: RequestPhase[] = ["cancelled", "declined"];
+const NAME_PLACEHOLDER = "未登録の依頼主";
 
 export default async function CustomersPage() {
   const ctx = await getStaffContext();
@@ -68,6 +69,12 @@ export default async function CustomersPage() {
       const activeRequest = customerRequests.find((r) => ACTIVE_PHASES.includes(r.phase)) ?? null;
       const activeCase = activeRequest ? { title: activeRequest.title, phaseLabel: PHASE_LABEL[activeRequest.phase] } : null;
 
+      // 匿名セッションを開始した瞬間に自動で流れるウェルカムメッセージ（システム
+      // 発言・sender_role null）だけがある状態＝ただページを開いて何もせず
+      // 離脱した訪問者。名乗ってもおらず依頼も無ければ、本当の見込み客とは
+      // 区別できないので一覧には出さない。
+      const isGhost = c.name === NAME_PLACEHOLDER && requestCount === 0 && summary?.last_message_sender_role == null;
+
       return {
         id: c.id,
         name: c.staff_label ?? c.name,
@@ -81,10 +88,12 @@ export default async function CustomersPage() {
         requestCount,
         lifetimeTotal,
         activeCase,
+        isGhost,
       };
     })
-    // やり取りが一度もない依頼主（ページを開いただけ）は一覧に一切出さない
-    .filter((r) => r.lastMessagePreview !== null);
+    // やり取りが一度もない依頼主（ページを開いただけ）、または自動ウェルカム
+    // メッセージしかない幽霊依頼主は一覧に一切出さない。
+    .filter((r) => r.lastMessagePreview !== null && !r.isGhost);
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>
