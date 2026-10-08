@@ -30,14 +30,14 @@ export function avatarInitial(customerName: string): string {
   return customerName && customerName !== NAME_PLACEHOLDER ? customerName.trim().charAt(0) : "";
 }
 
-export function Avatar({ url, initial, size, editable }: { url: string | null; initial: string; size: number; editable?: boolean }) {
+export function Avatar({ url, initial, size, editable, rounded }: { url: string | null; initial: string; size: number; editable?: boolean; rounded?: boolean }) {
   return (
     <div style={{ position: "relative", flex: "none", width: size, height: size }}>
       <div
         style={{
           width: size,
           height: size,
-          borderRadius: "50%",
+          borderRadius: rounded ? size * 0.28 : "50%",
           overflow: "hidden",
           display: "flex",
           alignItems: "center",

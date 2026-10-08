@@ -100,7 +100,7 @@ export default function AccountGate({ orgDisplayName }: { orgDisplayName: string
           style={{
             width: 56,
             height: 56,
-            borderRadius: "50%",
+            borderRadius: 16,
             overflow: "hidden",
             marginBottom: 4,
           }}

@@ -57,7 +57,7 @@ export function TextBubble({ msg, highlight, orgDisplayName }: { msg: MessageWit
   const isSelf = msg.sender_role === "client";
   return (
     <div style={{ display: "flex", flexDirection: isSelf ? "row-reverse" : "row", gap: 8, alignItems: "flex-end", maxWidth: "82%", alignSelf: isSelf ? "flex-end" : "flex-start" }}>
-      {!isSelf && <Avatar url={senderAvatar(msg)} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} />}
+      {!isSelf && <Avatar url={senderAvatar(msg)} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} rounded={!msg.senderName} />}
       <div style={{ ...bubbleShell, maxWidth: "100%", minWidth: 0, outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
         <div
           style={{
@@ -104,7 +104,7 @@ export function FilesBubble({ msg, highlight, orgId, orgDisplayName }: { msg: Me
 
   return (
     <div style={{ display: "flex", flexDirection: isSelf ? "row-reverse" : "row", gap: 8, alignItems: "flex-end", maxWidth: "82%", alignSelf: isSelf ? "flex-end" : "flex-start" }}>
-      {!isSelf && <Avatar url={senderAvatar(msg)} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} />}
+      {!isSelf && <Avatar url={senderAvatar(msg)} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} rounded={!msg.senderName} />}
       <div style={{ ...bubbleShell, maxWidth: "100%", minWidth: 0, outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
       <div
         style={{
