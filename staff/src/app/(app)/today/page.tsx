@@ -62,7 +62,7 @@ export default async function TodayPage() {
   const [{ data: dueRows }, { data: customerThreads }, { data: myDepartmentRows }, { data: pendingReportRows }, { data: quotedRows }] = await Promise.all([
     supabase
       .from("requests")
-      .select("id, title, due_at, customer_id, customers(name)")
+      .select("id, title, due_at, customer_id, customers(name, staff_label)")
       .eq("org_id", ctx.orgId)
       .eq("phase", "started")
       .not("due_at", "is", null)
@@ -72,12 +72,12 @@ export default async function TodayPage() {
     ctx.role === "dept_manager" ? supabase.from("staff_departments").select("department_id").eq("profile_id", ctx.userId) : Promise.resolve({ data: [] as { department_id: string }[] }),
     supabase
       .from("completion_reports")
-      .select("request_id, submitted_at, requests!inner(id, title, customer_id, customers(name), org_id)")
+      .select("request_id, submitted_at, requests!inner(id, title, customer_id, customers(name, staff_label), org_id)")
       .is("sent_at", null)
       .eq("requests.org_id", ctx.orgId),
     supabase
       .from("requests")
-      .select("id, title, amount, quoted_at, customer_id, customers(name)")
+      .select("id, title, amount, quoted_at, customer_id, customers(name, staff_label)")
       .eq("org_id", ctx.orgId)
       .eq("phase", "quoted")
       .order("quoted_at", { ascending: true }),
@@ -91,9 +91,9 @@ export default async function TodayPage() {
     const deptId = departmentIdByCustomer.get(customerId);
     return !!deptId && myDepartmentIds.has(deptId);
   }
-  function customerNameOf(c: { name: string } | { name: string }[] | null): string {
+  function customerNameOf(c: { name: string; staff_label: string | null } | { name: string; staff_label: string | null }[] | null): string {
     const row = Array.isArray(c) ? c[0] : c;
-    return row?.name ?? "—";
+    return row?.staff_label ?? row?.name ?? "—";
   }
 
   const dueList = (dueRows ?? []).filter((r) => visibleToViewer(r.customer_id));
