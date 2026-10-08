@@ -5,6 +5,7 @@ import { Trash } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { sendCaseMessage, deleteMessage, markThreadRead } from "@/app/actions";
 import { staffSenderLabel } from "@/lib/roles";
+import { errorMessage } from "@/lib/errors";
 import TextComposer from "@/components/TextComposer";
 import Avatar, { avatarInitial } from "@/components/Avatar";
 import type { AppRole } from "@/lib/supabase/types";
@@ -35,6 +36,7 @@ export default function CaseThreadChat({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
 
@@ -92,11 +94,14 @@ export default function CaseThreadChat({
   async function send() {
     if (sending || !draft.trim()) return;
     setSending(true);
+    setError("");
     const body = draft.trim();
     try {
       await sendCaseMessage(threadId, body);
       setDraft("");
       await refresh();
+    } catch (e) {
+      setError(errorMessage(e, "送信できませんでした"));
     } finally {
       setSending(false);
     }
@@ -106,9 +111,12 @@ export default function CaseThreadChat({
     if (busy) return;
     if (!confirm("このメッセージを削除します。よろしいですか？")) return;
     setBusy(true);
+    setError("");
     try {
       await deleteMessage(m.id);
       setMessages((rows) => rows.map((r) => (r.id === m.id ? { ...r, deleted_at: new Date().toISOString() } : r)));
+    } catch (e) {
+      setError(errorMessage(e, "削除できませんでした"));
     } finally {
       setBusy(false);
     }
@@ -169,6 +177,7 @@ export default function CaseThreadChat({
           );
         })}
       </div>
+      {error && <div style={{ flex: "none", padding: "0 18px", fontSize: 12, color: "var(--color-accent-200)" }}>{error}</div>}
       <TextComposer value={draft} onChange={setDraft} onSend={send} sending={sending} placeholder="メモを入力…" />
     </div>
   );

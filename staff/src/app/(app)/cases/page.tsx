@@ -38,6 +38,9 @@ export default async function CasesPage() {
   // 着手後、報告の目安時間（due_at）まで残り15分以内（経過済みも含む）か
   // どうかの判定に使う閾値。ナビの赤丸バッジ（Shell.tsx）と同じ基準。
   const soonThreshold = new Date(new Date().getTime() + 15 * 60 * 1000);
+  // 案件詳細（マネージャーが金額を見て着手判断をしないように）と同じ方針で、
+  // 一覧でも本部以外には金額そのものをクライアントへ送らない。
+  const canSeeAmount = ctx.role === "owner";
   const rows: CaseRow[] = (requests ?? []).map((r) => {
     const customer = Array.isArray(r.customers) ? r.customers[0] : r.customers;
     const thread = threadByRequestId.get(r.id) ?? null;
@@ -55,7 +58,7 @@ export default async function CasesPage() {
     return {
       id: r.id,
       title: r.title,
-      amount: r.amount,
+      amount: canSeeAmount ? r.amount : 0,
       phase: r.phase,
       paid: r.pay_status === "paid",
       dueAt: r.due_at,
@@ -87,7 +90,7 @@ export default async function CasesPage() {
           rows={rows}
           departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
           canDelete={ctx.role === "owner" || ctx.role === "dept_manager"}
-          canSeeAmount={ctx.role === "owner" || ctx.role === "dept_manager"}
+          canSeeAmount={canSeeAmount}
         />
       )}
     </div>

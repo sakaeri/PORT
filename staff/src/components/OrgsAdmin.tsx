@@ -68,10 +68,12 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [listError, setListError] = useState("");
 
   async function handleMarkFeedbackRead(orgId: string, feedbackId: string) {
     if (markingId) return;
     setMarkingId(feedbackId);
+    setListError("");
     try {
       await markHqFeedbackRead(feedbackId);
       setOrgs((rows) =>
@@ -80,7 +82,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
         ),
       );
     } catch (e) {
-      alert(errorMessage(e, "変更できませんでした"));
+      setListError(errorMessage(e, "変更できませんでした"));
     } finally {
       setMarkingId(null);
     }
@@ -91,11 +93,12 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
     const locking = o.plan_status !== "paused";
     if (locking && !confirm(`「${o.display_name}」をロックします。ロック中は新しい依頼のやり取りができなくなります（閲覧は可能）。よろしいですか？`)) return;
     setTogglingId(o.id);
+    setListError("");
     try {
       await setOrgLockState(o.id, locking);
       setOrgs((rows) => rows.map((r) => (r.id === o.id ? { ...r, plan_status: locking ? "paused" : "active" } : r)));
     } catch (e) {
-      alert(errorMessage(e, "変更できませんでした"));
+      setListError(errorMessage(e, "変更できませんでした"));
     } finally {
       setTogglingId(null);
     }
@@ -105,11 +108,12 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
     if (deletingId) return;
     if (!confirm(`「${o.display_name}」を完全に削除します。依頼主・案件・トーク履歴も含めて元に戻せません。よろしいですか？`)) return;
     setDeletingId(o.id);
+    setListError("");
     try {
       await deleteOrgForHq(o.id);
       setOrgs((rows) => rows.filter((r) => r.id !== o.id));
     } catch (e) {
-      alert(errorMessage(e, "削除できませんでした"));
+      setListError(errorMessage(e, "削除できませんでした"));
     } finally {
       setDeletingId(null);
     }
@@ -202,6 +206,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
       )}
 
       {loadError && <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>}
+      {listError && <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>{listError}</div>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {orgs.length === 0 && !loadError && (
@@ -250,6 +255,7 @@ export default function OrgsAdmin({ initialOrgs, loadError }: { initialOrgs: Org
                   onClick={() => handleDelete(o)}
                   disabled={deletingId === o.id}
                   aria-label="削除"
+                  title="完全に削除する"
                   style={{ flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
                 >
                   <Trash size={13} />

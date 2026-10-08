@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Trash } from "@phosphor-icons/react";
 import { addWorkMemo, deleteWorkMemo } from "@/app/actions";
+import { errorMessage } from "@/lib/errors";
 
 export interface WorkMemo {
   id: string;
@@ -17,15 +18,19 @@ export default function WorkMemos({ customerId, currentUserId, initialMemos }: {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function submit() {
     if (busy || !draft.trim()) return;
     setBusy(true);
+    setError("");
     try {
       const body = draft.trim();
       await addWorkMemo(customerId, body);
       setMemos((m) => [{ id: `temp-${Date.now()}`, authorId: currentUserId, authorName: "自分", body, createdAt: new Date().toISOString() }, ...m]);
       setDraft("");
+    } catch (e) {
+      setError(errorMessage(e, "追加できませんでした"));
     } finally {
       setBusy(false);
     }
@@ -35,9 +40,12 @@ export default function WorkMemos({ customerId, currentUserId, initialMemos }: {
     if (busy) return;
     if (!confirm("このメモを削除しますか？")) return;
     setBusy(true);
+    setError("");
     try {
       await deleteWorkMemo(id);
       setMemos((m) => m.filter((x) => x.id !== id));
+    } catch (e) {
+      setError(errorMessage(e, "削除できませんでした"));
     } finally {
       setBusy(false);
     }
@@ -72,6 +80,7 @@ export default function WorkMemos({ customerId, currentUserId, initialMemos }: {
               追加
             </button>
           </div>
+          {error && <div style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</div>}
           {memos.length === 0 && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>まだメモがありません。</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto" }}>
             {memos.map((m) => (

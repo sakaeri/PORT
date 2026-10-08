@@ -514,6 +514,7 @@ export default function CustomerThread({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [threadError, setThreadError] = useState("");
   const [templates, setTemplates] = useState(initialTemplates);
   const [showTemplates, setShowTemplates] = useState(false);
   const isMobile = useIsMobile();
@@ -671,11 +672,14 @@ export default function CustomerThread({
   async function send() {
     if (!thread || sending || !draft.trim()) return;
     setSending(true);
+    setThreadError("");
     const body = draft.trim();
     try {
       await sendStaffMessage(thread.id, body);
       setDraft("");
       await refresh();
+    } catch (e) {
+      setThreadError(errorMessage(e, "送信できませんでした"));
     } finally {
       setSending(false);
     }
@@ -685,9 +689,12 @@ export default function CustomerThread({
     if (busy) return;
     if (!confirm("このメッセージを削除します。よろしいですか？")) return;
     setBusy(true);
+    setThreadError("");
     try {
       await deleteMessage(m.id);
       setMessages((rows) => rows.map((r) => (r.id === m.id ? { ...r, deleted_at: new Date().toISOString() } : r)));
+    } catch (e) {
+      setThreadError(errorMessage(e, "削除できませんでした"));
     } finally {
       setBusy(false);
     }
@@ -857,6 +864,9 @@ export default function CustomerThread({
         })}
       </div>
 
+      {threadError && (
+        <div style={{ flex: "none", padding: "0 18px", fontSize: 12, color: "var(--color-accent-200)" }}>{threadError}</div>
+      )}
       {thread && showTemplates && (
         <TemplatesModal
           templates={templates}

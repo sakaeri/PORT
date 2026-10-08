@@ -195,6 +195,12 @@ export default function CaseDetail({
         {canSeeFinance && (
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>支払い：{PAYMENT_TIMING_LABEL[request.paymentTiming]}</div>
         )}
+        {canSeeFinance && request.paymentTiming === "deposit" && request.depositAmount != null && (
+          <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+            予約金：¥{request.depositAmount.toLocaleString("ja-JP")}
+            {request.depositPaidAt ? `（入金済み・${new Date(request.depositPaidAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric" })}）` : "（未入金）"}
+          </div>
+        )}
         {canSeeFinance && request.hourlyRate != null && (
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
             時間精算：時間単価¥{request.hourlyRate.toLocaleString("ja-JP")}・上限¥{(request.hourlyCap ?? 0).toLocaleString("ja-JP")}
