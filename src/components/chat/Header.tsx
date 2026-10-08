@@ -1,6 +1,6 @@
 "use client";
 
-import { MagnifyingGlass, ListChecks, ClipboardText, UserCircle } from "@phosphor-icons/react";
+import { MagnifyingGlass, ListChecks, ClipboardText } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { Avatar, avatarInitial } from "@/components/chat/AvatarPicker";
 
@@ -14,7 +14,6 @@ interface Props {
   onOpenProgress: () => void;
   onOpenReports: () => void;
   onOpenMyPage: () => void;
-  isAnonymous: boolean;
   customerName: string;
   avatarUrl: string | null;
 }
@@ -45,7 +44,6 @@ export default function Header({
   onOpenProgress,
   onOpenReports,
   onOpenMyPage,
-  isAnonymous,
   customerName,
   avatarUrl,
 }: Props) {
@@ -115,7 +113,7 @@ export default function Header({
         <button
           onClick={onOpenMyPage}
           aria-label="マイページ"
-          title={isAnonymous ? "マイページ（未ログイン）" : `マイページ（${customerName} でログイン中）`}
+          title={`マイページ（${customerName} でログイン中）`}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -123,15 +121,15 @@ export default function Header({
             cursor: "pointer",
             color: "var(--color-text)",
             background: "transparent",
-            border: isAnonymous ? "1px solid var(--color-divider)" : "none",
+            border: "none",
             padding: 0,
             width: 36,
             height: 36,
-            borderRadius: isAnonymous ? "var(--radius-md)" : "50%",
+            borderRadius: "50%",
             flex: "none",
           }}
         >
-          {isAnonymous ? <UserCircle size={16} /> : <Avatar url={avatarUrl} initial={avatarInitial(customerName)} size={36} />}
+          <Avatar url={avatarUrl} initial={avatarInitial(customerName)} size={36} />
         </button>
       </div>
     </div>

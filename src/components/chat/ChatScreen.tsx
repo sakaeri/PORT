@@ -240,7 +240,6 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
         onOpenProgress={() => setShowProgress(true)}
         onOpenReports={() => setShowReports(true)}
         onOpenMyPage={() => setShowMyPage(true)}
-        isAnonymous={ctx.isAnonymous}
         customerName={ctx.customerName}
         avatarUrl={avatarUrl}
       />
@@ -326,11 +325,8 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
       {showMyPage && (
         <MyPageDialog
           userId={ctx.userId}
-          memberNo={ctx.memberNo}
           customerName={ctx.customerName}
           currentEmail={ctx.email}
-          hasGuestActivity={messages.length > 0}
-          isAnonymous={ctx.isAnonymous}
           avatarUrl={avatarUrl}
           onAvatarChange={setAvatarUrl}
           isDark={isDark}
