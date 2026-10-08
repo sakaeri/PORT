@@ -216,7 +216,9 @@ export function RequestCard({
   bundle,
   balance,
   orgId,
+  orgDisplayName,
   onPay,
+  onOpenCharge,
   onSubmitRating,
   onSkipRating,
 }: {
@@ -224,7 +226,9 @@ export function RequestCard({
   bundle: RequestBundle;
   balance: number;
   orgId: string;
+  orgDisplayName: string;
   onPay: (id: string) => Promise<void>;
+  onOpenCharge: () => void;
   onSubmitRating: (id: string, stars: number, comment: string) => void;
   onSkipRating: (id: string) => void;
 }) {
@@ -294,7 +298,6 @@ export function RequestCard({
                 {CADENCE_LABEL[r.cadence]}
               </span>
             )}
-            <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--color-neutral-500)", whiteSpace: "nowrap" }}>秘書が作成</span>
           </div>
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, lineHeight: 1.2, marginTop: 2 }}>
             {payload.title ?? r.title}
@@ -345,7 +348,15 @@ export function RequestCard({
                       </div>
                     )}
                     {balance < r.amount && (
-                      <div style={{ color: "var(--color-accent-200)" }}>残高が不足しています。マイページからチャージしてください。</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ color: "var(--color-accent-200)" }}>残高が不足しています。</span>
+                        <button
+                          onClick={onOpenCharge}
+                          style={{ height: 28, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+                        >
+                          マイページでチャージ
+                        </button>
+                      </div>
                     )}
                     {payError && <div style={{ color: "var(--color-accent-200)" }}>{payError}</div>}
                     <button
@@ -514,7 +525,7 @@ export function RequestCard({
           </div>
         )}
       </div>
-      <Meta isSelf={false} time={timeLabel(msg.sent_at)} />
+      <Meta isSelf={false} time={timeLabel(msg.sent_at)} senderName={msg.senderName} orgDisplayName={orgDisplayName} />
     </div>
   );
 }

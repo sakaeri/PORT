@@ -88,6 +88,7 @@ export default function MyPageDialog({
   onClose,
   balance,
   autoRecharge,
+  initialChargeOpen,
 }: {
   userId: string;
   memberNo: string | null;
@@ -102,6 +103,7 @@ export default function MyPageDialog({
   onClose: () => void;
   balance: number;
   autoRecharge: { enabled: boolean; threshold: number | null; amount: number | null; hasCard: boolean };
+  initialChargeOpen?: boolean;
 }) {
   const [name, setName] = useState(customerName);
   const nameIsPlaceholder = name === NAME_PLACEHOLDER;
@@ -121,7 +123,7 @@ export default function MyPageDialog({
 
   const router = useRouter();
   const CHARGE_AMOUNTS = [10000, 30000, 50000, 100000];
-  const [chargeOpen, setChargeOpen] = useState(false);
+  const [chargeOpen, setChargeOpen] = useState(!!initialChargeOpen);
   const [chargeAmount, setChargeAmount] = useState(CHARGE_AMOUNTS[0]);
   const [chargeStarting, setChargeStarting] = useState(false);
   const [chargeError, setChargeError] = useState("");

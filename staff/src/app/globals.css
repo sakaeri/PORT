@@ -174,3 +174,18 @@ button:disabled {
     display: none !important;
   }
 }
+
+/* 「今日やること」の各項目に、印刷・PDF保存時だけチェックボックスを付ける
+   （画面上はチェックを入れても保存されないため、印刷時のみ表示する）。 */
+.print-checkbox {
+  display: none;
+}
+@media print {
+  .print-checkbox {
+    display: inline-block;
+    flex: none;
+    margin-right: 2px;
+    font-size: 14px;
+    line-height: 1;
+  }
+}

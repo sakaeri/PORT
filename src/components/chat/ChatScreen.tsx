@@ -50,6 +50,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
   const [showProgress, setShowProgress] = useState(false);
   const [showReports, setShowReports] = useState(false);
   const [showMyPage, setShowMyPage] = useState(false);
+  const [openMyPageWithCharge, setOpenMyPageWithCharge] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Both start matching the server's render (empty set / dark) and sync from
@@ -276,6 +277,11 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
                   bundle={m.requestBundle}
                   balance={ctx.balance}
                   orgId={ctx.orgId}
+                  orgDisplayName={ctx.orgDisplayName}
+                  onOpenCharge={() => {
+                    setOpenMyPageWithCharge(true);
+                    setShowMyPage(true);
+                  }}
                   onPay={async (id) => {
                     await payFromBalance(id);
                     await refresh();
@@ -321,9 +327,13 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
           onAvatarChange={setAvatarUrl}
           isDark={isDark}
           onToggleTheme={toggleTheme}
-          onClose={() => setShowMyPage(false)}
+          onClose={() => {
+            setShowMyPage(false);
+            setOpenMyPageWithCharge(false);
+          }}
           balance={ctx.balance}
           autoRecharge={ctx.autoRecharge}
+          initialChargeOpen={openMyPageWithCharge}
         />
       )}
     </div>

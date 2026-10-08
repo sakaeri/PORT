@@ -39,6 +39,16 @@ const card: React.CSSProperties = {
   color: "inherit",
 };
 
+const sectionHeader: React.CSSProperties = {
+  fontFamily: "var(--font-heading)",
+  fontWeight: headingWeight,
+  fontSize: 12.5,
+  color: "var(--color-accent-100)",
+  background: "var(--color-accent-900)",
+  padding: "6px 12px",
+  borderRadius: "var(--radius-md)",
+};
+
 export default async function TodayPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
@@ -124,13 +134,14 @@ export default async function TodayPage() {
       </div>
 
       <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>今日が期限の案件（期限超過含む）</div>
+        <div style={sectionHeader}>今日が期限の案件（期限超過含む）</div>
         {dueList.length === 0 ? (
           <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ありません。</div>
         ) : (
           dueList.map((r) => (
             <Link key={r.id} href={`/cases/${r.id}`} style={card}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="print-checkbox">☑</span>
                 <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{customerNameOf(r.customers)}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
                 <span style={{ flex: "none", fontSize: 11.5, color: r.due_at! < new Date().toISOString() ? "var(--color-accent-200)" : "var(--color-neutral-500)" }}>
@@ -146,13 +157,14 @@ export default async function TodayPage() {
       </section>
 
       <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>秘書の確認待ちの完了報告</div>
+        <div style={sectionHeader}>秘書の確認待ちの完了報告</div>
         {pendingReports.length === 0 ? (
           <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ありません。</div>
         ) : (
           pendingReports.map((r) => (
             <Link key={r.requestId} href={`/cases/${r.requestId}`} style={card}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="print-checkbox">☑</span>
                 <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{r.customerName}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
                 <span style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>提出 {fmtTime(r.submittedAt)}</span>
@@ -163,13 +175,14 @@ export default async function TodayPage() {
       </section>
 
       <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>返信待ちの見積もり</div>
+        <div style={sectionHeader}>返信待ちの見積もり</div>
         {quotedList.length === 0 ? (
           <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ありません。</div>
         ) : (
           quotedList.map((r) => (
             <Link key={r.id} href={`/cases/${r.id}`} style={card}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="print-checkbox">☑</span>
                 <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{customerNameOf(r.customers)}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
                 <span style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>{yen(r.amount)}</span>
