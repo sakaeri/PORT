@@ -23,37 +23,35 @@ async function emailsFor(admin: Admin, profileIds: string[]): Promise<string[]> 
   return emails;
 }
 
-// 依頼主からの最初のメッセージ（＝新規問い合わせ）が届いたときだけ、その事業所の
-// 受付（owner/reception）全員のログイン用メールアドレスに通知する。2通目以降は
-// 送らない（ログインして見ている前提のため）。失敗しても依頼主の送信自体は
-// 止めない（呼び出し側で await せず、エラーはここで握りつぶす）。
-export async function notifyNewInquiryIfFirst(orgId: string, threadId: string) {
+// 依頼主からのメッセージが「本部が未読の状態で」届いたときだけ、その事業所の
+// 受付（owner/reception）全員のログイン用メールアドレスに通知する。本当に
+// 最初の問い合わせだけでなく、既存の依頼主からの返信でも、本部がまだその
+// 続きを読んでいない間は知らせる。ただし未読のまま連続でメッセージが来た
+// 場合に毎通メールしないよう、「未読の先頭の1通」だけに絞る判定は呼び出し側
+// （actions.ts の touchThread）が行い、ここは渡された時だけ送る。失敗しても
+// 依頼主の送信自体は止めない（呼び出し側で await せず、エラーはここで握りつぶす）。
+export async function notifyNewInquiry(orgId: string, threadId: string) {
   try {
     const admin = createServiceRoleClient();
 
-    const { count } = await admin
-      .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("thread_id", threadId)
-      .eq("sender_role", "client");
-    if ((count ?? 0) !== 1) return;
-
-    const [{ data: org }, { data: staff }] = await Promise.all([
+    const [{ data: org }, { data: staff }, { data: thread }] = await Promise.all([
       admin.from("organizations").select("display_name").eq("id", orgId).single(),
       admin.from("profiles").select("id").eq("org_id", orgId).in("role", ["owner", "reception"]),
+      admin.from("threads").select("customer_id").eq("id", threadId).maybeSingle(),
     ]);
     if (!staff?.length) return;
 
     const emails = await emailsFor(admin, staff.map((s) => s.id));
     const staffUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
+    const openUrl = staffUrl && thread?.customer_id ? `${staffUrl}/customers/${thread.customer_id}` : staffUrl;
     await sendStaffEmail(
       admin,
       emails,
-      `【PORT】新規のお問い合わせがあります（${org?.display_name ?? ""}）`,
-      `<p>${org?.display_name ?? ""}に新しいお問い合わせが届きました。</p>${staffUrl ? `<p><a href="${staffUrl}">受付画面を開いて確認する</a></p>` : ""}`,
+      `【PORT】新着メッセージがあります（${org?.display_name ?? ""}）`,
+      `<p>${org?.display_name ?? ""}に新しいメッセージが届きました。</p>${openUrl ? `<p><a href="${openUrl}">トークを開いて確認する</a></p>` : ""}`,
     );
   } catch (e) {
-    console.error("notifyNewInquiryIfFirst failed", e);
+    console.error("notifyNewInquiry failed", e);
   }
 }
 

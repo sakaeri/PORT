@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getCustomerContext } from "@/lib/data";
-import { notifyNewInquiryIfFirst, notifyStaffPaymentConfirmed } from "@/lib/notify";
+import { notifyNewInquiry, notifyStaffPaymentConfirmed } from "@/lib/notify";
 import { getStripe } from "@/lib/stripe";
 
 async function requireContext() {
@@ -52,9 +52,18 @@ async function requireActiveContext() {
 // threads の RLS は受付（is_office()）にしか update を許可していないため、
 // 依頼主自身のセッションではこの更新が黙って0件のまま失敗する — service role
 // で書く（last_msg_at を進めるだけの安全な操作なので、ここだけRLSを迂回する）。
-async function touchThread(threadId: string) {
+//
+// 更新の直前の状態（前回の last_msg_at／last_read_at）を見て、「本部が
+// 読んだ後に初めて届いた1通」かどうかを返す。未読のまま連続でメッセージが
+// 来た場合は2通目以降 false になり、notifyNewInquiry 側で毎通メールしない
+// ようにするため（本当に最初の問い合わせ時は前回のメッセージが無いので true）。
+async function touchThread(threadId: string): Promise<boolean> {
   const admin = createServiceRoleClient();
+  const { data: before } = await admin.from("threads").select("last_msg_at, last_read_at").eq("id", threadId).maybeSingle();
   await admin.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+  if (!before || before.last_msg_at == null) return true;
+  const alreadyUnread = before.last_read_at == null || before.last_read_at < before.last_msg_at;
+  return !alreadyUnread;
 }
 
 // 既存アカウントへのログイン（マジックリンク）。今の匿名セッションのトーク内容は
@@ -86,8 +95,8 @@ export async function sendMessage(text: string) {
     .from("messages")
     .insert({ thread_id: ctx.threadId, sender_id: ctx.userId, sender_role: "client", kind: "text", body: trimmed });
   if (error) throw error;
-  await touchThread(ctx.threadId);
-  await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
+  const shouldNotify = await touchThread(ctx.threadId);
+  if (shouldNotify) await notifyNewInquiry(ctx.orgId, ctx.threadId);
 }
 
 // 見積もりの「はじめの質問」（menu_pick）と同じく、その場のメッセージとしてのみ残す。
@@ -106,8 +115,8 @@ export async function submitInfoRequestAnswer(formLabel: string, fields: { label
     payload: { formLabel, rows: filled },
   });
   if (error) throw error;
-  await touchThread(ctx.threadId);
-  await notifyNewInquiryIfFirst(ctx.orgId, ctx.threadId);
+  const shouldNotify = await touchThread(ctx.threadId);
+  if (shouldNotify) await notifyNewInquiry(ctx.orgId, ctx.threadId);
 }
 
 // 依頼主本人の名前はいつでも自由に変更できる（customers_self_update ポリシー）。
