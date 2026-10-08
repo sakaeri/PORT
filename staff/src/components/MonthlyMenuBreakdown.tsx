@@ -74,19 +74,21 @@ export default function MonthlyMenuBreakdown({ months }: { months: MonthBreakdow
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 2 }}>
-        {index > 0 && (
-          <button onClick={() => setIndex((i) => i - 1)} aria-label="前の月" style={navBtn}>
-            <CaretLeft size={14} />
-          </button>
-        )}
-        <div style={{ fontSize: 14, fontFamily: "var(--font-heading)" }}>{month.label}</div>
-        {index < months.length - 1 && (
-          <button onClick={() => setIndex((i) => i + 1)} aria-label="次の月" style={navBtn}>
-            <CaretRight size={14} />
-          </button>
-        )}
-      </div>
+      {months.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 2 }}>
+          {index > 0 && (
+            <button onClick={() => setIndex((i) => i - 1)} aria-label="前の月" style={navBtn}>
+              <CaretLeft size={14} />
+            </button>
+          )}
+          <div style={{ fontSize: 14, fontFamily: "var(--font-heading)" }}>{month.label}</div>
+          {index < months.length - 1 && (
+            <button onClick={() => setIndex((i) => i + 1)} aria-label="次の月" style={navBtn}>
+              <CaretRight size={14} />
+            </button>
+          )}
+        </div>
+      )}
 
       {month.rows.length === 0 ? (
         <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>この月の実績はありません。</div>
