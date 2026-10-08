@@ -121,6 +121,7 @@ export default function AvatarPicker({
 
   async function handleRemove() {
     setMenuOpen(false);
+    if (!confirm("プロフィール画像を削除しますか？")) return;
     setUploading(true);
     setError("");
     try {
