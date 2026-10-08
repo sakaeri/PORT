@@ -96,7 +96,7 @@ async function HqStats() {
 async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; viewerRole: StaffRole | "reception"; viewerUserId: string }) {
   const supabase = await createClient();
   const [{ data: requests, error }, { data: departmentRows }, { data: customerThreads }, { data: myDepartmentRows }, { data: ratingRows }] = await Promise.all([
-    supabase.from("requests").select("id, title, phase, amount, pay_status, paid_at, completed_at, customer_id, customers(name)").eq("org_id", orgId),
+    supabase.from("requests").select("id, title, phase, amount, pay_status, paid_at, completed_at, customer_id, customers(name, staff_label)").eq("org_id", orgId),
     supabase.from("departments").select("id, name, royalty_pct").eq("org_id", orgId).order("created_at", { ascending: true }),
     // 依頼主の窓口は、その依頼主の「customerトーク」が持つ department_id で決まる
     // （customersテーブル自体には窓口の列がない）。
@@ -110,7 +110,7 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
   const rows = requests ?? [];
   function customerNameOf(r: (typeof rows)[number]): string {
     const c = Array.isArray(r.customers) ? r.customers[0] : r.customers;
-    return c?.name ?? "—";
+    return c?.staff_label ?? c?.name ?? "—";
   }
   const departmentIdByCustomer = new Map((customerThreads ?? []).map((t) => [t.customer_id, t.department_id]));
   const { year, month } = nowJSTYearMonth();
