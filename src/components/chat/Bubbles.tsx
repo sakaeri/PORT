@@ -239,6 +239,7 @@ export function RequestCard({
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+  const [attachmentErrorId, setAttachmentErrorId] = useState<string | null>(null);
   const [recurringRequesting, setRecurringRequesting] = useState(false);
   const [recurringRequested, setRecurringRequested] = useState(false);
   const [recurringError, setRecurringError] = useState("");
@@ -260,11 +261,14 @@ export function RequestCard({
   async function openReportAttachment(path: string, id: string) {
     if (openingAttachmentId) return;
     setOpeningAttachmentId(id);
+    setAttachmentErrorId(null);
     try {
       const supabase = createClient(orgId);
       const { data, error } = await supabase.storage.from("attachments").createSignedUrl(path, 60);
       if (error || !data?.signedUrl) throw error ?? new Error("URLを発行できませんでした");
       window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      setAttachmentErrorId(id);
     } finally {
       setOpeningAttachmentId(null);
     }
@@ -429,19 +433,23 @@ export function RequestCard({
             {report.attachments.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
                 {report.attachments.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => openReportAttachment(f.file_path, f.id)}
-                    disabled={openingAttachmentId === f.id}
-                    style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, padding: "6px 8px", cursor: openingAttachmentId === f.id ? "wait" : "pointer", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-bg)" }}
-                  >
-                    {openingAttachmentId === f.id ? (
-                      <CircleNotch size={15} style={{ flex: "none", color: "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} />
-                    ) : (
-                      <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 15, color: "var(--color-accent)" }} />
+                  <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <button
+                      onClick={() => openReportAttachment(f.file_path, f.id)}
+                      disabled={openingAttachmentId === f.id}
+                      style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, padding: "6px 8px", cursor: openingAttachmentId === f.id ? "wait" : "pointer", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", background: "var(--color-bg)" }}
+                    >
+                      {openingAttachmentId === f.id ? (
+                        <CircleNotch size={15} style={{ flex: "none", color: "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} />
+                      ) : (
+                        <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 15, color: "var(--color-accent)" }} />
+                      )}
+                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{f.label ? `${f.label}：${f.file_name}` : f.file_name}</span>
+                    </button>
+                    {attachmentErrorId === f.id && (
+                      <span style={{ fontSize: 10.5, paddingLeft: 8, color: "var(--color-accent-200)" }}>開けませんでした。もう一度お試しください</span>
                     )}
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{f.label ? `${f.label}：${f.file_name}` : f.file_name}</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}

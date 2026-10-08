@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: ctx?.orgDisplayName ?? "PORT" };
 }
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ loginError?: string }> }) {
   // 初回訪問はまだ匿名セッションが存在しない（proxy.tsはもう自動でサイン
   // インしない）。これは想定内の状態なので、VerifyGateで見えない認証を
   // 済ませてから完了させる。以下の「読み込みに失敗しました」は、認証済み
@@ -58,7 +58,8 @@ export default async function Home() {
   // ここでAccountGateを挟み、名前・メールの登録 or 既存アカウントへの
   // ログインを済ませるまで先に進ませない。
   if (ctx.isAnonymous) {
-    return <AccountGate orgDisplayName={ctx.orgDisplayName} />;
+    const { loginError } = await searchParams;
+    return <AccountGate orgDisplayName={ctx.orgDisplayName} initialError={loginError ? "リンクの有効期限が切れているか、すでに使用されています。もう一度お試しください。" : undefined} />;
   }
 
   const { messages, hasMoreOlder } = await getThreadMessages(ctx.threadId);

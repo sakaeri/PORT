@@ -127,15 +127,18 @@ export function CancelDialog({
   onClose,
   onConfirm,
   confirming,
+  error,
 }: {
   onClose: () => void;
   onConfirm: () => void;
   confirming: boolean;
+  error?: string;
 }) {
   return (
     <Centered onBackdrop={onClose}>
       <div style={dialogTitle}>見積もりを見送りますか？</div>
       <div style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.85 }}>まだ決済前のため、費用は発生しません。この見積もりを見送ります。</div>
+      {error && <div style={{ fontSize: 12.5, color: "var(--color-accent-200)" }}>{error}</div>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
         <button onClick={onClose} style={ghostBtn}>依頼を続ける</button>
         <button onClick={onConfirm} disabled={confirming} style={{ ...accentBtn, opacity: confirming ? 0.6 : 1 }}>

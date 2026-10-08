@@ -7,6 +7,7 @@ import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, Int
 import { ProgressPanel, CancelDialog, ReportsDialog } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
 import { createClient } from "@/lib/supabase/client";
+import { errorMessage } from "@/lib/errors";
 import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle } from "@/lib/chat-types";
 import {
   sendMessage as sendMessageAction,
@@ -52,6 +53,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
   const [showMyPage, setShowMyPage] = useState(false);
   const [openMyPageWithCharge, setOpenMyPageWithCharge] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState("");
   const [busy, setBusy] = useState(false);
   // Both start matching the server's render (empty set / dark) and sync from
   // localStorage/the DOM in an effect (client-only, after hydration) — an
@@ -206,12 +208,13 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
   async function handleCancelConfirm() {
     if (!cancelTargetId || busy) return;
     setBusy(true);
+    setCancelError("");
     try {
       await declineQuote(cancelTargetId);
       await refresh();
       setCancelTargetId(null);
     } catch (e) {
-      console.error(e);
+      setCancelError(errorMessage(e, "見送りできませんでした"));
     } finally {
       setBusy(false);
     }
@@ -313,7 +316,12 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
       )}
       {showReports && <ReportsDialog bundles={bundles} ackedIds={ackedIds} onAck={ackReport} onClose={() => setShowReports(false)} />}
       {cancelTargetBundle && (
-        <CancelDialog confirming={busy} onClose={() => setCancelTargetId(null)} onConfirm={handleCancelConfirm} />
+        <CancelDialog
+          confirming={busy}
+          error={cancelError}
+          onClose={() => { setCancelTargetId(null); setCancelError(""); }}
+          onConfirm={handleCancelConfirm}
+        />
       )}
       {showMyPage && (
         <MyPageDialog
