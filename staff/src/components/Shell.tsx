@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Headset, Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X, PencilSimple, ListChecks } from "@phosphor-icons/react";
+import { Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X, PencilSimple, ListChecks } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { headingWeight } from "@/lib/style";
@@ -171,8 +171,9 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   const sidebarBody = (
     <>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "6px 4px 4px" }}>
-        <div style={{ width: 30, height: 30, flex: "none", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", border: "1px solid var(--color-nav-accent)" }}>
-          <Headset size={16} color="var(--color-nav-accent)" />
+        <div style={{ width: 30, height: 30, flex: "none", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- 固定サイズの静的アセットのため plain img */}
+          <img src="/logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
           <OrgSwitcher orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} orgs={ctx.orgs} unreadCounts={orgUnreadCounts} />

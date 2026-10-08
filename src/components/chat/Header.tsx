@@ -1,6 +1,6 @@
 "use client";
 
-import { MagnifyingGlass, ListChecks, ClipboardText, UserCircle, Headset } from "@phosphor-icons/react";
+import { MagnifyingGlass, ListChecks, ClipboardText, UserCircle } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { Avatar, avatarInitial } from "@/components/chat/AvatarPicker";
 
@@ -64,14 +64,12 @@ export default function Header({
             width: 32,
             height: 32,
             borderRadius: "var(--radius-md)",
-            border: "1px solid var(--color-accent)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            overflow: "hidden",
             flex: "none",
           }}
         >
-          <Headset size={17} color="var(--color-accent)" />
+          {/* eslint-disable-next-line @next/next/no-img-element -- 固定サイズの静的アセットのため plain img */}
+          <img src="/logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18, whiteSpace: "nowrap" }}>
           {brandName}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Headset } from "@phosphor-icons/react";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 import { setInitialProfile, requestMagicLink } from "@/app/actions";
@@ -101,15 +100,13 @@ export default function AccountGate({ orgDisplayName }: { orgDisplayName: string
           style={{
             width: 56,
             height: 56,
-            display: "grid",
-            placeItems: "center",
             borderRadius: "50%",
-            background: "var(--color-accent-900)",
-            border: "1px solid var(--color-accent-700)",
+            overflow: "hidden",
             marginBottom: 4,
           }}
         >
-          <Headset size={26} color="var(--color-accent)" />
+          {/* eslint-disable-next-line @next/next/no-img-element -- 固定サイズの静的アセットのため plain img */}
+          <img src="/logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 21, textAlign: "center" }}>{orgDisplayName}</div>
         <div style={{ fontSize: 13, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-400)", marginBottom: 10 }}>
