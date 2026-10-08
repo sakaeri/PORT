@@ -11,6 +11,12 @@ import { createClient } from "@/lib/supabase/client";
 import { submitInfoRequestAnswer, requestRecurringFollowup } from "@/app/actions";
 import { Avatar, avatarInitial } from "@/components/chat/AvatarPicker";
 
+// 担当者がまだ付いていない自動メッセージ（個人のアバター画像もなければ、
+// 名乗る担当者名もない）は、頭文字の代わりにロゴ画像を出す。
+function senderAvatar(msg: MessageWithExtras): string | null {
+  return msg.senderAvatarUrl ?? (msg.senderName ? null : "/logo.png");
+}
+
 function fileIconClass(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   if (["png", "jpg", "jpeg", "gif", "webp", "heic"].includes(ext)) return "ph ph-image";
@@ -51,7 +57,7 @@ export function TextBubble({ msg, highlight, orgDisplayName }: { msg: MessageWit
   const isSelf = msg.sender_role === "client";
   return (
     <div style={{ display: "flex", flexDirection: isSelf ? "row-reverse" : "row", gap: 8, alignItems: "flex-end", maxWidth: "82%", alignSelf: isSelf ? "flex-end" : "flex-start" }}>
-      {!isSelf && <Avatar url={msg.senderAvatarUrl} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} />}
+      {!isSelf && <Avatar url={senderAvatar(msg)} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} />}
       <div style={{ ...bubbleShell, maxWidth: "100%", minWidth: 0, outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
         <div
           style={{
@@ -98,7 +104,7 @@ export function FilesBubble({ msg, highlight, orgId, orgDisplayName }: { msg: Me
 
   return (
     <div style={{ display: "flex", flexDirection: isSelf ? "row-reverse" : "row", gap: 8, alignItems: "flex-end", maxWidth: "82%", alignSelf: isSelf ? "flex-end" : "flex-start" }}>
-      {!isSelf && <Avatar url={msg.senderAvatarUrl} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} />}
+      {!isSelf && <Avatar url={senderAvatar(msg)} initial={avatarInitial(msg.senderName ?? orgDisplayName)} size={28} />}
       <div style={{ ...bubbleShell, maxWidth: "100%", minWidth: 0, outline: highlight ? "2px solid var(--color-accent)" : "none", borderRadius: "var(--radius-lg)" }}>
       <div
         style={{
