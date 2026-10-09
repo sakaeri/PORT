@@ -8,12 +8,14 @@ import { createClient } from "@/lib/supabase/client";
 import { archiveThread, unarchiveThread, deleteCustomer } from "@/app/actions";
 import type { Department } from "@/components/StaffAdmin";
 import RowKebabMenu from "@/components/RowKebabMenu";
+import Avatar, { avatarInitial } from "@/components/Avatar";
 import DepartmentFilterDropdown from "@/components/DepartmentFilterDropdown";
 
 interface CustomerRow {
   id: string;
   name: string;
   memberNo: string | null;
+  avatarUrl: string | null;
   active: boolean;
   convertedOrg: { displayName: string; slug: string | null } | null;
   thread: { id: string; archived: boolean } | null;
@@ -117,6 +119,7 @@ export default function CustomersList({
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {visible.map((c) => (
           <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", opacity: c.active ? 1 : 0.55 }}>
+            <Avatar url={c.avatarUrl} initial={avatarInitial(c.name)} size={40} />
             <Link href={`/customers/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: c.unread ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>

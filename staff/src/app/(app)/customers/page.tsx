@@ -23,7 +23,7 @@ export default async function CustomersPage() {
   const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }, { data: requests }] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, name, staff_label, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
+      .select("id, name, staff_label, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug), profile:profiles!customers_profile_id_fkey(avatar_url)")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
     supabase.rpc("customer_thread_summaries", { p_org_id: ctx.orgId }),
@@ -51,6 +51,7 @@ export default async function CustomersPage() {
   const rows = (customers ?? [])
     .map((c) => {
       const convertedOrg = Array.isArray(c.converted_org) ? c.converted_org[0] : c.converted_org;
+      const profile = Array.isArray(c.profile) ? c.profile[0] : c.profile;
       const summary = summaryByCustomerId.get(c.id) ?? null;
       // customer_thread_summaries はスレッドさえあればメッセージが0件でも行を返す
       // （LEFT JOIN LATERAL のため）。last_message_kind が無ければ「やり取りなし」。
@@ -79,6 +80,7 @@ export default async function CustomersPage() {
         id: c.id,
         name: c.staff_label ?? c.name,
         memberNo: c.member_no,
+        avatarUrl: profile?.avatar_url ?? null,
         active: c.active,
         convertedOrg: convertedOrg ? { displayName: convertedOrg.display_name, slug: convertedOrg.slug } : null,
         thread: summary ? { id: summary.thread_id, archived: summary.archived } : null,
