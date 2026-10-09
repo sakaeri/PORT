@@ -15,6 +15,7 @@ import {
   submitRating,
   skipRating,
   payFromBalance,
+  markChatRead,
 } from "@/app/actions";
 
 interface Props {
@@ -166,6 +167,19 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
       clearInterval(interval);
     };
   }, [ctx.threadId, ctx.customerId, ctx.orgId, refresh]);
+
+  // 画面が見えている間に最新メッセージが変わったら既読にする（本部からの
+  // メール通知を「未読の先頭の1通」だけに絞るため）。裏タブのまま届いた分は、
+  // タブに戻ってきた時点で既読にする。
+  const lastMessageId = messages[messages.length - 1]?.id;
+  useEffect(() => {
+    const mark = () => {
+      if (document.visibilityState === "visible") markChatRead().catch(() => {});
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
+  }, [lastMessageId]);
 
   function toggleTheme() {
     const next = isDark ? "light" : "dark";

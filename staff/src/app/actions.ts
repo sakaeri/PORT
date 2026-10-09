@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
-import { notifyCustomerCompletionReport, notifyCustomerQuoteCreated } from "@/lib/notify";
+import { isCustomerCaughtUp, notifyCustomerCompletionReport, notifyCustomerNewMessage, notifyCustomerQuoteCreated } from "@/lib/notify";
 import type { StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
@@ -584,11 +584,14 @@ export async function sendStaffMessage(threadId: string, text: string) {
   const trimmed = text.trim();
   if (!trimmed) return;
   const supabase = await createClient();
+  const admin = createServiceRoleClient();
+  const shouldNotify = await isCustomerCaughtUp(admin, threadId);
   const { error } = await supabase
     .from("messages")
     .insert({ thread_id: threadId, sender_id: ctx.userId, sender_role: ctx.role, kind: "text", body: trimmed });
   if (error) throw error;
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+  if (shouldNotify) await notifyCustomerNewMessage(admin, threadId);
 }
 
 // 依頼主一覧の未読マーク用。スタッフ共有ログインなので個人別ではなく
@@ -1079,6 +1082,8 @@ export async function sendTemplateMessage(threadId: string, templateId: string) 
     .map((f) => ({ key: f.key, label: f.label, kind: f.kind, required: f.required }));
   if (fields.length === 0) throw new Error("このテンプレには項目がありません");
 
+  const admin = createServiceRoleClient();
+  const shouldNotify = await isCustomerCaughtUp(admin, threadId);
   const { error } = await supabase.from("messages").insert({
     thread_id: threadId,
     sender_id: ctx.userId,
@@ -1088,6 +1093,7 @@ export async function sendTemplateMessage(threadId: string, templateId: string) 
   });
   if (error) throw error;
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+  if (shouldNotify) await notifyCustomerNewMessage(admin, threadId);
 }
 
 // ============================================================

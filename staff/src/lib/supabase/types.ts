@@ -374,6 +374,7 @@ export interface Database {
           last_msg_at: string | null;
           archived_at: string | null;
           last_read_at: string | null;
+          customer_last_read_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["threads"]["Row"]>;
