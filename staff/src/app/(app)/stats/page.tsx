@@ -95,7 +95,7 @@ async function HqStats() {
 
 async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; viewerRole: StaffRole | "reception"; viewerUserId: string }) {
   const supabase = await createClient();
-  const [{ data: requests, error }, { data: departmentRows }, { data: customerThreads }, { data: myDepartmentRows }, { data: ratingRows }] = await Promise.all([
+  const [{ data: requests, error }, { data: departmentRows }, { data: customerThreads }, { data: myDepartmentRows }, { data: ratingRows }, { data: managerProfiles }, { data: staffDepartmentRows }] = await Promise.all([
     supabase.from("requests").select("id, title, phase, amount, pay_status, paid_at, completed_at, customer_id, customers(name, staff_label)").eq("org_id", orgId),
     supabase.from("departments").select("id, name, royalty_pct").eq("org_id", orgId).order("created_at", { ascending: true }),
     // 依頼主の窓口は、その依頼主の「customerトーク」が持つ department_id で決まる
@@ -103,6 +103,9 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
     supabase.from("threads").select("customer_id, department_id").eq("org_id", orgId).eq("kind", "customer"),
     viewerRole === "dept_manager" ? supabase.from("staff_departments").select("department_id").eq("profile_id", viewerUserId) : Promise.resolve({ data: [] as { department_id: string }[] }),
     supabase.from("ratings").select("customer_id, stars, created_at, skipped").eq("skipped", false).not("stars", "is", null),
+    // 窓口カードの名前の横に、その窓口の秘書（マネージャー）のアイコンを出す。
+    supabase.from("profiles").select("id, avatar_url").eq("org_id", orgId).eq("role", "dept_manager"),
+    supabase.from("staff_departments").select("profile_id, department_id"),
   ]);
 
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
@@ -111,6 +114,13 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
   function customerNameOf(r: (typeof rows)[number]): string {
     const c = Array.isArray(r.customers) ? r.customers[0] : r.customers;
     return c?.staff_label ?? c?.name ?? "—";
+  }
+  const managerAvatarById = new Map((managerProfiles ?? []).map((p) => [p.id, p.avatar_url]));
+  const managerAvatarByDepartment = new Map<string, string | null>();
+  for (const sd of staffDepartmentRows ?? []) {
+    if (managerAvatarById.has(sd.profile_id) && !managerAvatarByDepartment.has(sd.department_id)) {
+      managerAvatarByDepartment.set(sd.department_id, managerAvatarById.get(sd.profile_id) ?? null);
+    }
   }
   const departmentIdByCustomer = new Map((customerThreads ?? []).map((t) => [t.customer_id, t.department_id]));
   const { year, month } = nowJSTYearMonth();
@@ -130,13 +140,13 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
   const creatorIdByRequestId = new Map((reportRows ?? []).map((r) => [r.request_id, r.creator_id]));
   const creatorIds = [...new Set((reportRows ?? []).map((r) => r.creator_id).filter((id): id is string => !!id))];
   const { data: creatorProfiles } =
-    creatorIds.length > 0 ? await supabase.from("profiles").select("id, role, display_name, staff_alias").in("id", creatorIds) : { data: [] as { id: string; role: StaffRole; display_name: string; staff_alias: string | null }[] };
-  const staffNameById = new Map(
-    (creatorProfiles ?? []).filter((p) => p.role === "dept_leader").map((p) => [p.id, p.staff_alias ?? p.display_name]),
+    creatorIds.length > 0 ? await supabase.from("profiles").select("id, role, display_name, staff_alias, avatar_url").in("id", creatorIds) : { data: [] as { id: string; role: StaffRole; display_name: string; staff_alias: string | null; avatar_url: string | null }[] };
+  const staffById = new Map(
+    (creatorProfiles ?? []).filter((p) => p.role === "dept_leader").map((p) => [p.id, { name: p.staff_alias ?? p.display_name, avatarUrl: p.avatar_url }]),
   );
-  function staffNameFor(requestId: string): string | null {
+  function staffFor(requestId: string): { name: string; avatarUrl: string | null } | null {
     const creatorId = creatorIdByRequestId.get(requestId);
-    return creatorId ? (staffNameById.get(creatorId) ?? null) : null;
+    return creatorId ? (staffById.get(creatorId) ?? null) : null;
   }
 
   // 窓口（マネージャー）ごとに集計する。支払いタイミングは案件によって違う
@@ -156,18 +166,19 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
     let monthRevenue = 0;
     for (const r of deptRows) {
       if (r.phase === "completed" && r.completed_at && monthKeyJST(r.completed_at) === currentKey) {
-        completedThisMonth.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid", staffName: staffNameFor(r.id) });
+        completedThisMonth.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid", staff: staffFor(r.id) });
         monthRevenue += r.amount;
       }
     }
     const pendingRows: MonthRow[] = deptRows
       .filter((r) => r.pay_status !== "paid" && !["draft", "cancelled", "declined"].includes(r.phase))
-      .map((r) => ({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "pending" as const, staffName: null }))
+      .map((r) => ({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "pending" as const, staff: null }))
       .filter((r) => r.amount > 0);
 
     const months: MonthBreakdown[] = [{ key: currentKey, label: currentLabel, rows: [...pendingRows, ...completedThisMonth] }];
 
-    return { id, name, royaltyPct, monthRatingAvg, monthRatingCount, monthCompleted: completedThisMonth.length, monthRevenue, months };
+    const avatarUrl = matchDeptId ? (managerAvatarByDepartment.get(matchDeptId) ?? null) : null;
+    return { id, name, avatarUrl, royaltyPct, monthRatingAvg, monthRatingCount, monthCompleted: completedThisMonth.length, monthRevenue, months };
   }
 
   // マネージャーは自分の窓口だけ、オーナーは全窓口（＋窓口未設定分、

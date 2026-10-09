@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CaretDown, CaretRight } from "@phosphor-icons/react";
 import { setDepartmentRoyaltyPct } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
+import Avatar, { avatarInitial } from "@/components/Avatar";
 import MonthlyMenuBreakdown, { type MonthBreakdown } from "@/components/MonthlyMenuBreakdown";
 
 export interface DepartmentStat {
@@ -11,6 +12,8 @@ export interface DepartmentStat {
   // オーナー視点のみ）も入る。ロイヤリティはそちらでは編集できない。
   id: string;
   name: string;
+  // その窓口の秘書（マネージャー）のアイコン。窓口未設定分はnull。
+  avatarUrl: string | null;
   royaltyPct: number | null;
   monthRatingAvg: number | null;
   monthRatingCount: number;
@@ -88,6 +91,7 @@ export default function DepartmentStatsList({
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer", background: "transparent", border: "none", textAlign: "left", color: "var(--color-text)" }}
             >
               {expanded ? <CaretDown size={14} color="var(--color-neutral-500)" /> : <CaretRight size={14} color="var(--color-neutral-500)" />}
+              {isRealDepartment && <Avatar url={d.avatarUrl} initial={avatarInitial(d.name)} size={28} />}
               <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
               {d.monthRatingCount > 0 && (
                 <span style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>★{d.monthRatingAvg?.toFixed(1)}</span>
