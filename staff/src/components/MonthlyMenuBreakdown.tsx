@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
+import Avatar, { avatarInitial } from "@/components/Avatar";
 
 export interface MonthRow {
   requestId: string;
@@ -10,9 +11,9 @@ export interface MonthRow {
   title: string;
   amount: number;
   status: "paid" | "pending";
-  // 完了報告を出したのがスタッフ（dept_leader）だった場合のみ、その名前。
+  // 完了報告を出したのがスタッフ（dept_leader）だった場合のみ、その名前とアイコン。
   // 窓口のマネージャー自身が出した分や、まだ完了していない分はnull。
-  staffName: string | null;
+  staff: { name: string; avatarUrl: string | null } | null;
 }
 
 export interface MonthBreakdown {
@@ -57,8 +58,11 @@ function Row({ r }: { r: MonthRow }) {
       {r.status === "pending" && (
         <span style={{ flex: "none", fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)" }}>入金待ち</span>
       )}
-      {r.staffName && (
-        <span style={{ flex: "none", fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)" }}>{r.staffName}</span>
+      {r.staff && (
+        <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--color-neutral-400)" }}>
+          <Avatar url={r.staff.avatarUrl} initial={avatarInitial(r.staff.name)} size={18} />
+          {r.staff.name}
+        </span>
       )}
       <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>{yen(r.amount)}</div>
     </Link>
