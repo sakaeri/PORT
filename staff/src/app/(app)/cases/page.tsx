@@ -13,7 +13,7 @@ export default async function CasesPage() {
   const [{ data: requests, error }, { data: caseThreads, error: threadsError }, { data: summaries, error: summariesError }, { data: unsentReports }, { data: customerThreads }, { data: departments }] = await Promise.all([
     supabase
       .from("requests")
-      .select("id, title, amount, phase, pay_status, due_at, created_at, customer_id, customers(name, staff_label)")
+      .select("id, title, amount, phase, pay_status, due_at, created_at, customer_id, customers(name, staff_label, profile:profiles!customers_profile_id_fkey(avatar_url))")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
     supabase.from("threads").select("id, request_id, archived_at").eq("org_id", ctx.orgId).eq("kind", "case"),
@@ -43,6 +43,7 @@ export default async function CasesPage() {
   const canSeeAmount = ctx.role === "owner";
   const rows: CaseRow[] = (requests ?? []).map((r) => {
     const customer = Array.isArray(r.customers) ? r.customers[0] : r.customers;
+    const customerProfile = customer ? (Array.isArray(customer.profile) ? customer.profile[0] : customer.profile) : null;
     const thread = threadByRequestId.get(r.id) ?? null;
     const summary = summaryByRequestId.get(r.id) ?? null;
     const lastMessagePreview =
@@ -66,6 +67,7 @@ export default async function CasesPage() {
       dueSoon,
       reportPending,
       customerName: customer?.staff_label ?? customer?.name ?? "—",
+      customerAvatarUrl: customerProfile?.avatar_url ?? null,
       departmentId: departmentIdByCustomerId.get(r.customer_id) ?? null,
       threadId: thread?.id ?? null,
       archived: !!thread?.archived_at,

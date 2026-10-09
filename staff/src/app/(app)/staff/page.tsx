@@ -32,7 +32,7 @@ export default async function StaffPage() {
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
     supabase
       .from("profiles")
-      .select("id, role, display_name, staff_alias")
+      .select("id, role, display_name, staff_alias, avatar_url")
       .eq("org_id", ctx.orgId)
       .in("role", rosterRoles)
       .order("created_at", { ascending: true }),
@@ -86,6 +86,7 @@ export default async function StaffPage() {
     return {
       id: p.id,
       displayName: p.staff_alias ?? p.display_name,
+      avatarUrl: p.avatar_url,
       role: p.role as StaffRole,
       departmentIds: departmentIdsByProfile.get(p.id) ?? [],
       threadId: summary?.thread_id ?? null,

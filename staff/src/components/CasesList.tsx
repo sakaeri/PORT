@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { PHASE_LABEL } from "@/lib/stage";
 import { archiveCaseThread, unarchiveCaseThread, deleteCaseRequest } from "@/app/actions";
+import Avatar, { avatarInitial } from "@/components/Avatar";
 import RowKebabMenu from "@/components/RowKebabMenu";
 import DepartmentFilterDropdown from "@/components/DepartmentFilterDropdown";
 import type { RequestPhase } from "@/lib/supabase/types";
@@ -21,6 +22,7 @@ export interface CaseRow {
   // 本部メンバーが依頼主に送っていない状態（＝報告済み・承認待ち）。
   reportPending: boolean;
   customerName: string;
+  customerAvatarUrl: string | null;
   departmentId: string | null;
   threadId: string | null;
   archived: boolean;
@@ -148,6 +150,7 @@ export default function CasesList({
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {visible.map((r) => (
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)", opacity: r.archived ? 0.55 : 1 }}>
+            <Avatar url={r.customerAvatarUrl} initial={avatarInitial(r.customerName)} size={40} />
             <Link href={`/cases/${r.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
               <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

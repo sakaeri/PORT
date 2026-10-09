@@ -11,11 +11,13 @@ import Modal from "@/components/Modal";
 import RowKebabMenu from "@/components/RowKebabMenu";
 import { InviteAdmin, type Department } from "@/components/StaffAdmin";
 import DepartmentFilterDropdown from "@/components/DepartmentFilterDropdown";
+import Avatar, { avatarInitial } from "@/components/Avatar";
 import type { StaffRole } from "@/lib/supabase/types";
 
 export interface StaffDirectoryRow {
   id: string;
   displayName: string;
+  avatarUrl: string | null;
   role: StaffRole;
   departmentIds: string[];
   threadId: string | null;
@@ -28,6 +30,7 @@ export interface StaffDirectoryRow {
 interface RosterEntry {
   id: string;
   displayName: string;
+  avatarUrl: string | null;
   lastMessagePreview: string | null;
   unread: boolean;
   isSelf: boolean;
@@ -104,10 +107,10 @@ export default function StaffChat({
   const entries: RosterEntry[] =
     currentRole === "dept_manager"
       ? [
-          { id: currentUserId, displayName: "本部", lastMessagePreview: selfEntry?.lastMessagePreview ?? null, unread: selfEntry?.unread ?? false, isSelf: true },
-          ...visibleOtherStaff.map((s) => ({ id: s.id, displayName: s.displayName, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false })),
+          { id: currentUserId, displayName: "本部", avatarUrl: null, lastMessagePreview: selfEntry?.lastMessagePreview ?? null, unread: selfEntry?.unread ?? false, isSelf: true },
+          ...visibleOtherStaff.map((s) => ({ id: s.id, displayName: s.displayName, avatarUrl: s.avatarUrl, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false })),
         ]
-      : visibleOtherStaff.map((s) => ({ id: s.id, displayName: s.displayName, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false }));
+      : visibleOtherStaff.map((s) => ({ id: s.id, displayName: s.displayName, avatarUrl: s.avatarUrl, lastMessagePreview: s.lastMessagePreview, unread: s.unread, isSelf: false }));
 
   const selectedEntry = selectedId ? entries.find((e) => e.id === selectedId) : null;
   const selectedStaff = selectedEntry && !selectedEntry.isSelf ? otherStaff.find((s) => s.id === selectedEntry.id) : null;
@@ -225,6 +228,7 @@ export default function StaffChat({
                     opacity: staffRow?.archived ? 0.55 : 1,
                   }}
                 >
+                  <Avatar url={e.avatarUrl} initial={avatarInitial(e.displayName)} size={40} />
                   <button
                     onClick={() => setSelectedId(e.id)}
                     style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2, textAlign: "left", cursor: "pointer", color: "var(--color-text)", background: "transparent", border: "none", padding: 0 }}

@@ -182,6 +182,7 @@ export interface Database {
         Relationships: [
           { foreignKeyName: "customers_creator_fk"; columns: ["creator_id"]; isOneToOne: false; referencedRelation: "creators"; referencedColumns: ["id"] },
           { foreignKeyName: "customers_converted_org_id_fkey"; columns: ["converted_org_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
+          { foreignKeyName: "customers_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
         ];
       };
       creators: {

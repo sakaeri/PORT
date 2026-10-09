@@ -11,6 +11,7 @@ import OrgSwitcher from "@/components/OrgSwitcher";
 import BillingModal from "@/components/BillingModal";
 import Modal from "@/components/Modal";
 import AccountSettingsPanel from "@/components/AccountSettingsPanel";
+import Avatar, { avatarInitial } from "@/components/Avatar";
 import { signOutStaff } from "@/lib/signOutStaff";
 import type { StaffContext } from "@/lib/data";
 
@@ -246,6 +247,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
             border: "none",
           }}
         >
+          <Avatar url={myAvatarUrl} initial={avatarInitial(myName)} size={24} />
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myName}</span>
           <PencilSimple size={11} style={{ flex: "none" }} />
         </button>
