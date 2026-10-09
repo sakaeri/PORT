@@ -113,6 +113,7 @@ export default async function CustomersPage() {
         rows={rows}
         isHq={ctx.isHq}
         orgId={ctx.orgId}
+        orgDisplayName={ctx.orgDisplayName}
         departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
       />
     </div>

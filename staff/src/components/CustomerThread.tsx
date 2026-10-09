@@ -491,6 +491,7 @@ export default function CustomerThread({
   canSeeHqFeedback,
   hqFeedbackThreadId,
   hqFeedbackUnread,
+  orgDisplayName,
 }: {
   customer: { id: string; name: string; staffLabel: string | null; memberNo: string | null; balance: number };
   thread: { id: string; archived: boolean; departmentId: string | null } | null;
@@ -509,6 +510,7 @@ export default function CustomerThread({
   canSeeHqFeedback: boolean;
   hqFeedbackThreadId: string | null;
   hqFeedbackUnread: boolean;
+  orgDisplayName: string;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -737,7 +739,7 @@ export default function CustomerThread({
         {thread && departments.length > 0 && (
           <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 11, color: "var(--color-neutral-400)" }}>担当秘書</span>
-            <ThreadDepartmentControl threadId={thread.id} departments={departments} initialDepartmentId={thread.departmentId} />
+            <ThreadDepartmentControl threadId={thread.id} departments={departments} initialDepartmentId={thread.departmentId} orgDisplayName={orgDisplayName} />
           </div>
         )}
         {isMobile && (
@@ -1068,10 +1070,13 @@ function ThreadDepartmentControl({
   threadId,
   departments,
   initialDepartmentId,
+  orgDisplayName,
 }: {
   threadId: string;
   departments: { id: string; name: string }[];
   initialDepartmentId: string | null;
+  // 窓口（秘書）未設定＝事業所全体の担当。
+  orgDisplayName: string;
 }) {
   const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? "");
   const [saving, setSaving] = useState(false);
@@ -1109,7 +1114,7 @@ function ThreadDepartmentControl({
         outline: "none",
       }}
     >
-      <option value="">担当秘書未設定</option>
+      <option value="">{orgDisplayName}</option>
       {departments.map((d) => (
         <option key={d.id} value={d.id}>
           {d.name}
