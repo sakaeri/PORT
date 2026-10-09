@@ -91,7 +91,8 @@ export default function DepartmentStatsList({
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer", background: "transparent", border: "none", textAlign: "left", color: "var(--color-text)" }}
             >
               {expanded ? <CaretDown size={14} color="var(--color-neutral-500)" /> : <CaretRight size={14} color="var(--color-neutral-500)" />}
-              {isRealDepartment && <Avatar url={d.avatarUrl} initial={avatarInitial(d.name)} size={28} />}
+              {/* 窓口未設定分は事業所全体のくくりなので、サイドバーと同じ事業所のロゴを出す */}
+              <Avatar url={isRealDepartment ? d.avatarUrl : "/logo.png"} initial={avatarInitial(d.name)} size={28} />
               <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
               {d.monthRatingCount > 0 && (
                 <span style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>★{d.monthRatingAvg?.toFixed(1)}</span>
