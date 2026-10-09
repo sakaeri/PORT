@@ -93,6 +93,7 @@ export default async function CasesPage() {
           departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
           canDelete={ctx.role === "owner" || ctx.role === "dept_manager"}
           canSeeAmount={canSeeAmount}
+          orgDisplayName={ctx.orgDisplayName}
         />
       )}
     </div>

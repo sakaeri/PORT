@@ -34,11 +34,14 @@ export default function CustomersList({
   isHq,
   orgId,
   departments: initialDepartments,
+  orgDisplayName,
 }: {
   rows: CustomerRow[];
   isHq: boolean;
   orgId: string;
   departments: Department[];
+  // 窓口（秘書）未設定の分は、事業所全体の担当としてこの名前でくくる。
+  orgDisplayName: string;
 }) {
   const router = useRouter();
   const [departments, setDepartments] = useState(initialDepartments);
@@ -51,7 +54,7 @@ export default function CustomersList({
     .filter((c) => c.active || showArchived)
     .filter((c) => departmentFilter === "all" || (departmentFilter === "none" ? c.departmentId === null : c.departmentId === departmentFilter));
   const archivedCount = rows.filter((c) => !c.active).length;
-  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "担当秘書未設定" }];
+  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: orgDisplayName }];
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a server-refetched prop (router.refresh()), not state derived from other client state

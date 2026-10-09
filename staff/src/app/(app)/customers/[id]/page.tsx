@@ -133,6 +133,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       initialHasMoreOlder={hasMoreOlder}
       currentUserId={ctx.userId}
       orgId={ctx.orgId}
+      orgDisplayName={ctx.orgDisplayName}
       isHq={ctx.isHq}
       convertedOrg={convertedOrg}
       templates={templates}

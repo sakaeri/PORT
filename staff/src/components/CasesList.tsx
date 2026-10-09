@@ -36,11 +36,14 @@ export default function CasesList({
   departments,
   canDelete,
   canSeeAmount,
+  orgDisplayName,
 }: {
   rows: CaseRow[];
   departments: { id: string; name: string }[];
   canDelete: boolean;
   canSeeAmount: boolean;
+  // 窓口（秘書）未設定の分は、事業所全体の担当としてこの名前でくくる。
+  orgDisplayName: string;
 }) {
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
@@ -48,7 +51,7 @@ export default function CasesList({
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const departmentById = new Map(departments.map((d) => [d.id, d.name]));
-  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "担当秘書未設定" }];
+  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: orgDisplayName }];
   const byDepartment = rows.filter((r) => departmentFilter === "all" || (departmentFilter === "none" ? r.departmentId === null : r.departmentId === departmentFilter));
   const active = byDepartment.filter((r) => !r.archived);
   const archivedCount = byDepartment.filter((r) => r.archived).length;

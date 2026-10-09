@@ -46,6 +46,7 @@ export default function StaffChat({
   selfEntry,
   departments,
   myDepartmentIds,
+  orgDisplayName,
 }: {
   currentUserId: string;
   currentRole: StaffRole | "reception";
@@ -63,6 +64,8 @@ export default function StaffChat({
   // マネージャーが見ている場合、自分の窓口だけがスタッフ割り当て先の
   // 選択肢になる（他窓口には割り当てられないため）。オーナーは全窓口。
   myDepartmentIds: string[];
+  // 窓口（秘書）未設定の分は、事業所全体の担当としてこの名前でくくる。
+  orgDisplayName: string;
 }) {
   const router = useRouter();
   const [staff, setStaff] = useState(initialStaff);
@@ -72,7 +75,7 @@ export default function StaffChat({
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const departmentById = new Map(departments.map((d) => [d.id, d.name]));
-  const departmentFilterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "担当秘書未設定" }];
+  const departmentFilterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: orgDisplayName }];
 
   // 一覧の最終メッセージ・未読はこのコンポーネント自身では再取得せず、
   // ページ全体(staff/page.tsx)を router.refresh() で再取得させる

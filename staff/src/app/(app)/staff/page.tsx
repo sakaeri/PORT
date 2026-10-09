@@ -107,6 +107,7 @@ export default async function StaffPage() {
       currentUserId={ctx.userId}
       currentRole={ctx.role}
       orgId={ctx.orgId}
+      orgDisplayName={ctx.orgDisplayName}
       canAdmin={canAdmin}
       canBrowseStaff={canBrowseStaff}
       staff={staff}

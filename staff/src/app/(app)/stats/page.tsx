@@ -45,7 +45,7 @@ export default async function StatsPage() {
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>
         売上・実績　<span style={{ fontSize: 15, color: "var(--color-neutral-500)" }}>{`${year}年${month}月`}</span>
       </div>
-      {ctx.isHq ? <HqStats /> : <OrgStats orgId={ctx.orgId} viewerRole={ctx.role} viewerUserId={ctx.userId} />}
+      {ctx.isHq ? <HqStats /> : <OrgStats orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} viewerRole={ctx.role} viewerUserId={ctx.userId} />}
     </div>
   );
 }
@@ -93,7 +93,7 @@ async function HqStats() {
   );
 }
 
-async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; viewerRole: StaffRole | "reception"; viewerUserId: string }) {
+async function OrgStats({ orgId, orgDisplayName, viewerRole, viewerUserId }: { orgId: string; orgDisplayName: string; viewerRole: StaffRole | "reception"; viewerUserId: string }) {
   const supabase = await createClient();
   const [{ data: requests, error }, { data: departmentRows }, { data: customerThreads }, { data: myDepartmentRows }, { data: ratingRows }, { data: managerProfiles }, { data: staffDepartmentRows }] = await Promise.all([
     supabase.from("requests").select("id, title, phase, amount, pay_status, paid_at, completed_at, customer_id, customers(name, staff_label)").eq("org_id", orgId),
@@ -188,7 +188,7 @@ async function OrgStats({ orgId, viewerRole, viewerUserId }: { orgId: string; vi
   const stats: DepartmentStat[] = visibleDepartments.map((d) => buildStat(d.id, d.id, d.name, d.royalty_pct));
 
   if (viewerRole !== "dept_manager") {
-    const unassigned = buildStat(null, "unassigned", "担当秘書未設定", null);
+    const unassigned = buildStat(null, "unassigned", orgDisplayName, null);
     if (unassigned.monthRevenue > 0 || unassigned.monthRatingCount > 0 || unassigned.monthCompleted > 0 || unassigned.months.some((m) => m.rows.length > 0)) {
       stats.push(unassigned);
     }
