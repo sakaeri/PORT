@@ -66,6 +66,16 @@ async function touchThread(threadId: string): Promise<boolean> {
   return !alreadyUnread;
 }
 
+// 依頼主がトーク画面を見ている間に呼ぶ。本部側の notifyCustomerNewMessage が
+// 「依頼主が読んだ後に初めて届いた1通」だけメールするための既読時刻。
+// threads の update は受付にしか RLS で許可していないため service role で書く
+// （自分のスレッドの既読時刻を進めるだけの安全な操作）。
+export async function markChatRead() {
+  const ctx = await requireContext();
+  const admin = createServiceRoleClient();
+  await admin.from("threads").update({ customer_last_read_at: new Date().toISOString() }).eq("id", ctx.threadId);
+}
+
 // 既存アカウントへのログイン（マジックリンク）。今の匿名セッションのトーク内容は
 // 引き継がれない — 呼び出し側（UI）で事前に確認を取ってから呼ぶこと。
 export async function requestMagicLink(email: string) {

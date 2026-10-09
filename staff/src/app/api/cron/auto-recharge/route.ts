@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
+import { notifyCustomerAutoRechargeFailed } from "@/lib/notify";
 
 // 残高の自動チャージの日次バッチ。有効化している依頼主のうち、残高が
 // しきい値を下回っている人だけ、保存済みのカードへ off_session で課金する。
@@ -73,9 +74,11 @@ export async function GET(request: Request) {
       if (failCount >= MAX_FAILURES) {
         await admin.from("customers").update({ auto_recharge_enabled: false, auto_recharge_fail_count: failCount }).eq("id", c.id);
         await notifyCustomer(admin, c.id, "カードへの請求に続けて失敗したため、自動チャージを停止しました。マイページから設定し直してください。");
+        await notifyCustomerAutoRechargeFailed(admin, c.org_id, c.id, true);
       } else {
         await admin.from("customers").update({ auto_recharge_fail_count: failCount }).eq("id", c.id);
         await notifyCustomer(admin, c.id, "自動チャージに失敗しました。カード情報をご確認のうえ、必要であればマイページから設定し直してください。");
+        await notifyCustomerAutoRechargeFailed(admin, c.org_id, c.id, false);
       }
     }
   }

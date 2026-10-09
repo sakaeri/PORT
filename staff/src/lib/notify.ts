@@ -73,3 +73,65 @@ export async function notifyCustomerCompletionReport(admin: Admin, orgId: string
   }
 }
 
+
+// 本部が依頼主トークに書き込む「直前」に呼ぶ。依頼主が最後にトーク画面で読んだ後、
+// まだ本部からのメッセージが1通も届いていなければ true（＝これから送る1通が
+// 未読の先頭なのでメールする）。未読のまま本部が続けて送った2通目以降は false に
+// なり、依頼主が読むまでメールは1通だけにする（本部側の notifyNewInquiry と同じ考え方）。
+export async function isCustomerCaughtUp(admin: Admin, threadId: string): Promise<boolean> {
+  try {
+    const { data: thread } = await admin.from("threads").select("kind, customer_last_read_at").eq("id", threadId).maybeSingle();
+    if (thread?.kind !== "customer") return false;
+    let q = admin
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("thread_id", threadId)
+      .is("deleted_at", null)
+      .not("sender_role", "is", null)
+      .neq("sender_role", "client");
+    if (thread.customer_last_read_at) q = q.gt("sent_at", thread.customer_last_read_at);
+    const { count } = await q;
+    return (count ?? 0) === 0;
+  } catch (e) {
+    console.error("isCustomerCaughtUp failed", e);
+    return false;
+  }
+}
+
+export async function notifyCustomerNewMessage(admin: Admin, threadId: string) {
+  try {
+    const { data: thread } = await admin.from("threads").select("org_id, customer_id").eq("id", threadId).maybeSingle();
+    if (!thread?.customer_id) return;
+    const email = await getCustomerEmail(admin, thread.customer_id);
+    if (!email) return;
+    const { displayName, slug } = await getOrgSlug(admin, thread.org_id);
+    await sendEmail(
+      email,
+      `【${displayName}】新着メッセージがあります`,
+      `<p>${displayName}から新しいメッセージが届いています。</p><p><a href="${customerChatUrl(slug)}">トーク画面を開いて確認する</a></p>`,
+    );
+  } catch (e) {
+    console.error("notifyCustomerNewMessage failed", e);
+  }
+}
+
+// 自動チャージの失敗・停止は、トーク内のお知らせだけだと依頼主が開くまで
+// 気づけず、定期対応の引き落としに間に合わないためメールでも知らせる。
+export async function notifyCustomerAutoRechargeFailed(admin: Admin, orgId: string, customerId: string, stopped: boolean) {
+  try {
+    const email = await getCustomerEmail(admin, customerId);
+    if (!email) return;
+    const { displayName, slug } = await getOrgSlug(admin, orgId);
+    await sendEmail(
+      email,
+      stopped ? `【${displayName}】自動チャージを停止しました` : `【${displayName}】自動チャージに失敗しました`,
+      `<p>${
+        stopped
+          ? "カードへの請求に続けて失敗したため、自動チャージを停止しました。マイページから設定し直してください。"
+          : "自動チャージに失敗しました。カード情報をご確認のうえ、必要であればマイページから設定し直してください。"
+      }</p><p><a href="${customerChatUrl(slug)}">トーク画面を開く</a></p>`,
+    );
+  } catch (e) {
+    console.error("notifyCustomerAutoRechargeFailed failed", e);
+  }
+}
