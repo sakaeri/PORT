@@ -92,7 +92,7 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
         justifyItems: "center",
         // 真ん中に置くと下の3ボタンの分だけ全体が下寄りに見えるので、少し上から始める
         alignContent: "start",
-        paddingTop: "clamp(32px, 9vh, 96px)",
+        paddingTop: "clamp(76px, calc(9vh + 44px), 140px)",
         background: "radial-gradient(circle at 50% 0%, var(--color-section-glow) 0%, var(--color-bg) 62%)",
         color: "var(--color-text)",
         fontFamily: "var(--font-body)",
