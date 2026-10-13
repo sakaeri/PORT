@@ -4,6 +4,7 @@ import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 import { setInitialProfile, requestMagicLink } from "@/app/actions";
+import GateInfo from "@/components/chat/GateInfo";
 
 const input: React.CSSProperties = {
   width: "100%",
@@ -112,7 +113,7 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
         <div style={{ fontSize: 13, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-400)", marginBottom: 10 }}>
           ちょっとした頼みごとも、まずはこちらから。
           <br />
-          あなたの人間秘書です。
+          単発から定期まで柔軟に対応いたします。
         </div>
 
         <div
@@ -181,6 +182,8 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
               </>
             )}
         </div>
+
+        <GateInfo />
       </div>
     </main>
   );
