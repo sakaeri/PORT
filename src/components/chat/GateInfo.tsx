@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "@phosphor-icons/react";
+import { X, ListNumbers, Coins, Question } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 
 // ログイン前の入口画面（AccountGate）の下に並べる、サービス紹介の3つのボタン。
@@ -9,10 +9,10 @@ import { headingWeight } from "@/lib/style";
 // 文面は利用規約（/terms の DEFAULT_TERMS_CONTENT）と食い違わない範囲に留める。
 type Topic = "howto" | "pricing" | "faq";
 
-const TOPICS: { id: Topic; label: string }[] = [
-  { id: "howto", label: "利用方法" },
-  { id: "pricing", label: "料金形態" },
-  { id: "faq", label: "よくあるご質問" },
+const TOPICS: { id: Topic; label: string; Icon: typeof Question }[] = [
+  { id: "howto", label: "利用方法", Icon: ListNumbers },
+  { id: "pricing", label: "料金形態", Icon: Coins },
+  { id: "faq", label: "よくあるご質問", Icon: Question },
 ];
 
 const STEPS = [
@@ -20,6 +20,12 @@ const STEPS = [
   { title: "お見積り", body: "内容を確認し、金額と目安をトーク上でお送りします。" },
   { title: "ご依頼の確定", body: "内容にご納得いただけたら、チャージ残高からお支払いいただき、作業に着手します。" },
   { title: "完了のご報告", body: "作業が終わると、トーク上に完了報告が届きます。" },
+];
+
+const PRICING = [
+  { title: "ご依頼ごとのお見積り", body: "料金はご依頼の内容に応じて、その都度お見積りします。ご登録は無料です。" },
+  { title: "チャージ残高からお支払い", body: "あらかじめクレジットカードで残高をチャージし、ご依頼の確定時にその残高からお支払いいただきます。自動チャージも設定できます。" },
+  { title: "ご依頼の確定前なら費用はかかりません", body: "見積もりを見てから見送ることもできます。ご依頼の確定後のキャンセル・返金については利用規約をご確認ください。" },
 ];
 
 const FAQ = [
@@ -38,73 +44,56 @@ const dialogBox: React.CSSProperties = {
   position: "relative",
   display: "flex",
   flexDirection: "column",
-  gap: 14,
+  gap: 16,
   padding: 22,
   borderRadius: "var(--radius-lg)",
   background: "var(--color-surface)",
   color: "var(--color-text)",
   boxShadow: "var(--shadow-lg)",
 };
-const bodyText: React.CSSProperties = { fontSize: 13, lineHeight: 1.75, color: "var(--color-neutral-400)" };
 
-function Content({ topic }: { topic: Topic }) {
-  if (topic === "howto") {
-    return (
-      <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
-        {STEPS.map((s, i) => (
-          <li key={s.title} style={{ display: "flex", gap: 10 }}>
-            <span
-              style={{
-                flex: "none",
-                width: 22,
-                height: 22,
-                display: "grid",
-                placeItems: "center",
-                borderRadius: "50%",
-                fontSize: 11.5,
-                color: "var(--color-accent)",
-                border: "1px solid var(--color-accent)",
-              }}
-            >
-              {i + 1}
-            </span>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <span style={{ fontSize: 13.5 }}>{s.title}</span>
-              <span style={bodyText}>{s.body}</span>
-            </div>
-          </li>
-        ))}
-      </ol>
-    );
-  }
-  if (topic === "pricing") {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: 13.5 }}>ご依頼ごとのお見積り</span>
-          <span style={bodyText}>料金はご依頼の内容に応じて、その都度お見積りします。ご登録は無料です。</span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: 13.5 }}>チャージ残高からお支払い</span>
-          <span style={bodyText}>あらかじめクレジットカードで残高をチャージし、ご依頼の確定時にその残高からお支払いいただきます。自動チャージも設定できます。</span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: 13.5 }}>ご依頼の確定前なら費用はかかりません</span>
-          <span style={bodyText}>見積もりを見てから見送ることもできます。ご依頼の確定後のキャンセル・返金については利用規約をご確認ください。</span>
-        </div>
-      </div>
-    );
-  }
+// 各項目の見出しを帯にして、どこからどこまでが1つの話かを一目で分かるようにする。
+const band: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "7px 12px",
+  borderRadius: "var(--radius-md)",
+  fontSize: 13.5,
+  color: "var(--color-accent-100)",
+  background: "var(--color-accent-900)",
+  borderLeft: "3px solid var(--color-accent)",
+};
+const badge: React.CSSProperties = {
+  flex: "none",
+  minWidth: 20,
+  height: 20,
+  padding: "0 5px",
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 10,
+  fontSize: 11,
+  color: "var(--color-bg)",
+  background: "var(--color-accent)",
+};
+const bodyText: React.CSSProperties = { padding: "0 4px 0 12px", fontSize: 13, lineHeight: 1.75, color: "var(--color-neutral-400)" };
+
+function Section({ mark, title, body }: { mark?: string; title: string; body: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {FAQ.map((f) => (
-        <div key={f.q} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: 13.5 }}>{f.q}</span>
-          <span style={bodyText}>{f.a}</span>
-        </div>
-      ))}
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={band}>
+        {mark && <span style={badge}>{mark}</span>}
+        <span>{title}</span>
+      </div>
+      <div style={bodyText}>{body}</div>
     </div>
   );
+}
+
+function Content({ topic }: { topic: Topic }) {
+  if (topic === "howto") return <>{STEPS.map((s, i) => <Section key={s.title} mark={String(i + 1)} title={s.title} body={s.body} />)}</>;
+  if (topic === "pricing") return <>{PRICING.map((p) => <Section key={p.title} title={p.title} body={p.body} />)}</>;
+  return <>{FAQ.map((f) => <Section key={f.q} mark="Q" title={f.q} body={f.a} />)}</>;
 }
 
 export default function GateInfo() {
@@ -113,24 +102,31 @@ export default function GateInfo() {
 
   return (
     <>
-      <div style={{ width: "100%", display: "flex", gap: 6 }}>
-        {TOPICS.map((t) => (
+      <div style={{ width: "100%", display: "flex", gap: 8, marginTop: 4 }}>
+        {TOPICS.map(({ id, label, Icon }) => (
           <button
-            key={t.id}
-            onClick={() => setOpen(t.id)}
+            key={id}
+            onClick={() => setOpen(id)}
             style={{
               flex: 1,
-              height: 34,
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 6,
+              padding: "12px 4px 10px",
               cursor: "pointer",
               fontSize: 12,
               whiteSpace: "nowrap",
-              color: "var(--color-neutral-400)",
-              background: "transparent",
+              color: "var(--color-text)",
+              background: "var(--color-surface)",
               border: "1px solid var(--color-divider)",
               borderRadius: "var(--radius-md)",
+              boxShadow: "var(--shadow-sm)",
             }}
           >
-            {t.label}
+            <Icon size={22} color="var(--color-accent)" />
+            {label}
           </button>
         ))}
       </div>
@@ -145,7 +141,10 @@ export default function GateInfo() {
             >
               <X size={16} />
             </button>
-            <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 19 }}>{current.label}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <current.Icon size={22} color="var(--color-accent)" />
+              <span style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 19 }}>{current.label}</span>
+            </div>
             <Content topic={current.id} />
           </div>
         </div>
