@@ -87,13 +87,18 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
   return (
     <main
       style={{
-        height: "100vh",
+        minHeight: "100vh",
         display: "grid",
-        placeItems: "center",
+        justifyItems: "center",
+        // 真ん中に置くと下の3ボタンの分だけ全体が下寄りに見えるので、少し上から始める
+        alignContent: "start",
+        paddingTop: "clamp(32px, 9vh, 96px)",
         background: "radial-gradient(circle at 50% 0%, var(--color-section-glow) 0%, var(--color-bg) 62%)",
         color: "var(--color-text)",
         fontFamily: "var(--font-body)",
-        padding: 24,
+        paddingLeft: 24,
+        paddingRight: 24,
+        paddingBottom: 24,
       }}
     >
       <div style={{ width: "min(380px, 100%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
