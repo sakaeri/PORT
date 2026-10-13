@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X, CaretDown, CaretRight, Plus } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, CircleNotch, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X, CaretDown, CaretRight, Plus } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { createClient } from "@/lib/supabase/client";
 import {
   sendStaffMessage,
+  sendStaffFiles,
   deleteMessage,
   markThreadRead,
   convertCustomerToOrg,
@@ -29,12 +30,16 @@ import HqFeedbackChat from "@/components/HqFeedbackChat";
 import Avatar, { avatarInitial } from "@/components/Avatar";
 import QuoteDialog, { type MenuOption } from "@/components/QuoteDialog";
 import TextComposer from "@/components/TextComposer";
+import AttachmentList from "@/components/AttachmentList";
 import Modal from "@/components/Modal";
 import { PHASE_LABEL } from "@/lib/stage";
 import type { AppRole, RequestPhase } from "@/lib/supabase/types";
 
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 依頼主側の送信上限（Composer）と揃える
+
 export interface ThreadAttachment {
   id: string;
+  file_path: string;
   file_name: string;
   mime: string | null;
   bytes: number | null;
@@ -517,6 +522,7 @@ export default function CustomerThread({
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [threadError, setThreadError] = useState("");
+  const [uploadingFiles, setUploadingFiles] = useState(false);
   const [templates, setTemplates] = useState(initialTemplates);
   const [showTemplates, setShowTemplates] = useState(false);
   const isMobile = useIsMobile();
@@ -687,6 +693,41 @@ export default function CustomerThread({
     }
   }
 
+  // 選んだ画像・PDFはその場でアップロードして送る（LINEの写真送信と同じ感覚で、
+  // 下書きに溜めずに1回で送信まで終える）。
+  async function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (!thread || files.length === 0) return;
+    const ok = files.filter((f) => f.type.startsWith("image/") || f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+    if (ok.length < files.length) setThreadError("画像またはPDFファイルのみ送信できます");
+    else setThreadError("");
+    const tooBig = ok.find((f) => f.size > MAX_ATTACHMENT_BYTES);
+    if (tooBig) {
+      setThreadError(`${tooBig.name} は20MBを超えているため送信できません`);
+      return;
+    }
+    if (ok.length === 0) return;
+    setUploadingFiles(true);
+    try {
+      const supabase = createClient(orgId);
+      const uploaded: { path: string; name: string; mime: string; bytes: number }[] = [];
+      for (const file of ok) {
+        const ext = /\.[a-zA-Z0-9]{1,8}$/.exec(file.name)?.[0].toLowerCase() ?? "";
+        const path = `${thread.id}/${crypto.randomUUID()}${ext}`;
+        const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
+        if (error) throw error;
+        uploaded.push({ path, name: file.name, mime: file.type, bytes: file.size });
+      }
+      await sendStaffFiles(thread.id, uploaded);
+      await refresh();
+    } catch (err) {
+      setThreadError(errorMessage(err, "送信できませんでした"));
+    } finally {
+      setUploadingFiles(false);
+    }
+  }
+
   async function handleDeleteMessage(m: Message) {
     if (busy) return;
     if (!confirm("このメッセージを削除します。よろしいですか？")) return;
@@ -831,6 +872,8 @@ export default function CustomerThread({
                 <MenuPickBubble msg={m} />
               ) : m.kind === "intake_answer" ? (
                 <IntakeAnswerBubble msg={m} />
+              ) : m.kind === "files" && m.attachments.length > 0 ? (
+                <AttachmentList attachments={m.attachments} orgId={orgId} />
               ) : (
                 <div
                   style={{
@@ -891,13 +934,22 @@ export default function CustomerThread({
           sending={sending}
           placeholder="返信を入力…"
           leftButton={
-            <button
-              onClick={() => setShowTemplates((v) => !v)}
-              aria-label="テンプレを選ぶ"
-              style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
-            >
-              <ChatCircleText size={16} />
-            </button>
+            <>
+              <button
+                onClick={() => setShowTemplates((v) => !v)}
+                aria-label="テンプレを選ぶ"
+                style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+              >
+                <ChatCircleText size={16} />
+              </button>
+              <label
+                aria-label="画像・PDFを送る"
+                style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: uploadingFiles ? "wait" : "pointer", color: "var(--color-neutral-400)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+              >
+                {uploadingFiles ? <CircleNotch size={16} style={{ animation: "vid-spin 0.7s linear infinite" }} /> : <Paperclip size={16} />}
+                <input type="file" multiple accept="image/*,application/pdf" onChange={handlePickFiles} disabled={uploadingFiles} style={{ display: "none" }} />
+              </label>
+            </>
           }
         />
       )}

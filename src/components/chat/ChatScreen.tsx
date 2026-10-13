@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/chat/Header";
-import Composer from "@/components/chat/Composer";
+import Composer, { type PendingAttachment } from "@/components/chat/Composer";
 import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, IntakeCard, IntakeAnswerBubble } from "@/components/chat/Bubbles";
 import { ProgressPanel, CancelDialog, ReportsDialog } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
@@ -212,8 +212,8 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
     return isMatch;
   });
 
-  async function handleSend(text: string) {
-    await sendMessageAction(text);
+  async function handleSend(text: string, attachments: PendingAttachment[]) {
+    await sendMessageAction(text, attachments);
     await refresh();
   }
 
@@ -318,7 +318,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
         })}
       </div>
 
-      <Composer onSend={handleSend} />
+      <Composer threadId={ctx.threadId} orgId={ctx.orgId} onSend={handleSend} />
 
       {showProgress && (
         <ProgressPanel

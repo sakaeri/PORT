@@ -95,16 +95,29 @@ export async function requestMagicLink(email: string) {
   if (error) throw new Error("このメールアドレスのご登録が見つかりませんでした。初めてのご利用の場合は、決済の画面から新規登録してください。");
 }
 
-export async function sendMessage(text: string) {
+export async function sendMessage(text: string, attachments: { path: string; name: string; mime: string; bytes: number }[]) {
   const ctx = await requireActiveContext();
   const supabase = await createClient();
   const trimmed = text.trim();
-  if (!trimmed) return;
+  if (!trimmed && attachments.length === 0) return;
 
-  const { error } = await supabase
-    .from("messages")
-    .insert({ thread_id: ctx.threadId, sender_id: ctx.userId, sender_role: "client", kind: "text", body: trimmed });
-  if (error) throw error;
+  if (attachments.length > 0) {
+    const { data: filesMsg, error } = await supabase
+      .from("messages")
+      .insert({ thread_id: ctx.threadId, sender_id: ctx.userId, sender_role: "client", kind: "files" })
+      .select("id")
+      .single();
+    if (error) throw error;
+    await supabase.from("message_attachments").insert(
+      attachments.map((a) => ({ message_id: filesMsg.id, file_path: a.path, file_name: a.name, mime: a.mime, bytes: a.bytes })),
+    );
+  }
+  if (trimmed) {
+    const { error } = await supabase
+      .from("messages")
+      .insert({ thread_id: ctx.threadId, sender_id: ctx.userId, sender_role: "client", kind: "text", body: trimmed });
+    if (error) throw error;
+  }
   const shouldNotify = await touchThread(ctx.threadId);
   if (shouldNotify) await notifyNewInquiry(ctx.orgId, ctx.threadId);
 }

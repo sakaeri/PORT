@@ -594,6 +594,29 @@ export async function sendStaffMessage(threadId: string, text: string) {
   if (shouldNotify) await notifyCustomerNewMessage(admin, threadId);
 }
 
+// 依頼主トークへの画像・PDFの送信。ファイル本体はクライアント側で Storage に
+// アップロード済み（パスは `<threadId>/...`）で、ここではメッセージと添付レコードを作るだけ。
+export async function sendStaffFiles(threadId: string, attachments: { path: string; name: string; mime: string; bytes: number }[]) {
+  const ctx = await requireContext();
+  if (attachments.length === 0) return;
+  if (attachments.some((a) => !a.path.startsWith(`${threadId}/`))) throw new Error("添付ファイルの保存先が正しくありません");
+  const supabase = await createClient();
+  const admin = createServiceRoleClient();
+  const shouldNotify = await isCustomerCaughtUp(admin, threadId);
+  const { data: filesMsg, error } = await supabase
+    .from("messages")
+    .insert({ thread_id: threadId, sender_id: ctx.userId, sender_role: ctx.role, kind: "files" })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const { error: attError } = await supabase.from("message_attachments").insert(
+    attachments.map((a) => ({ message_id: filesMsg.id, file_path: a.path, file_name: a.name, mime: a.mime, bytes: a.bytes })),
+  );
+  if (attError) throw attError;
+  await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+  if (shouldNotify) await notifyCustomerNewMessage(admin, threadId);
+}
+
 // 依頼主一覧の未読マーク用。スタッフ共有ログインなので個人別ではなく
 // スレッド単位で「最後に誰か見た時刻」を記録するだけでよい。
 export async function markThreadRead(threadId: string) {
@@ -908,7 +931,12 @@ export async function startCaseRequest(requestId: string) {
 // スタッフ（dept_leader）が提出した完了報告は、そのまま依頼主に送らず
 // マネージャー・オーナーの確認待ち（下書き）にする。オーナー・マネージャー
 // 自身が提出した場合は、自分の確認が要らないのでそのまま依頼主に送る。
-export async function submitCaseReport(requestId: string, summary: string, details: { label: string; value: string }[]) {
+export async function submitCaseReport(
+  requestId: string,
+  summary: string,
+  details: { label: string; value: string }[],
+  attachments: { path: string; name: string; mime: string | null; bytes: number | null; label?: string }[],
+) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const trimmed = summary.trim();
@@ -919,6 +947,13 @@ export async function submitCaseReport(requestId: string, summary: string, detai
   if (request.phase !== "started") throw new Error("着手中の案件のみ完了報告できます");
 
   const cleanDetails = details.filter((d) => d.label.trim() && d.value.trim()).map((d) => ({ label: d.label.trim(), value: d.value.trim() }));
+
+  if (attachments.length > 0) {
+    const { error: attError } = await supabase.from("completion_report_attachments").insert(
+      attachments.map((a) => ({ request_id: requestId, file_path: a.path, file_name: a.name, mime: a.mime, bytes: a.bytes, label: a.label ?? null })),
+    );
+    if (attError) throw attError;
+  }
 
   const canSendDirectly = ctx.role === "owner" || ctx.role === "dept_manager";
   const now = new Date().toISOString();
