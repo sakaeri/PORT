@@ -7,7 +7,7 @@ import { ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/re
 // ための共通入力欄。自動で高さが伸びる（自動改行）、元に戻す（↩）・
 // 消す（✕）が入力中に出る、Enterで送信・Shift+Enterで改行——という
 // クライアント側チャット(src/components/chat/Composer.tsx)と同じ振る舞い。
-// 添付ファイルは受付側チャットではまだ対応していないため含めない。
+// 添付ボタンなど入力欄の左に置くものは leftButton で呼び出し側から渡す。
 export default function TextComposer({
   value,
   onChange,
