@@ -267,8 +267,11 @@ export async function updateIntakeForm(id: string, fields: { label: string; note
   if (error) throw error;
 }
 
+// 返信テンプレは事業所全体で共有するものなので、削除できるのは本部（オーナー）だけ。
+// 秘書（マネージャー・受付）が誤って消して他の人が困らないようにする。
 export async function deleteIntakeForm(id: string) {
-  await requireContextWithDelete();
+  const ctx = await requireContextWithDelete();
+  if (ctx.role !== "owner") throw new Error("返信テンプレの削除は本部のみ行えます");
   const supabase = await createClient();
   const { error } = await supabase.from("intake_forms").delete().eq("id", id);
   if (error) throw error;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, CircleNotch, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X, CaretDown, CaretRight, Plus } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, CircleNotch, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X, CaretRight, ChatText, ListChecks } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -16,12 +16,6 @@ import {
   convertCustomerToOrg,
   sendTemplateMessage,
   reassignThreadDepartment,
-  createIntakeForm,
-  updateIntakeForm,
-  deleteIntakeForm,
-  addIntakeField,
-  updateIntakeField,
-  deleteIntakeField,
   updateCustomerStaffLabel,
 } from "@/app/actions";
 import { EMPTY_ORG_FORM, OrgAccountFields, slugify, type OrgAccountFormState } from "@/components/OrgAccountFields";
@@ -107,26 +101,17 @@ interface TemplateInfo {
   fields: TemplateField[];
 }
 
-const FIELD_KINDS = [
-  { value: "text", label: "テキスト" },
-  { value: "tel", label: "電話番号" },
-  { value: "email", label: "メールアドレス" },
-  { value: "date", label: "日付" },
-  { value: "textarea", label: "長文" },
-];
-
+// トークから定型文・入力フォームを選んで使うだけのピッカー。テンプレの追加・
+// 編集・削除はメニュー管理（返信テンプレ）に集約し、ここでは触れないようにする
+// （秘書が操作中に誤って消したり書き換えたりしないように）。
 function TemplatesModal({
   templates,
-  setTemplates,
-  orgId,
   busy,
   onClose,
   onSendForm,
   onUseText,
 }: {
   templates: TemplateInfo[];
-  setTemplates: React.Dispatch<React.SetStateAction<TemplateInfo[]>>;
-  orgId: string;
   busy: boolean;
   onClose: () => void;
   onSendForm: (id: string) => void;
@@ -134,234 +119,131 @@ function TemplatesModal({
 }) {
   const forms = templates.filter((t) => t.fields.length > 0);
   const plain = templates.filter((t) => t.fields.length === 0);
-  const [creating, setCreating] = useState(false);
-  const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
-
-  async function handleAdd() {
-    if (creating) return;
-    setCreating(true);
-    try {
-      const id = await createIntakeForm(orgId);
-      setTemplates((ts) => [...ts, { id, label: "新しいテンプレ", note: null, fields: [] }]);
-      setJustCreatedId(id);
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  function patchLocal(id: string, patch: Partial<TemplateInfo>) {
-    setTemplates((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
-  }
-
-  async function commit(t: TemplateInfo) {
-    await updateIntakeForm(t.id, { label: t.label, note: t.note ?? "" });
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm("このテンプレを削除しますか？")) return;
-    await deleteIntakeForm(id);
-    setTemplates((ts) => ts.filter((t) => t.id !== id));
-  }
-
-  async function handleAddField(templateId: string) {
-    const t = templates.find((x) => x.id === templateId);
-    const created = await addIntakeField(templateId, t?.fields.length ?? 0);
-    setTemplates((ts) => ts.map((x) => (x.id === templateId ? { ...x, fields: [...x.fields, { id: created.id, label: "", kind: "text", required: false }] } : x)));
-  }
-
-  function patchFieldLocal(templateId: string, fieldId: string, patch: Partial<TemplateField>) {
-    setTemplates((ts) => ts.map((t) => (t.id === templateId ? { ...t, fields: t.fields.map((f) => (f.id === fieldId ? { ...f, ...patch } : f)) } : t)));
-  }
-
-  async function commitField(f: TemplateField) {
-    await updateIntakeField(f.id, { label: f.label, kind: f.kind });
-  }
-
-  async function handleDeleteField(templateId: string, fieldId: string) {
-    await deleteIntakeField(fieldId);
-    setTemplates((ts) => ts.map((t) => (t.id === templateId ? { ...t, fields: t.fields.filter((f) => f.id !== fieldId) } : t)));
-  }
 
   return (
-    <Modal onClose={onClose} maxWidth={460}>
-      <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16 }}>
+    <Modal onClose={onClose} maxWidth={440}>
+      <div style={{ padding: "20px 20px 16px", display: "flex", flexDirection: "column", gap: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>返信テンプレから送る</div>
+          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>テンプレを使う</div>
           <div style={{ flex: 1 }} />
           <button onClick={onClose} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
             <X size={18} />
           </button>
         </div>
-        {forms.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ ...templateSectionLabel, color: "var(--color-accent-300)" }}>入力してもらう</span>
-            {forms.map((t) => (
-              <TemplateRow
+
+        {templates.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだテンプレがありません。</div>}
+
+        {plain.length > 0 && (
+          <TemplateSection title="文章を入れる">
+            {plain.map((t) => (
+              <TemplatePick
                 key={t.id}
-                template={t}
-                isForm
-                busy={busy}
-                onSend={() => onSendForm(t.id)}
-                onUse={() => onUseText(t.note ?? t.label)}
-                onPatch={(patch) => patchLocal(t.id, patch)}
-                onCommit={() => commit(t)}
-                onDelete={() => handleDelete(t.id)}
-                onAddField={() => handleAddField(t.id)}
-                onPatchField={(fieldId, patch) => patchFieldLocal(t.id, fieldId, patch)}
-                onCommitField={commitField}
-                onDeleteField={(fieldId) => handleDeleteField(t.id, fieldId)}
+                icon={<ChatText size={16} />}
+                title={t.label || "（無題）"}
+                sub={(t.note ?? "").replace(/\s+/g, " ").trim() || "（本文なし）"}
+                action="入れる"
+                onClick={() => onUseText(t.note ?? t.label)}
               />
             ))}
-          </div>
+          </TemplateSection>
         )}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={{ ...templateSectionLabel, color: "var(--stb-seal-ink)" }}>送るだけ</span>
-          {plain.length === 0 && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>まだテンプレがありません。</div>}
-          {plain.map((t) => (
-            <TemplateRow
-              key={t.id}
-              template={t}
-              isForm={false}
-              busy={busy}
-              initialOpen={t.id === justCreatedId}
-              onSend={() => onSendForm(t.id)}
-              onUse={() => onUseText(t.note ?? t.label)}
-              onPatch={(patch) => patchLocal(t.id, patch)}
-              onCommit={() => commit(t)}
-              onDelete={() => handleDelete(t.id)}
-              onAddField={() => handleAddField(t.id)}
-              onPatchField={(fieldId, patch) => patchFieldLocal(t.id, fieldId, patch)}
-              onCommitField={commitField}
-              onDeleteField={(fieldId) => handleDeleteField(t.id, fieldId)}
-            />
-          ))}
-          <button onClick={handleAdd} disabled={creating} style={templateAddBtn}>
-            <Plus size={13} /> 新しいテンプレを作る
-          </button>
-        </div>
+
+        {forms.length > 0 && (
+          <TemplateSection title="入力フォームを送る">
+            {forms.map((t) => (
+              <TemplatePick
+                key={t.id}
+                icon={<ListChecks size={16} />}
+                title={t.label || "（無題）"}
+                sub={t.fields.map((f) => f.label).filter(Boolean).join("・") || `${t.fields.length}項目`}
+                action="送信"
+                strong
+                disabled={busy}
+                onClick={() => onSendForm(t.id)}
+              />
+            ))}
+          </TemplateSection>
+        )}
+
+        <Link href="/menu" style={{ alignSelf: "center", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "var(--color-neutral-500)", textDecoration: "none" }}>
+          テンプレの追加・編集はメニュー管理から
+          <CaretRight size={11} />
+        </Link>
       </div>
     </Modal>
   );
 }
 
-const templateSectionLabel: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: "0.05em" };
-const templateRowHeader: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, padding: "10px 12px" };
-const templateCaretBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, cursor: "pointer", background: "transparent", border: "none", textAlign: "left", color: "var(--color-text)" };
-const templateCountBadge: React.CSSProperties = { flex: "none", fontSize: 10.5 };
-const templateSendBtn: React.CSSProperties = { flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
-const templateSendBtnText: React.CSSProperties = { flex: "none", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--stb-seal-ink)", background: "transparent", border: "1px solid var(--stb-seal-ink)", borderRadius: "var(--radius-md)" };
-const templateDeleteBtn: React.CSSProperties = { alignSelf: "flex-end", display: "flex", alignItems: "center", gap: 4, marginTop: 4, cursor: "pointer", fontSize: 11, color: "var(--stb-seal-ink)", background: "transparent", border: "none" };
-const templateAddBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--stb-seal-ink)", background: "transparent", border: "1px dashed var(--stb-seal-ink)", borderRadius: "var(--radius-md)" };
-const templateEditInput: React.CSSProperties = { height: 32, padding: "0 10px", fontSize: 12.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" };
-const templateAddFieldBtn: React.CSSProperties = { alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 4, height: 28, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" };
-const templateFieldDeleteBtn: React.CSSProperties = { width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" };
-
-function TemplateRow({
-  template,
-  isForm,
-  busy,
-  initialOpen,
-  onSend,
-  onUse,
-  onPatch,
-  onCommit,
-  onDelete,
-  onAddField,
-  onPatchField,
-  onCommitField,
-  onDeleteField,
-}: {
-  template: TemplateInfo;
-  isForm: boolean;
-  busy: boolean;
-  initialOpen?: boolean;
-  onSend: () => void;
-  onUse: () => void;
-  onPatch: (patch: Partial<TemplateInfo>) => void;
-  onCommit: () => void;
-  onDelete: () => void;
-  onAddField: () => void;
-  onPatchField: (fieldId: string, patch: Partial<TemplateField>) => void;
-  onCommitField: (field: TemplateField) => void;
-  onDeleteField: (fieldId: string) => void;
-}) {
-  const [open, setOpen] = useState(!!initialOpen);
-  const accentColor = isForm ? "var(--color-accent)" : "var(--stb-seal-ink)";
-  const text = template.note ?? template.label;
-  const lineCount = text.split("\n").length;
+function TemplateSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", borderLeft: `3px solid ${accentColor}`, background: "var(--color-surface)", overflow: "hidden" }}>
-      <div style={templateRowHeader}>
-        <button onClick={() => setOpen((v) => !v)} style={templateCaretBtn}>
-          {open ? <CaretDown size={13} color="var(--color-neutral-500)" /> : <CaretRight size={13} color="var(--color-neutral-500)" />}
-          <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{template.label || "（無題）"}</span>
-        </button>
-        <span style={{ ...templateCountBadge, color: accentColor }}>{isForm ? `${template.fields.length}項目` : `${lineCount}行`}</span>
-        <button
-          onClick={isForm ? onSend : onUse}
-          disabled={isForm && busy}
-          aria-label={isForm ? "この内容で送信" : "この内容を入力欄にセット"}
-          style={isForm ? templateSendBtn : templateSendBtnText}
-        >
-          <PaperPlaneTilt size={13} />
-        </button>
-      </div>
-      {open && (
-        <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-          <input value={template.label} onChange={(e) => onPatch({ label: e.target.value })} onBlur={onCommit} placeholder="テンプレ名" className="vid-input" style={templateEditInput} />
-          <textarea
-            value={template.note ?? ""}
-            onChange={(e) => onPatch({ note: e.target.value })}
-            onBlur={onCommit}
-            rows={3}
-            placeholder={isForm ? "項目の前に添える案内文（空でも可）" : "送信する文章"}
-            className="vid-input"
-            style={{ ...templateEditInput, height: "auto", padding: "8px 10px", resize: "vertical" }}
-          />
-          {template.fields.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {template.fields.map((f, i) => (
-                <div key={f.id} style={{ display: "grid", gridTemplateColumns: "16px minmax(0,1fr) 100px 28px", gap: 6, alignItems: "center" }}>
-                  <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{i + 1}</span>
-                  <input
-                    value={f.label}
-                    onChange={(e) => onPatchField(f.id, { label: e.target.value })}
-                    onBlur={() => onCommitField(f)}
-                    placeholder="項目名（例：ご希望の日時）"
-                    className="vid-input"
-                    style={{ ...templateEditInput, height: 30, fontSize: 12 }}
-                  />
-                  <select
-                    value={f.kind}
-                    onChange={(e) => {
-                      onPatchField(f.id, { kind: e.target.value });
-                      onCommitField({ ...f, kind: e.target.value });
-                    }}
-                    className="vid-input"
-                    style={{ ...templateEditInput, height: 30, fontSize: 11.5, padding: "0 6px" }}
-                  >
-                    {FIELD_KINDS.map((k) => (
-                      <option key={k.value} value={k.value}>
-                        {k.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button onClick={() => onDeleteField(f.id)} aria-label="項目を削除" style={templateFieldDeleteBtn}>
-                    <Trash size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button onClick={onAddField} style={templateAddFieldBtn}>
-            <Plus size={11} /> 項目を追加
-          </button>
-          <button onClick={onDelete} style={templateDeleteBtn}>
-            <Trash size={12} /> このテンプレを削除
-          </button>
-        </div>
-      )}
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", color: "var(--color-neutral-500)" }}>{title}</span>
+      <div style={{ display: "flex", flexDirection: "column", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>{children}</div>
     </div>
+  );
+}
+
+function TemplatePick({
+  icon,
+  title,
+  sub,
+  action,
+  strong,
+  disabled,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  sub: string;
+  action: string;
+  strong?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="vid-template-pick"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        width: "100%",
+        padding: "11px 12px",
+        cursor: disabled ? "wait" : "pointer",
+        textAlign: "left",
+        color: "var(--color-text)",
+        background: "var(--color-surface)",
+        border: "none",
+        borderTop: "1px solid var(--color-divider)",
+        marginTop: -1,
+      }}
+    >
+      <span style={{ flex: "none", width: 32, height: 32, display: "grid", placeItems: "center", borderRadius: "50%", color: "var(--color-accent)", background: "var(--color-accent-900)" }}>{icon}</span>
+      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+        <span style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+      </span>
+      <span
+        style={{
+          flex: "none",
+          height: 26,
+          padding: "0 12px",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          borderRadius: 13,
+          fontSize: 11.5,
+          color: strong ? "var(--color-accent-100)" : "var(--color-accent)",
+          background: strong ? "var(--color-accent-900)" : "transparent",
+          border: "1px solid var(--color-accent)",
+        }}
+      >
+        {strong && <PaperPlaneTilt size={11} />}
+        {action}
+      </span>
+    </button>
   );
 }
 
@@ -523,7 +405,7 @@ export default function CustomerThread({
   const [busy, setBusy] = useState(false);
   const [threadError, setThreadError] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState(false);
-  const [templates, setTemplates] = useState(initialTemplates);
+  const templates = initialTemplates;
   const [showTemplates, setShowTemplates] = useState(false);
   const isMobile = useIsMobile();
   const [showInfoPanel, setShowInfoPanel] = useState(false);
@@ -915,8 +797,6 @@ export default function CustomerThread({
       {thread && showTemplates && (
         <TemplatesModal
           templates={templates}
-          setTemplates={setTemplates}
-          orgId={orgId}
           busy={busy}
           onClose={() => setShowTemplates(false)}
           onSendForm={sendTemplateForm}
