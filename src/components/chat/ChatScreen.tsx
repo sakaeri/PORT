@@ -22,6 +22,7 @@ interface Props {
   ctx: CustomerContext;
   initialMessages: MessageWithExtras[];
   initialHasMoreOlder?: boolean;
+  openPasswordSetup?: boolean;
 }
 
 const ACKED_KEY = "VID_acked_reports";
@@ -42,7 +43,7 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }: Props) {
+export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, openPasswordSetup }: Props) {
   const [messages, setMessages] = useState(initialMessages);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
@@ -51,7 +52,11 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
   const [searchQuery, setSearchQuery] = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showReports, setShowReports] = useState(false);
-  const [showMyPage, setShowMyPage] = useState(false);
+  // 「パスワードをお忘れの方」のリンクから来たら、マイページのパスワード設定を開いて迎える。
+  const [showMyPage, setShowMyPage] = useState(!!openPasswordSetup);
+  useEffect(() => {
+    if (openPasswordSetup) window.history.replaceState(null, "", window.location.pathname);
+  }, [openPasswordSetup]);
   const [openMyPageWithCharge, setOpenMyPageWithCharge] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState("");
@@ -351,6 +356,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
           userId={ctx.userId}
           customerName={ctx.customerName}
           currentEmail={ctx.email}
+          hasPassword={ctx.hasPassword}
           avatarUrl={avatarUrl}
           onAvatarChange={setAvatarUrl}
           isDark={isDark}
@@ -362,6 +368,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
           balance={ctx.balance}
           autoRecharge={ctx.autoRecharge}
           initialChargeOpen={openMyPageWithCharge}
+          initialPasswordOpen={!!openPasswordSetup}
         />
       )}
     </div>

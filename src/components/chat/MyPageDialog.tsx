@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/errors";
 import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
-import { updateCustomerName, changeEmail, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge } from "@/app/actions";
+import { updateCustomerName, changeEmail, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge, setLoginPassword, removeLoginPassword } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 import AvatarPicker from "@/components/chat/AvatarPicker";
 import HqChatPanel from "@/components/chat/HqChatPanel";
@@ -63,6 +63,7 @@ export default function MyPageDialog({
   userId,
   customerName,
   currentEmail,
+  hasPassword: initialHasPassword,
   avatarUrl,
   onAvatarChange,
   isDark,
@@ -71,10 +72,12 @@ export default function MyPageDialog({
   balance,
   autoRecharge,
   initialChargeOpen,
+  initialPasswordOpen,
 }: {
   userId: string;
   customerName: string;
   currentEmail: string | null;
+  hasPassword: boolean;
   avatarUrl: string | null;
   onAvatarChange: (url: string | null) => void;
   isDark: boolean;
@@ -83,6 +86,7 @@ export default function MyPageDialog({
   balance: number;
   autoRecharge: { enabled: boolean; threshold: number | null; amount: number | null; hasCard: boolean };
   initialChargeOpen?: boolean;
+  initialPasswordOpen?: boolean;
 }) {
   const [name, setName] = useState(customerName);
   const nameIsPlaceholder = name === NAME_PLACEHOLDER;
@@ -92,13 +96,23 @@ export default function MyPageDialog({
   const [nameError, setNameError] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
 
-  const [email, setEmail] = useState(currentEmail ?? "");
+  const email = currentEmail ?? "";
   const [emOpen, setEmOpen] = useState(false);
   const [emNext, setEmNext] = useState("");
   const [emConf, setEmConf] = useState("");
+  const [emPw, setEmPw] = useState("");
   const [emError, setEmError] = useState("");
   const [emDone, setEmDone] = useState(false);
   const [emSaving, setEmSaving] = useState(false);
+
+  // パスワードは任意。未設定ならログインはメールのリンクだけ。
+  const [hasPassword, setHasPassword] = useState(initialHasPassword);
+  const [pwOpen, setPwOpen] = useState(!!initialPasswordOpen);
+  const [pwNext, setPwNext] = useState("");
+  const [pwConf, setPwConf] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwDone, setPwDone] = useState("");
 
   const router = useRouter();
   const CHARGE_AMOUNTS = [10000, 30000, 50000, 100000];
@@ -198,10 +212,11 @@ export default function MyPageDialog({
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emNext)) return setEmError("メールアドレスの形式をご確認ください");
     if (emNext !== emConf) return setEmError("確認用のメールアドレスが一致しません");
     if (emNext === email) return setEmError("現在と同じアドレスです");
+    if (hasPassword && !emPw) return setEmError("パスワードをご入力ください");
     setEmSaving(true);
     try {
-      await changeEmail(emNext);
-      setEmail(emNext);
+      await changeEmail(emNext, hasPassword ? emPw : undefined);
+      setEmPw("");
       setEmOpen(false);
       setEmError("");
       setEmDone(true);
@@ -209,6 +224,41 @@ export default function MyPageDialog({
       setEmError(errorMessage(e, "保存できませんでした"));
     } finally {
       setEmSaving(false);
+    }
+  }
+
+  async function savePassword() {
+    if (pwNext.length < 8) return setPwError("パスワードは8文字以上にしてください");
+    if (pwNext !== pwConf) return setPwError("確認用のパスワードが一致しません");
+    setPwSaving(true);
+    setPwError("");
+    try {
+      await setLoginPassword(pwNext);
+      setHasPassword(true);
+      setPwOpen(false);
+      setPwNext("");
+      setPwConf("");
+      setPwDone("パスワードを設定しました");
+    } catch (e) {
+      setPwError(errorMessage(e, "設定できませんでした"));
+    } finally {
+      setPwSaving(false);
+    }
+  }
+
+  async function stopPassword() {
+    if (!confirm("パスワードをやめて、メールのリンクだけでログインするようにしますか？")) return;
+    setPwSaving(true);
+    setPwError("");
+    try {
+      await removeLoginPassword();
+      setHasPassword(false);
+      setPwOpen(false);
+      setPwDone("メールのリンクだけでログインするようにしました");
+    } catch (e) {
+      setPwError(errorMessage(e, "操作できませんでした"));
+    } finally {
+      setPwSaving(false);
     }
   }
 
@@ -270,6 +320,12 @@ export default function MyPageDialog({
                     <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>確認のため再入力</span>
                     <input type="email" value={emConf} onChange={(e) => setEmConf(e.target.value)} className="vid-input" style={input} />
                   </div>
+                  {hasPassword && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>パスワード</span>
+                      <input type="password" value={emPw} onChange={(e) => setEmPw(e.target.value)} autoComplete="current-password" className="vid-input" style={input} />
+                    </div>
+                  )}
                   {emError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{emError}</span>}
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={saveEmail} disabled={emSaving} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
@@ -279,13 +335,58 @@ export default function MyPageDialog({
                       キャンセル
                     </button>
                   </div>
-                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>保存すると新しいアドレスに確認メールをお送りします。</span>
                 </div>
               )}
               {emDone && (
+                <span style={{ display: "flex", alignItems: "flex-start", gap: 5, fontSize: 11, lineHeight: 1.6, color: "var(--color-accent-300)" }}>
+                  <CheckCircle size={13} style={{ flex: "none", marginTop: 2 }} />
+                  新しいアドレスに確認メールをお送りしました。メール内のリンクを開くと変更が完了します。
+                </span>
+              )}
+            </div>
+
+            {/* パスワード（任意） */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              <div style={rowBox}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5 }}>
+                  パスワード
+                  <span style={{ marginLeft: 8, fontSize: 11.5, color: "var(--color-neutral-500)" }}>{hasPassword ? "設定済み" : "未設定"}</span>
+                </span>
+                <button
+                  onClick={() => {
+                    setPwOpen((v) => !v);
+                    setPwError("");
+                    setPwDone("");
+                  }}
+                  style={smallBtn}
+                >
+                  {hasPassword ? "変更" : "設定"}
+                </button>
+              </div>
+              {pwOpen && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
+                  <input type="password" value={pwNext} onChange={(e) => setPwNext(e.target.value)} placeholder="新しいパスワード（8文字以上）" autoComplete="new-password" className="vid-input" style={input} />
+                  <input type="password" value={pwConf} onChange={(e) => setPwConf(e.target.value)} placeholder="確認のため再入力" autoComplete="new-password" className="vid-input" style={input} />
+                  {pwError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{pwError}</span>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={savePassword} disabled={pwSaving} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: pwSaving ? 0.6 : 1 }}>
+                      {pwSaving ? "保存中…" : "保存"}
+                    </button>
+                    <button onClick={() => setPwOpen(false)} style={{ flex: "none", height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                      キャンセル
+                    </button>
+                  </div>
+                  {hasPassword && (
+                    <button onClick={stopPassword} disabled={pwSaving} style={{ alignSelf: "flex-start", padding: 0, cursor: "pointer", fontSize: 11, color: "var(--color-neutral-500)", background: "transparent", border: "none", textDecoration: "underline" }}>
+                      パスワードをやめる（メールのリンクだけにする）
+                    </button>
+                  )}
+                </div>
+              )}
+              {pwDone && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--color-accent-300)" }}>
                   <CheckCircle size={13} />
-                  変更しました。確認メールをお送りしました
+                  {pwDone}
                 </span>
               )}
             </div>

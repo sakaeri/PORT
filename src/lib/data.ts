@@ -106,6 +106,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     threadId: thread.id,
     email: auth.user.email ?? null,
     isAnonymous: auth.user.is_anonymous ?? false,
+    hasPassword: auth.user.user_metadata?.has_password === true,
     avatarUrl: profile?.avatar_url ?? null,
     orgLocked,
     balance: customer.balance,
