@@ -245,12 +245,14 @@ export async function updateLoginPassword(currentPassword: string, newPassword: 
 // ============================================================
 // 返信テンプレ（トークからワンタップで送る定型文。項目を付けると入力フォームになる）
 // ============================================================
+const NEW_TEMPLATE_LABEL = "新しいテンプレ";
+
 export async function createIntakeForm(orgId: string) {
   await requireContext();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("intake_forms")
-    .insert({ org_id: orgId, label: "新しいテンプレ", sort: 999 })
+    .insert({ org_id: orgId, label: NEW_TEMPLATE_LABEL, sort: 999 })
     .select("id")
     .single();
   if (error || !data) throw error ?? new Error("作成できませんでした");
@@ -275,6 +277,24 @@ export async function deleteIntakeForm(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("intake_forms").delete().eq("id", id);
   if (error) throw error;
+}
+
+// 「新しいテンプレを作る」を押したまま何も入力されなかったテンプレを片付ける。
+// 中身が空のときだけ消すので、削除権限のない秘書が呼んでもよい。
+export async function discardIntakeFormIfEmpty(id: string) {
+  await requireContext();
+  const supabase = await createClient();
+  const { data } = await supabase.from("intake_forms").select("label, note, intake_fields(label)").eq("id", id).maybeSingle();
+  if (!data) return false;
+  const label = (data.label ?? "").trim();
+  const empty =
+    (label === "" || label === NEW_TEMPLATE_LABEL) &&
+    !(data.note ?? "").trim() &&
+    (data.intake_fields ?? []).every((f: { label: string | null }) => !(f.label ?? "").trim());
+  if (!empty) return false;
+  const { error } = await supabase.from("intake_forms").delete().eq("id", id);
+  if (error) throw error;
+  return true;
 }
 
 export async function addIntakeField(formId: string, sort: number) {

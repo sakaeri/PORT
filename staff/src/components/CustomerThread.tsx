@@ -20,6 +20,7 @@ import {
   createIntakeForm,
   updateIntakeForm,
   deleteIntakeForm,
+  discardIntakeFormIfEmpty,
   addIntakeField,
   updateIntakeField,
   deleteIntakeField,
@@ -141,6 +142,7 @@ function TemplatesModal({
   const plain = templates.filter((t) => t.fields.length === 0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const editing = editingId ? templates.find((t) => t.id === editingId) ?? null : null;
 
   async function handleCreate() {
@@ -148,25 +150,41 @@ function TemplatesModal({
     setCreating(true);
     try {
       const id = await createIntakeForm(orgId);
-      setTemplates((ts) => [...ts, { id, label: "新しいテンプレ", note: null, fields: [] }]);
+      setTemplates((ts) => [...ts, { id, label: "", note: null, fields: [] }]);
+      setCreatedId(id);
       setEditingId(id);
     } finally {
       setCreating(false);
     }
   }
 
+  // 新規作成したテンプレが何も入力されないまま閉じられたら、作らなかったことにする。
+  function leaveEditor() {
+    setEditingId(null);
+    const t = createdId ? templates.find((x) => x.id === createdId) : null;
+    setCreatedId(null);
+    if (!t || !isEmptyTemplate(t)) return;
+    setTemplates((ts) => ts.filter((x) => x.id !== t.id));
+    discardIntakeFormIfEmpty(t.id).catch(() => {});
+  }
+
+  function close() {
+    leaveEditor();
+    onClose();
+  }
+
   return (
-    <Modal onClose={onClose} maxWidth={440}>
+    <Modal onClose={close} maxWidth={440}>
       <div style={{ padding: "20px 20px 16px", display: "flex", flexDirection: "column", gap: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {editing && (
-            <button onClick={() => setEditingId(null)} aria-label="一覧に戻る" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none", padding: 0 }}>
+            <button onClick={leaveEditor} aria-label="一覧に戻る" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none", padding: 0 }}>
               <CaretLeft size={18} />
             </button>
           )}
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>{editing ? "テンプレを編集" : "テンプレを使う"}</div>
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+          <button onClick={close} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
             <X size={18} />
           </button>
         </div>
@@ -179,8 +197,9 @@ function TemplatesModal({
             onDeleted={() => {
               setTemplates((ts) => ts.filter((t) => t.id !== editing.id));
               setEditingId(null);
+              setCreatedId(null);
             }}
-            onDone={() => setEditingId(null)}
+            onDone={leaveEditor}
           />
         ) : (
           <>
@@ -234,6 +253,11 @@ function TemplatesModal({
   );
 }
 
+function isEmptyTemplate(t: TemplateInfo): boolean {
+  const label = t.label.trim();
+  return (label === "" || label === "新しいテンプレ") && !(t.note ?? "").trim() && t.fields.every((f) => !f.label.trim());
+}
+
 const editInput: React.CSSProperties = { width: "100%", height: 36, padding: "0 10px", fontSize: 13, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" };
 const editLabel: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", color: "var(--color-neutral-500)" };
 
@@ -285,7 +309,7 @@ function TemplateEditor({
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <span style={editLabel}>テンプレ名</span>
-        <input value={template.label} onChange={(e) => onPatch({ label: e.target.value })} onBlur={() => save(template)} className="vid-input" style={editInput} />
+        <input value={template.label} onChange={(e) => onPatch({ label: e.target.value })} onBlur={() => save(template)} placeholder="例：ご予約の確認" className="vid-input" style={editInput} />
       </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <span style={editLabel}>{template.fields.length > 0 ? "項目の前に添える案内文（空でも可）" : "送る文章"}</span>

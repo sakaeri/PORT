@@ -55,6 +55,7 @@ import {
   createIntakeForm,
   updateIntakeForm,
   deleteIntakeForm,
+  discardIntakeFormIfEmpty,
   addIntakeField,
   updateIntakeField,
   deleteIntakeField,
@@ -530,10 +531,25 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
 function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; initialTemplates: IntakeForm[]; canDelete: boolean }) {
   const [templates, setTemplates] = useState(initialTemplates);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+
+  // 新規作成したテンプレを何も入力しないまま閉じたら、作らなかったことにする。
+  function openOnly(id: string | null) {
+    const t = createdId && createdId !== id ? templates.find((x) => x.id === createdId) : null;
+    if (createdId !== id) setCreatedId(null);
+    const label = t?.label.trim() ?? "";
+    if (t && (label === "" || label === "新しいテンプレ") && !(t.note ?? "").trim() && t.intake_fields.every((f) => !f.label.trim())) {
+      setTemplates((rows) => rows.filter((x) => x.id !== t.id));
+      discardIntakeFormIfEmpty(t.id).catch(() => {});
+    }
+    setOpenId(id);
+  }
 
   async function handleAdd() {
     const id = await createIntakeForm(orgId);
-    setTemplates((t) => [...t, { id, org_id: orgId, label: "新しいテンプレ", note: null, sort: 999, intake_fields: [] }]);
+    openOnly(null);
+    setTemplates((t) => [...t, { id, org_id: orgId, label: "", note: null, sort: 999, intake_fields: [] }]);
+    setCreatedId(id);
     setOpenId(id);
   }
 
@@ -571,7 +587,7 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
           return (
             <div key={t.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
               <button
-                onClick={() => setOpenId(open ? null : t.id)}
+                onClick={() => openOnly(open ? null : t.id)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
               >
                 {open ? <CaretDown size={13} /> : <CaretRight size={13} />}
@@ -582,7 +598,7 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
                 <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={label}>テンプレ名</span>
-                    <input value={t.label} onChange={(e) => patchLocal(t.id, { label: e.target.value })} onBlur={() => commit(t)} className="vid-input" style={input} />
+                    <input value={t.label} onChange={(e) => patchLocal(t.id, { label: e.target.value })} onBlur={() => commit(t)} placeholder="例：ご予約の確認" className="vid-input" style={input} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={label}>定型文の本文（項目がなければそのまま送信されます）</span>
