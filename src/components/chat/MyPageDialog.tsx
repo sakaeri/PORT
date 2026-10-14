@@ -495,7 +495,7 @@ export default function MyPageDialog({
             {/* 担当マネージャーには見えない、本部との直接のやり取り */}
             <HqChatPanel />
 
-            <div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <SignOutButton onSignedOut={onClose} />
             </div>
           </div>
