@@ -6,9 +6,9 @@ import MenuSettings from "@/components/MenuSettings";
 export default async function MenuSettingsPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
-  // スタッフ（dept_leader）は依頼主とは直接やり取りしない役割で、
-  // メニューや会社設定も編集させない。直接URLで来ても弾く。
-  if (ctx.role === "dept_leader") return null;
+  // メニュー管理は本部（オーナー）専用。秘書・スタッフが直接URLで来ても出さない
+  // （返信テンプレの作成・編集は、秘書はトークのテンプレ画面から行う）。
+  if (ctx.role !== "owner" && ctx.role !== "reception") return null;
 
   const supabase = await createClient();
   const [{ data: menus }, { data: templates }, { data: org }] = await Promise.all([

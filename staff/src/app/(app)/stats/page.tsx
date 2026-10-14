@@ -34,9 +34,8 @@ function monthKeyFromYM(year: number, month: number): string {
 export default async function StatsPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
-  // スタッフ（dept_leader）は依頼主とは直接やり取りしない役割で、
-  // 売上・実績も見せない。直接URLで来ても弾く。
-  if (ctx.role === "dept_leader") return null;
+  // 売上・実績は本部（オーナー）専用。秘書・スタッフが直接URLで来ても出さない。
+  if (ctx.role !== "owner" && ctx.role !== "reception") return null;
 
   const { year, month } = nowJSTYearMonth();
 

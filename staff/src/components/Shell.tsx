@@ -19,12 +19,13 @@ import type { StaffContext } from "@/lib/data";
 // 依頼主一覧・売上実績・メニュー管理は隠す。案件トークと、本部との連絡用の
 // スタッフ画面はそのまま使える。
 const NAV = [
-  { href: "/today", label: "今日やること", icon: ListChecks, hideWhenStaff: true },
+  { href: "/today", label: "今日やること", icon: ListChecks },
   { href: "/customers", label: "依頼主", icon: Users, hideWhenStaff: true },
   { href: "/cases", label: "案件トーク", icon: ChatsCircle },
   { href: "/staff", label: "スタッフ", icon: UsersThree },
-  { href: "/stats", label: "売上・実績", icon: ChartBar, hideWhenStaff: true },
-  { href: "/menu", label: "メニュー管理", icon: GearSix, hideWhenStaff: true },
+  // 売上・実績とメニュー管理は本部（オーナー）だけ。秘書・スタッフには出さない。
+  { href: "/stats", label: "売上・実績", icon: ChartBar, ownerOnly: true },
+  { href: "/menu", label: "メニュー管理", icon: GearSix, ownerOnly: true },
   { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true },
 ];
 
@@ -142,7 +143,8 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     router.refresh();
   }
 
-  const navItems = NAV.filter((n) => !(n.hqOnly && !ctx.isHq) && !(n.hideWhenStaff && ctx.role === "dept_leader"));
+  const isOwner = ctx.role === "owner" || ctx.role === "reception";
+  const navItems = NAV.filter((n) => !("hqOnly" in n && n.hqOnly && !ctx.isHq) && !("hideWhenStaff" in n && n.hideWhenStaff && ctx.role === "dept_leader") && !("ownerOnly" in n && n.ownerOnly && !isOwner));
 
   // Date.now() はレンダー中に直接呼べない（純粋関数のルール）ため、
   // マウント後にeffectで計算する。初回描画では null のままバナーを出さない。

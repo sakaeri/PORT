@@ -271,7 +271,7 @@ export async function updateIntakeForm(id: string, fields: { label: string; note
 // 秘書（マネージャー・受付）が誤って消して他の人が困らないようにする。
 export async function deleteIntakeForm(id: string) {
   const ctx = await requireContextWithDelete();
-  if (ctx.role !== "owner") throw new Error("返信テンプレの削除は本部のみ行えます");
+  if (ctx.role !== "owner" && ctx.role !== "reception") throw new Error("返信テンプレの削除は本部のみ行えます");
   const supabase = await createClient();
   const { error } = await supabase.from("intake_forms").delete().eq("id", id);
   if (error) throw error;

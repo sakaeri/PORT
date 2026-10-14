@@ -54,7 +54,8 @@ export default function CustomersList({
     .filter((c) => c.active || showArchived)
     .filter((c) => departmentFilter === "all" || (departmentFilter === "none" ? c.departmentId === null : c.departmentId === departmentFilter));
   const archivedCount = rows.filter((c) => !c.active).length;
-  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: orgDisplayName }];
+  // 窓口未設定の依頼主は本部にしか見えないので、該当する行がある時だけ選択肢に出す。
+  const filterOptions = [{ id: "all", name: "すべて" }, ...departments, ...(rows.some((r) => r.departmentId === null) ? [{ id: "none", name: orgDisplayName }] : [])];
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a server-refetched prop (router.refresh()), not state derived from other client state
