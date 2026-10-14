@@ -247,6 +247,22 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# ログイン系メールの日本語テンプレート（通知メールの src/lib/email-layout.ts と同じデザイン）。
+# ここはローカル開発用の設定で、本番は Supabase の管理画面
+# （Authentication → Emails → Templates）に同じ件名・本文を貼り付けて反映する。
+# リンクは /auth/confirm が受け取る token_hash 形式にしている（ConfirmationURL は使わない）。
+[auth.email.template.magic_link]
+subject = "【PORT】ログイン用のリンクです"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "【PORT】メールアドレスの確認をお願いします"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.recovery]
+subject = "【PORT】パスワードの再設定"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
