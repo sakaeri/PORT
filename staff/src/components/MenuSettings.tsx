@@ -316,7 +316,7 @@ export default function MenuSettings({
       )}
 
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
-      {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} />}
+      {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} canDelete={canEdit} />}
       {tab === "terms" && <TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} />}
     </div>
   );
@@ -526,7 +526,8 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
   );
 }
 
-function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemplates: IntakeForm[] }) {
+// canDelete: 返信テンプレの削除は本部（オーナー）のみ。追加・編集は秘書もできる。
+function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; initialTemplates: IntakeForm[]; canDelete: boolean }) {
   const [templates, setTemplates] = useState(initialTemplates);
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -598,10 +599,12 @@ function TemplatesCard({ orgId, initialTemplates }: { orgId: string; initialTemp
                   <TemplateFieldsEditor formId={t.id} fields={t.intake_fields} onChange={(fields) => patchLocal(t.id, { intake_fields: fields })} />
 
                   <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    {canDelete && (
                     <button onClick={() => handleDelete(t.id)} style={{ ...smallBtn, color: "var(--color-accent-200)", borderColor: "var(--color-divider)" }}>
                       <Trash size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
                       削除
                     </button>
+                    )}
                   </div>
                 </div>
               )}
