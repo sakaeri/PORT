@@ -251,7 +251,7 @@ otp_expiry = 3600
 # 日本語テンプレートを設定済み。ここに置いているのはその写し（メールアドレス確認のみ）で、
 # 通知メールのデザイン（src/lib/email-layout.ts）もこれに合わせてある。
 [auth.email.template.email_change]
-subject = "【中央秘書】メールアドレスの確認をお願いします"
+subject = "【中央秘書事務所】メールアドレスの確認をお願いします"
 content_path = "./supabase/templates/email_change.html"
 
 # Uncomment to customize notification email template

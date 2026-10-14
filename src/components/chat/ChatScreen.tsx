@@ -323,8 +323,18 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
       {showProgress && (
         <ProgressPanel
           bundles={bundles}
+          balance={ctx.balance}
           onClose={() => setShowProgress(false)}
           onCancel={(id) => { setShowProgress(false); setCancelTargetId(id); }}
+          onPay={async (id) => {
+            await payFromBalance(id);
+            await refresh();
+          }}
+          onOpenCharge={() => {
+            setShowProgress(false);
+            setOpenMyPageWithCharge(true);
+            setShowMyPage(true);
+          }}
         />
       )}
       {showReports && <ReportsDialog bundles={bundles} ackedIds={ackedIds} onAck={ackReport} onClose={() => setShowReports(false)} />}
