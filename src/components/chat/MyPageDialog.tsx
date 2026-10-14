@@ -100,6 +100,7 @@ export default function MyPageDialog({
   const [emOpen, setEmOpen] = useState(false);
   const [emNext, setEmNext] = useState("");
   const [emConf, setEmConf] = useState("");
+  const [emPw, setEmPw] = useState("");
   const [emError, setEmError] = useState("");
   const [emDone, setEmDone] = useState(false);
   const [emSaving, setEmSaving] = useState(false);
@@ -211,9 +212,11 @@ export default function MyPageDialog({
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emNext)) return setEmError("メールアドレスの形式をご確認ください");
     if (emNext !== emConf) return setEmError("確認用のメールアドレスが一致しません");
     if (emNext === email) return setEmError("現在と同じアドレスです");
+    if (hasPassword && !emPw) return setEmError("パスワードをご入力ください");
     setEmSaving(true);
     try {
-      await changeEmail(emNext);
+      await changeEmail(emNext, hasPassword ? emPw : undefined);
+      setEmPw("");
       setEmOpen(false);
       setEmError("");
       setEmDone(true);
@@ -317,6 +320,12 @@ export default function MyPageDialog({
                     <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>確認のため再入力</span>
                     <input type="email" value={emConf} onChange={(e) => setEmConf(e.target.value)} className="vid-input" style={input} />
                   </div>
+                  {hasPassword && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>パスワード</span>
+                      <input type="password" value={emPw} onChange={(e) => setEmPw(e.target.value)} autoComplete="current-password" className="vid-input" style={input} />
+                    </div>
+                  )}
                   {emError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{emError}</span>}
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={saveEmail} disabled={emSaving} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
@@ -331,7 +340,7 @@ export default function MyPageDialog({
               {emDone && (
                 <span style={{ display: "flex", alignItems: "flex-start", gap: 5, fontSize: 11, lineHeight: 1.6, color: "var(--color-accent-300)" }}>
                   <CheckCircle size={13} style={{ flex: "none", marginTop: 2 }} />
-                  今のアドレスと新しいアドレスに確認メールを1通ずつお送りしました。両方のリンクを開くと変更が完了します。
+                  新しいアドレスに確認メールをお送りしました。メール内のリンクを開くと変更が完了します。
                 </span>
               )}
             </div>

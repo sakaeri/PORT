@@ -110,3 +110,43 @@ export async function notifyStaffPaymentConfirmed(orgId: string, requestId: stri
     console.error("notifyStaffPaymentConfirmed failed", e);
   }
 }
+
+// 依頼主のログイン用メールアドレスの変更が完了したとき（auth/confirm で
+// email_change の確認が通り、実際にアドレスが切り替わった時点）に呼ぶ。
+// 前のアドレスへ「変更されました」とお知らせし（もう使えないアドレスなら
+// 届かないだけで害はない）、依頼主トークにも記録を残して本部が気づけるようにする。
+export async function notifyEmailChanged(userId: string, prevEmail: string) {
+  try {
+    const admin = createServiceRoleClient();
+    const { data: customers } = await admin.from("customers").select("id, org_id").eq("profile_id", userId);
+    if (!customers?.length) return;
+
+    const { data: threads } = await admin
+      .from("threads")
+      .select("id")
+      .eq("kind", "customer")
+      .in("customer_id", customers.map((c) => c.id));
+    if (threads?.length) {
+      await admin.from("messages").insert(threads.map((t) => ({ thread_id: t.id, sender_id: null, sender_role: null, kind: "notice" as const, body: "ログイン用のメールアドレスが変更されました" })));
+    }
+
+    const { data: org } = await admin.from("organizations").select("display_name, email, tel").eq("id", customers[0].org_id).maybeSingle();
+    const orgName = org?.display_name ?? "";
+    const contact = org?.email || org?.tel;
+    await sendStaffEmail(
+      admin,
+      [prevEmail],
+      emailSubject(orgName, "メールアドレスが変更されました"),
+      renderEmail({
+        orgName,
+        heading: "メールアドレスが変更されました",
+        lines: [
+          "ご登録のログイン用メールアドレスが変更されました。今後のご案内は新しいアドレスにお送りします。",
+          contact ? `お心当たりがない場合は、お手数ですが ${contact} までご連絡ください。` : "お心当たりがない場合は、お手数ですが本部までご連絡ください。",
+        ],
+      }),
+    );
+  } catch (e) {
+    console.error("notifyEmailChanged failed", e);
+  }
+}

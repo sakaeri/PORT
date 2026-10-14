@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getCustomerContext } from "@/lib/data";
 import { notifyNewInquiry, notifyStaffPaymentConfirmed } from "@/lib/notify";
@@ -256,12 +257,36 @@ export async function removeAvatar() {
   if (error) throw error;
 }
 
-export async function changeEmail(newEmail: string) {
+// メールアドレスの変更は「新しいアドレスの確認だけ」で完了する（Supabase の
+// Secure email change はオフ。前のアドレスがもう使えない人でも変えられるように）。
+// 代わりに、パスワードを設定している人は変更時にパスワードを確認し、変更後は
+// 前のアドレスへお知らせを送る（auth/confirm → notifyEmailChanged）。
+export async function changeEmail(newEmail: string, password?: string) {
+  const ctx = await requireContext();
+  if (ctx.isAnonymous) throw new Error("認証されていません");
   const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user?.email) throw new Error("認証されていません");
+
+  if (user.user_metadata?.has_password === true) {
+    if (!password) throw new Error("パスワードをご入力ください");
+    // 本人のセッションに影響しないよう、cookie を持たない使い捨てのクライアントで確かめる。
+    const verifier = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { error: pwErr } = await verifier.auth.signInWithPassword({ email: user.email, password });
+    if (pwErr) throw new Error("パスワードが正しくありません");
+    await verifier.auth.signOut({ scope: "local" });
+  }
+
   const h = await headers();
   const host = h.get("host");
   const protocol = host?.startsWith("localhost") ? "http" : "https";
-  const { error } = await supabase.auth.updateUser({ email: newEmail.trim() }, { emailRedirectTo: `${protocol}://${host}/auth/confirm` });
+  const { error } = await supabase.auth.updateUser(
+    { email: newEmail.trim(), data: { prev_email: user.email } },
+    { emailRedirectTo: `${protocol}://${host}/auth/confirm` },
+  );
   if (error) {
     if (error.code === "email_exists" || error.code === "user_already_exists") {
       throw new Error("このメールアドレスは既に登録されています。");
