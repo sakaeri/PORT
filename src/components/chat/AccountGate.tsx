@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
-import { setInitialProfile, requestMagicLink } from "@/app/actions";
+import { setInitialProfile, requestMagicLink, signInWithPasswordLogin } from "@/app/actions";
 import GateInfo from "@/components/chat/GateInfo";
 
 const input: React.CSSProperties = {
@@ -38,7 +39,11 @@ function tabBtn(active: boolean): React.CSSProperties {
 // いるが、名前・メールアドレスを登録して確認メールのリンクを開くまでは
 // チャット画面を見せない（page.tsx 側で ctx.isAnonymous を見て出し分ける）。
 export default function AccountGate({ orgDisplayName, initialError }: { orgDisplayName: string; initialError?: string }) {
+  const router = useRouter();
   const [mode, setMode] = useState<"new" | "existing">("new");
+  // ログインは基本メールのリンク。パスワードを設定済みの人だけ切り替えて使う。
+  const [usePassword, setUsePassword] = useState(false);
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [agreed, setAgreed] = useState(false);
@@ -80,6 +85,22 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));
     } finally {
+      setSending(false);
+    }
+  }
+
+  async function submitPasswordLogin() {
+    if (!email.trim() || !password) {
+      setError("メールアドレスとパスワードをご入力ください");
+      return;
+    }
+    setSending(true);
+    setError("");
+    try {
+      await signInWithPasswordLogin(email, password);
+      router.refresh();
+    } catch (e) {
+      setError(errorMessage(e, "ログインできませんでした"));
       setSending(false);
     }
   }
@@ -173,14 +194,35 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="登録済みのメールアドレス" className="vid-input" style={input} />
+                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="登録済みのメールアドレス" autoComplete="email" className="vid-input" style={input} />
+                    {usePassword && (
+                      <input
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && submitPasswordLogin()}
+                        type="password"
+                        placeholder="パスワード"
+                        autoComplete="current-password"
+                        className="vid-input"
+                        style={input}
+                      />
+                    )}
                     {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
                     <button
-                      onClick={submitLogin}
+                      onClick={usePassword ? submitPasswordLogin : submitLogin}
                       disabled={sending}
                       style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending ? 0.6 : 1 }}
                     >
-                      {sending ? "送信中…" : "ログインリンクを送る"}
+                      {sending ? (usePassword ? "ログイン中…" : "送信中…") : usePassword ? "ログイン" : "ログインリンクを送る"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUsePassword((v) => !v);
+                        setError("");
+                      }}
+                      style={{ alignSelf: "center", padding: 0, cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-500)", background: "transparent", border: "none", textDecoration: "underline" }}
+                    >
+                      {usePassword ? "メールのリンクでログイン" : "パスワードでログイン"}
                     </button>
                   </div>
                 )}

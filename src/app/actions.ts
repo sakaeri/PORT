@@ -95,6 +95,47 @@ export async function requestMagicLink(email: string) {
   if (error) throw new Error("このメールアドレスのご登録が見つかりませんでした。初めてのご利用の場合は、決済の画面から新規登録してください。");
 }
 
+// 任意で設定できるパスワードでのログイン。基本はマジックリンクで、パスワードは
+// メールを開かずに入りたい人のための選択肢。忘れた場合はマジックリンクで入り、
+// マイページから設定し直してもらう（再設定メールの仕組みは持たない）。
+export async function signInWithPasswordLogin(email: string, password: string) {
+  const trimmed = email.trim();
+  if (!trimmed || !password) throw new Error("メールアドレスとパスワードをご入力ください");
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email: trimmed, password });
+  if (error) throw new Error("メールアドレスかパスワードが正しくありません");
+}
+
+// パスワードを設定済みかどうかは Supabase 側で取れないので user_metadata に印を残す。
+export async function setLoginPassword(password: string) {
+  const ctx = await requireContext();
+  if (ctx.isAnonymous) throw new Error("認証されていません");
+  if (password.length < 8) throw new Error("パスワードは8文字以上にしてください");
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password, data: { has_password: true } });
+  if (error) {
+    if (error.code === "same_password") throw new Error("現在と同じパスワードです");
+    if (error.code === "weak_password") throw new Error("推測されやすいパスワードです。別のものにしてください");
+    if (error.code === "reauthentication_needed") throw new Error("安全のため、一度ログアウトしてメールのリンクから入り直してから設定してください");
+    throw new Error("設定できませんでした");
+  }
+}
+
+// パスワードをやめて、マジックリンクだけに戻す。Supabase にはパスワードを消す
+// 操作がないため、誰も知らないランダムな値に置き換えて実質的に無効にする。
+export async function removeLoginPassword() {
+  const ctx = await requireContext();
+  if (ctx.isAnonymous) throw new Error("認証されていません");
+  const admin = createServiceRoleClient();
+  const { data: current } = await admin.auth.admin.getUserById(ctx.userId);
+  const random = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
+  const { error } = await admin.auth.admin.updateUserById(ctx.userId, {
+    password: random,
+    user_metadata: { ...(current.user?.user_metadata ?? {}), has_password: false },
+  });
+  if (error) throw new Error("操作できませんでした");
+}
+
 export async function sendMessage(text: string, attachments: { path: string; name: string; mime: string; bytes: number }[]) {
   const ctx = await requireActiveContext();
   const supabase = await createClient();

@@ -351,6 +351,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder }
           userId={ctx.userId}
           customerName={ctx.customerName}
           currentEmail={ctx.email}
+          hasPassword={ctx.hasPassword}
           avatarUrl={avatarUrl}
           onAvatarChange={setAvatarUrl}
           isDark={isDark}
