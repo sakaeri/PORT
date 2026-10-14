@@ -85,6 +85,9 @@ export default function TextComposer({
           rows={1}
           className="vid-textarea"
           style={{
+            // textareaは既定でインライン要素なので、行の下に数pxの余白ができて
+            // 送信・添付ボタンと高さがずれる。blockにして揃える。
+            display: "block",
             width: "100%",
             resize: "none",
             maxHeight: 170,
