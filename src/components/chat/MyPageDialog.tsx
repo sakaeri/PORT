@@ -72,6 +72,7 @@ export default function MyPageDialog({
   balance,
   autoRecharge,
   initialChargeOpen,
+  initialPasswordOpen,
 }: {
   userId: string;
   customerName: string;
@@ -85,6 +86,7 @@ export default function MyPageDialog({
   balance: number;
   autoRecharge: { enabled: boolean; threshold: number | null; amount: number | null; hasCard: boolean };
   initialChargeOpen?: boolean;
+  initialPasswordOpen?: boolean;
 }) {
   const [name, setName] = useState(customerName);
   const nameIsPlaceholder = name === NAME_PLACEHOLDER;
@@ -94,7 +96,7 @@ export default function MyPageDialog({
   const [nameError, setNameError] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
 
-  const [email, setEmail] = useState(currentEmail ?? "");
+  const email = currentEmail ?? "";
   const [emOpen, setEmOpen] = useState(false);
   const [emNext, setEmNext] = useState("");
   const [emConf, setEmConf] = useState("");
@@ -104,7 +106,7 @@ export default function MyPageDialog({
 
   // パスワードは任意。未設定ならログインはメールのリンクだけ。
   const [hasPassword, setHasPassword] = useState(initialHasPassword);
-  const [pwOpen, setPwOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(!!initialPasswordOpen);
   const [pwNext, setPwNext] = useState("");
   const [pwConf, setPwConf] = useState("");
   const [pwError, setPwError] = useState("");
@@ -212,7 +214,6 @@ export default function MyPageDialog({
     setEmSaving(true);
     try {
       await changeEmail(emNext);
-      setEmail(emNext);
       setEmOpen(false);
       setEmError("");
       setEmDone(true);
@@ -325,13 +326,12 @@ export default function MyPageDialog({
                       キャンセル
                     </button>
                   </div>
-                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>保存すると新しいアドレスに確認メールをお送りします。</span>
                 </div>
               )}
               {emDone && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--color-accent-300)" }}>
-                  <CheckCircle size={13} />
-                  変更しました。確認メールをお送りしました
+                <span style={{ display: "flex", alignItems: "flex-start", gap: 5, fontSize: 11, lineHeight: 1.6, color: "var(--color-accent-300)" }}>
+                  <CheckCircle size={13} style={{ flex: "none", marginTop: 2 }} />
+                  今のアドレスと新しいアドレスに確認メールを1通ずつお送りしました。両方のリンクを開くと変更が完了します。
                 </span>
               )}
             </div>

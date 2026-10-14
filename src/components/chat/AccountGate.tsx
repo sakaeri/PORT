@@ -20,6 +20,8 @@ const input: React.CSSProperties = {
   outline: "none",
 };
 
+const subLink: React.CSSProperties = { padding: 0, cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-500)", background: "transparent", border: "none", textDecoration: "underline" };
+
 function tabBtn(active: boolean): React.CSSProperties {
   return {
     flex: 1,
@@ -49,6 +51,7 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
   const [agreed, setAgreed] = useState(false);
   const [sending, setSending] = useState(false);
   const [sentTo, setSentTo] = useState("");
+  const [sentForReset, setSentForReset] = useState(false);
   const [error, setError] = useState(initialError ?? "");
 
   async function submitNew() {
@@ -81,6 +84,24 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
     setError("");
     try {
       await requestMagicLink(email);
+      setSentTo(email);
+    } catch (e) {
+      setError(errorMessage(e, "送信できませんでした"));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function sendResetLink() {
+    if (!email.trim()) {
+      setError("メールアドレスをご入力ください");
+      return;
+    }
+    setSending(true);
+    setError("");
+    try {
+      await requestMagicLink(email, { resetPassword: true });
+      setSentForReset(true);
       setSentTo(email);
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));
@@ -157,7 +178,7 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
         >
             {sentTo ? (
               <div style={{ fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>
-                {sentTo} 宛にメールをお送りしました。メール内のリンクを開くとご利用いただけます。
+                {sentTo} 宛にメールをお送りしました。メール内のリンクを開くと{sentForReset ? "、新しいパスワードを設定できます。" : "ご利用いただけます。"}
               </div>
             ) : (
               <>
@@ -215,15 +236,22 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
                     >
                       {sending ? (usePassword ? "ログイン中…" : "送信中…") : usePassword ? "ログイン" : "ログインリンクを送る"}
                     </button>
-                    <button
-                      onClick={() => {
-                        setUsePassword((v) => !v);
-                        setError("");
-                      }}
-                      style={{ alignSelf: "center", padding: 0, cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-500)", background: "transparent", border: "none", textDecoration: "underline" }}
-                    >
-                      {usePassword ? "メールのリンクでログイン" : "パスワードでログイン"}
-                    </button>
+                    <div style={{ display: "flex", justifyContent: usePassword ? "space-between" : "center", gap: 12 }}>
+                      {usePassword && (
+                        <button onClick={sendResetLink} disabled={sending} style={subLink}>
+                          パスワードをお忘れの方
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setUsePassword((v) => !v);
+                          setError("");
+                        }}
+                        style={subLink}
+                      >
+                        {usePassword ? "メールのリンクでログイン" : "パスワードでログイン"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </>

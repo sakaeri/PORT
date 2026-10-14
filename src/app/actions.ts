@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getCustomerContext } from "@/lib/data";
 import { notifyNewInquiry, notifyStaffPaymentConfirmed } from "@/lib/notify";
@@ -78,7 +78,10 @@ export async function markChatRead() {
 
 // 既存アカウントへのログイン（マジックリンク）。今の匿名セッションのトーク内容は
 // 引き継がれない — 呼び出し側（UI）で事前に確認を取ってから呼ぶこと。
-export async function requestMagicLink(email: string) {
+// resetPassword: ログイン画面の「パスワードをお忘れの方」から。リンクを開いて
+// ログインしたあと、マイページのパスワード設定をそのまま開く（auth/confirm が
+// この cookie を見て振り分ける）。
+export async function requestMagicLink(email: string, opts?: { resetPassword?: boolean }) {
   const trimmed = email.trim();
   if (!trimmed) throw new Error("メールアドレスをご入力ください");
   const supabase = await createClient();
@@ -93,6 +96,9 @@ export async function requestMagicLink(email: string) {
     options: { emailRedirectTo: `${protocol}://${host}/auth/confirm`, shouldCreateUser: false },
   });
   if (error) throw new Error("このメールアドレスのご登録が見つかりませんでした。初めてのご利用の場合は、決済の画面から新規登録してください。");
+  if (opts?.resetPassword) {
+    (await cookies()).set("vid_setpw", "1", { httpOnly: true, sameSite: "lax", secure: protocol === "https", maxAge: 60 * 60, path: "/" });
+  }
 }
 
 // 任意で設定できるパスワードでのログイン。基本はマジックリンクで、パスワードは
