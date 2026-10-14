@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { emailSubject, renderEmail } from "@/lib/email-layout";
 
 type Admin = ReturnType<typeof createServiceRoleClient>;
 
@@ -47,8 +48,8 @@ export async function notifyNewInquiry(orgId: string, threadId: string) {
     await sendStaffEmail(
       admin,
       emails,
-      `【PORT】新着メッセージがあります（${org?.display_name ?? ""}）`,
-      `<p>${org?.display_name ?? ""}に新しいメッセージが届きました。</p>${openUrl ? `<p><a href="${openUrl}">トークを開いて確認する</a></p>` : ""}`,
+      emailSubject(org?.display_name ?? "", "新着メッセージがあります"),
+      renderEmail({ orgName: org?.display_name ?? "", lines: ["依頼主から新しいメッセージが届きました。"], url: openUrl }),
     );
   } catch (e) {
     console.error("notifyNewInquiry failed", e);
@@ -96,10 +97,12 @@ export async function notifyStaffPaymentConfirmed(orgId: string, requestId: stri
     await sendStaffEmail(
       admin,
       emails,
-      `【PORT】依頼が確定しました（${request.title}・¥${request.amount.toLocaleString("ja-JP")}）`,
-      `<p>${org?.display_name ?? ""}で、依頼主が依頼を確定し、お支払いが完了しました。</p><p>${request.title}・¥${request.amount.toLocaleString("ja-JP")}</p>${
-        caseUrl ? `<p><a href="${caseUrl}">案件トークを開いて確認する</a></p>` : ""
-      }`,
+      emailSubject(org?.display_name ?? "", "依頼が確定しました"),
+      renderEmail({
+        orgName: org?.display_name ?? "",
+        lines: ["依頼主が依頼を確定し、お支払いが完了しました。", `${request.title}・¥${request.amount.toLocaleString("ja-JP")}`],
+        url: caseUrl,
+      }),
     );
   } catch (e) {
     console.error("notifyStaffPaymentConfirmed failed", e);

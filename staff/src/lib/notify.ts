@@ -1,4 +1,5 @@
 import type { createServiceRoleClient } from "@/lib/supabase/server";
+import { emailSubject, renderEmail } from "@/lib/email-layout";
 
 type Admin = ReturnType<typeof createServiceRoleClient>;
 
@@ -50,8 +51,8 @@ export async function notifyCustomerQuoteCreated(admin: Admin, orgId: string, cu
     const { displayName, slug } = await getOrgSlug(admin, orgId);
     await sendEmail(
       email,
-      `【${displayName}】お見積りが届いています`,
-      `<p>${displayName}より、お見積り（${title}・¥${amount.toLocaleString("ja-JP")}）が届いています。</p><p><a href="${customerChatUrl(slug)}">トーク画面を開いて確認する</a></p>`,
+      emailSubject(displayName, "お見積りが届いています"),
+      renderEmail({ orgName: displayName, lines: ["お見積りが届いています。", `${title}・¥${amount.toLocaleString("ja-JP")}`], url: customerChatUrl(slug) }),
     );
   } catch (e) {
     console.error("notifyCustomerQuoteCreated failed", e);
@@ -65,8 +66,8 @@ export async function notifyCustomerCompletionReport(admin: Admin, orgId: string
     const { displayName, slug } = await getOrgSlug(admin, orgId);
     await sendEmail(
       email,
-      `【${displayName}】完了報告が届いています`,
-      `<p>${displayName}より、完了報告が届いています。</p><p><a href="${customerChatUrl(slug)}">トーク画面を開いて確認する</a></p>`,
+      emailSubject(displayName, "完了報告が届いています"),
+      renderEmail({ orgName: displayName, lines: ["ご依頼の完了報告が届いています。"], url: customerChatUrl(slug) }),
     );
   } catch (e) {
     console.error("notifyCustomerCompletionReport failed", e);
@@ -107,8 +108,8 @@ export async function notifyCustomerNewMessage(admin: Admin, threadId: string) {
     const { displayName, slug } = await getOrgSlug(admin, thread.org_id);
     await sendEmail(
       email,
-      `【${displayName}】新着メッセージがあります`,
-      `<p>${displayName}から新しいメッセージが届いています。</p><p><a href="${customerChatUrl(slug)}">トーク画面を開いて確認する</a></p>`,
+      emailSubject(displayName, "新着メッセージがあります"),
+      renderEmail({ orgName: displayName, lines: ["新しいメッセージが届いています。"], url: customerChatUrl(slug) }),
     );
   } catch (e) {
     console.error("notifyCustomerNewMessage failed", e);
@@ -124,12 +125,16 @@ export async function notifyCustomerAutoRechargeFailed(admin: Admin, orgId: stri
     const { displayName, slug } = await getOrgSlug(admin, orgId);
     await sendEmail(
       email,
-      stopped ? `【${displayName}】自動チャージを停止しました` : `【${displayName}】自動チャージに失敗しました`,
-      `<p>${
-        stopped
-          ? "カードへの請求に続けて失敗したため、自動チャージを停止しました。マイページから設定し直してください。"
-          : "自動チャージに失敗しました。カード情報をご確認のうえ、必要であればマイページから設定し直してください。"
-      }</p><p><a href="${customerChatUrl(slug)}">トーク画面を開く</a></p>`,
+      emailSubject(displayName, stopped ? "自動チャージを停止しました" : "自動チャージに失敗しました"),
+      renderEmail({
+        orgName: displayName,
+        lines: [
+          stopped
+            ? "カードへの請求に続けて失敗したため、自動チャージを停止しました。マイページから設定し直してください。"
+            : "自動チャージに失敗しました。カード情報をご確認のうえ、必要であればマイページから設定し直してください。",
+        ],
+        url: customerChatUrl(slug),
+      }),
     );
   } catch (e) {
     console.error("notifyCustomerAutoRechargeFailed failed", e);
