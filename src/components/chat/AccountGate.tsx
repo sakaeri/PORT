@@ -66,7 +66,8 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
     setSending(true);
     setError("");
     try {
-      await setInitialProfile(name, email, "", agreed);
+      const r = await setInitialProfile(name, email, "", agreed);
+      if (r.error !== null) return setError(r.error || "作成できませんでした");
       setSentTo(email);
     } catch (e) {
       setError(errorMessage(e, "作成できませんでした"));
@@ -83,7 +84,8 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
     setSending(true);
     setError("");
     try {
-      await requestMagicLink(email);
+      const r = await requestMagicLink(email);
+      if (r.error !== null) return setError(r.error || "送信できませんでした");
       setSentTo(email);
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));
@@ -100,7 +102,8 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
     setSending(true);
     setError("");
     try {
-      await requestMagicLink(email, { resetPassword: true });
+      const r = await requestMagicLink(email, { resetPassword: true });
+      if (r.error !== null) return setError(r.error || "送信できませんでした");
       setSentForReset(true);
       setSentTo(email);
     } catch (e) {
@@ -118,7 +121,12 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
     setSending(true);
     setError("");
     try {
-      await signInWithPasswordLogin(email, password);
+      const r = await signInWithPasswordLogin(email, password);
+      if (r.error !== null) {
+        setError(r.error || "ログインできませんでした");
+        setSending(false);
+        return;
+      }
       router.refresh();
     } catch (e) {
       setError(errorMessage(e, "ログインできませんでした"));
