@@ -49,7 +49,7 @@ export async function notifyNewInquiry(orgId: string, threadId: string) {
       admin,
       emails,
       emailSubject(org?.display_name ?? "", "新着メッセージがあります"),
-      renderEmail({ orgName: org?.display_name ?? "", lines: ["依頼主から新しいメッセージが届きました。"], url: openUrl }),
+      renderEmail({ orgName: org?.display_name ?? "", heading: "新着メッセージがあります", lines: ["依頼主から新しいメッセージが届きました。"], url: openUrl, buttonLabel: "トークを確認する" }),
     );
   } catch (e) {
     console.error("notifyNewInquiry failed", e);
@@ -100,8 +100,10 @@ export async function notifyStaffPaymentConfirmed(orgId: string, requestId: stri
       emailSubject(org?.display_name ?? "", "依頼が確定しました"),
       renderEmail({
         orgName: org?.display_name ?? "",
+        heading: "依頼が確定しました",
         lines: ["依頼主が依頼を確定し、お支払いが完了しました。", `${request.title}・¥${request.amount.toLocaleString("ja-JP")}`],
         url: caseUrl,
+        buttonLabel: "案件を確認する",
       }),
     );
   } catch (e) {

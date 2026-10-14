@@ -52,7 +52,7 @@ export async function notifyCustomerQuoteCreated(admin: Admin, orgId: string, cu
     await sendEmail(
       email,
       emailSubject(displayName, "お見積りが届いています"),
-      renderEmail({ orgName: displayName, lines: ["お見積りが届いています。", `${title}・¥${amount.toLocaleString("ja-JP")}`], url: customerChatUrl(slug) }),
+      renderEmail({ orgName: displayName, heading: "お見積りが届いています", lines: [`${title}・¥${amount.toLocaleString("ja-JP")}`, "内容をご確認のうえ、よろしければご依頼を確定してください。"], url: customerChatUrl(slug), buttonLabel: "お見積りを確認する" }),
     );
   } catch (e) {
     console.error("notifyCustomerQuoteCreated failed", e);
@@ -67,7 +67,7 @@ export async function notifyCustomerCompletionReport(admin: Admin, orgId: string
     await sendEmail(
       email,
       emailSubject(displayName, "完了報告が届いています"),
-      renderEmail({ orgName: displayName, lines: ["ご依頼の完了報告が届いています。"], url: customerChatUrl(slug) }),
+      renderEmail({ orgName: displayName, heading: "完了報告が届いています", lines: ["ご依頼いただいた作業が完了しました。トーク画面から報告内容をご確認ください。"], url: customerChatUrl(slug), buttonLabel: "完了報告を確認する" }),
     );
   } catch (e) {
     console.error("notifyCustomerCompletionReport failed", e);
@@ -109,7 +109,7 @@ export async function notifyCustomerNewMessage(admin: Admin, threadId: string) {
     await sendEmail(
       email,
       emailSubject(displayName, "新着メッセージがあります"),
-      renderEmail({ orgName: displayName, lines: ["新しいメッセージが届いています。"], url: customerChatUrl(slug) }),
+      renderEmail({ orgName: displayName, heading: "新着メッセージがあります", lines: ["担当者から新しいメッセージが届いています。"], url: customerChatUrl(slug), buttonLabel: "トークを確認する" }),
     );
   } catch (e) {
     console.error("notifyCustomerNewMessage failed", e);
@@ -128,12 +128,14 @@ export async function notifyCustomerAutoRechargeFailed(admin: Admin, orgId: stri
       emailSubject(displayName, stopped ? "自動チャージを停止しました" : "自動チャージに失敗しました"),
       renderEmail({
         orgName: displayName,
+        heading: stopped ? "自動チャージを停止しました" : "自動チャージに失敗しました",
         lines: [
           stopped
             ? "カードへの請求に続けて失敗したため、自動チャージを停止しました。マイページから設定し直してください。"
             : "自動チャージに失敗しました。カード情報をご確認のうえ、必要であればマイページから設定し直してください。",
         ],
         url: customerChatUrl(slug),
+        buttonLabel: "トーク画面を開く",
       }),
     );
   } catch (e) {
