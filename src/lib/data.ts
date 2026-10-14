@@ -86,7 +86,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("avatar_url")
+    .select("avatar_url, role")
     .eq("id", auth.user.id)
     .maybeSingle();
 
@@ -107,6 +107,9 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     email: auth.user.email ?? null,
     isAnonymous: auth.user.is_anonymous ?? false,
     hasPassword: auth.user.user_metadata?.has_password === true,
+    // 本部・スタッフのアカウントでも依頼主画面に入れる（同じログイン）。その場合の
+    // パスワードとメールアドレスは本部画面のログインと共用なので、ここでは変えさせない。
+    isStaffAccount: !!profile && profile.role !== "client",
     avatarUrl: profile?.avatar_url ?? null,
     orgLocked,
     balance: customer.balance,

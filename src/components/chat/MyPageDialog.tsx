@@ -64,6 +64,7 @@ export default function MyPageDialog({
   customerName,
   currentEmail,
   hasPassword: initialHasPassword,
+  isStaffAccount,
   avatarUrl,
   onAvatarChange,
   isDark,
@@ -78,6 +79,7 @@ export default function MyPageDialog({
   customerName: string;
   currentEmail: string | null;
   hasPassword: boolean;
+  isStaffAccount: boolean;
   avatarUrl: string | null;
   onAvatarChange: (url: string | null) => void;
   isDark: boolean;
@@ -215,7 +217,8 @@ export default function MyPageDialog({
     if (hasPassword && !emPw) return setEmError("パスワードをご入力ください");
     setEmSaving(true);
     try {
-      await changeEmail(emNext, hasPassword ? emPw : undefined);
+      const r = await changeEmail(emNext, hasPassword ? emPw : undefined);
+      if (r.error !== null) return setEmError(r.error || "保存できませんでした");
       setEmPw("");
       setEmOpen(false);
       setEmError("");
@@ -233,7 +236,8 @@ export default function MyPageDialog({
     setPwSaving(true);
     setPwError("");
     try {
-      await setLoginPassword(pwNext);
+      const r = await setLoginPassword(pwNext);
+      if (r.error !== null) return setPwError(r.error || "設定できませんでした");
       setHasPassword(true);
       setPwOpen(false);
       setPwNext("");
@@ -251,7 +255,8 @@ export default function MyPageDialog({
     setPwSaving(true);
     setPwError("");
     try {
-      await removeLoginPassword();
+      const r = await removeLoginPassword();
+      if (r.error !== null) return setPwError(r.error || "操作できませんでした");
       setHasPassword(false);
       setPwOpen(false);
       setPwDone("メールのリンクだけでログインするようにしました");
@@ -306,9 +311,11 @@ export default function MyPageDialog({
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               <div style={rowBox}>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email || "未登録"}</span>
-                <button onClick={() => setEmOpen((v) => !v)} style={smallBtn}>
-                  {email ? "変更" : "登録"}
-                </button>
+                {!isStaffAccount && (
+                  <button onClick={() => setEmOpen((v) => !v)} style={smallBtn}>
+                    {email ? "変更" : "登録"}
+                  </button>
+                )}
               </div>
               {emOpen && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 9, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-accent-800)" }}>
@@ -345,7 +352,8 @@ export default function MyPageDialog({
               )}
             </div>
 
-            {/* パスワード（任意） */}
+            {/* パスワード（任意）。本部画面と共用のアカウントは本部画面側で管理する */}
+            {!isStaffAccount && (
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               <div style={rowBox}>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5 }}>
@@ -390,6 +398,7 @@ export default function MyPageDialog({
                 </span>
               )}
             </div>
+            )}
 
             {/* 画面の色合い */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
