@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { X, Timer } from "@phosphor-icons/react";
+import { errorMessage } from "@/lib/errors";
 import type { RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
-import { stageInfoFor, statusBadgeFor, STAGE_LABELS } from "@/lib/stage";
+import { stageInfoFor, statusBadgeFor, STAGE_LABELS, PAYMENT_TIMING_LABEL, CADENCE_LABEL } from "@/lib/stage";
 import { headingWeight } from "@/lib/style";
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 50 };
@@ -37,13 +39,37 @@ function Centered({ onBackdrop, children }: { onBackdrop: () => void; children: 
 // ---------- 進捗状況パネル ----------
 export function ProgressPanel({
   bundles,
+  balance,
   onClose,
   onCancel,
+  onPay,
+  onOpenCharge,
 }: {
   bundles: RequestBundle[];
+  balance: number;
   onClose: () => void;
   onCancel: (id: string) => void;
+  // 見積もり待ちの依頼をここからも確定できるようにする（トークで見積もりカードを
+  // 探さなくて済むように）。中身はトークの見積もりカードの「依頼を確定する」と同じ。
+  onPay: (id: string) => Promise<void>;
+  onOpenCharge: () => void;
 }) {
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [payError, setPayError] = useState<{ id: string; message: string } | null>(null);
+
+  async function handlePay(id: string) {
+    if (payingId) return;
+    setPayingId(id);
+    setPayError(null);
+    try {
+      await onPay(id);
+    } catch (e) {
+      setPayError({ id, message: errorMessage(e, "お支払いできませんでした") });
+    } finally {
+      setPayingId(null);
+    }
+  }
+
   const active = bundles.filter((b) => b.request.phase !== "declined");
   const quoted = active.filter((b) => b.request.phase === "quoted").length;
   const preparing = active.filter((b) => b.request.phase === "preparing").length;
@@ -106,10 +132,48 @@ export function ProgressPanel({
                     </span>
                     <span style={{ flex: "none" }}>{yen(r.amount)}</span>
                   </div>
+                  {canCancel && r.payment_timing === "balance" && balance < r.amount && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
+                      <span style={{ flex: 1, color: "var(--color-accent-200)" }}>残高が不足しています（残高 {yen(balance)}）</span>
+                      <button onClick={onOpenCharge} style={{ ...accentBtn, height: 30, fontSize: 11.5 }}>
+                        チャージする
+                      </button>
+                    </div>
+                  )}
+                  {canCancel && r.payment_timing !== "balance" && (
+                    <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{PAYMENT_TIMING_LABEL[r.payment_timing]}</div>
+                  )}
+                  {canCancel && r.payment_timing === "balance" && r.cadence && (
+                    <div style={{ fontSize: 11.5, lineHeight: 1.6, color: "var(--color-neutral-500)" }}>
+                      確定すると、以降は{CADENCE_LABEL[r.cadence]}自動的に依頼が作られ、残高から引き落とされます。
+                    </div>
+                  )}
+                  {payError?.id === r.id && <div style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{payError.message}</div>}
                   {canCancel && (
-                    <button onClick={() => onCancel(r.id)} style={{ height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--color-text)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-                      この見積もりを見送る
-                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {r.payment_timing === "balance" && (
+                        <button
+                          onClick={() => handlePay(r.id)}
+                          disabled={!!payingId || balance < r.amount}
+                          style={{
+                            flex: 2,
+                            height: 34,
+                            cursor: payingId || balance < r.amount ? "not-allowed" : "pointer",
+                            fontSize: 12.5,
+                            color: "var(--color-accent-100)",
+                            background: "var(--color-accent-900)",
+                            border: "1px solid var(--color-accent)",
+                            borderRadius: "var(--radius-md)",
+                            opacity: payingId || balance < r.amount ? 0.6 : 1,
+                          }}
+                        >
+                          {payingId === r.id ? "処理中…" : `依頼を確定する（${yen(r.amount)}）`}
+                        </button>
+                      )}
+                      <button onClick={() => onCancel(r.id)} style={{ flex: 1, height: 34, cursor: "pointer", fontSize: 12.5, color: "var(--color-text)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+                        見送る
+                      </button>
+                    </div>
                   )}
                 </div>
               );
