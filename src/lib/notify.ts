@@ -3,6 +3,8 @@ import { emailSubject, renderEmail } from "@/lib/email-layout";
 
 type Admin = ReturnType<typeof createServiceRoleClient>;
 
+const SUPPORT_EMAIL = "hello.stb.app@gmail.com";
+
 async function sendStaffEmail(admin: Admin, emails: string[], subject: string, html: string) {
   if (!emails.length) return;
   const apiKey = process.env.RESEND_API_KEY;
@@ -130,9 +132,10 @@ export async function notifyEmailChanged(userId: string, prevEmail: string) {
       await admin.from("messages").insert(threads.map((t) => ({ thread_id: t.id, sender_id: null, sender_role: null, kind: "notice" as const, body: "ログイン用のメールアドレスが変更されました" })));
     }
 
-    const { data: org } = await admin.from("organizations").select("display_name, email, tel").eq("id", customers[0].org_id).maybeSingle();
+    const { data: org } = await admin.from("organizations").select("display_name, email").eq("id", customers[0].org_id).maybeSingle();
     const orgName = org?.display_name ?? "";
-    const contact = org?.email || org?.tel;
+    // 連絡先はメールに統一する（事業所のメールが未登録なら PORT の問い合わせ窓口）。
+    const contact = org?.email || SUPPORT_EMAIL;
     await sendStaffEmail(
       admin,
       [prevEmail],
@@ -142,7 +145,7 @@ export async function notifyEmailChanged(userId: string, prevEmail: string) {
         heading: "メールアドレスが変更されました",
         lines: [
           "ご登録のログイン用メールアドレスが変更されました。今後のご案内は新しいアドレスにお送りします。",
-          contact ? `お心当たりがない場合は、お手数ですが ${contact} までご連絡ください。` : "お心当たりがない場合は、お手数ですが本部までご連絡ください。",
+          `お心当たりがない場合は、お手数ですが ${contact} までメールでご連絡ください。`,
         ],
       }),
     );
