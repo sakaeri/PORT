@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Inter, Noto_Sans_JP } from "next/font/google";
-import "@phosphor-icons/web/regular";
-import "@phosphor-icons/web/fill";
 import "./globals.css";
 
 const inter = Inter({

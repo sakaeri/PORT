@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, Timer } from "@phosphor-icons/react";
+import { StepIcon } from "@/components/chat/icons";
 import { errorMessage } from "@/lib/errors";
 import type { RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
@@ -109,10 +110,9 @@ export function ProgressPanel({
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     {stage.steps.map((s, i) => {
                       const color = s.state === "done" || s.state === "muted" ? "var(--color-accent-300)" : s.state === "current" ? "var(--color-neutral-400)" : "var(--color-neutral-600)";
-                      const icon = s.state === "done" || s.state === "muted" ? (r.phase === "cancelled" || r.phase === "declined" ? "ph-fill ph-x-circle" : "ph-fill ph-check-circle") : s.state === "current" ? "ph ph-circle-dashed" : "ph ph-circle";
                       return (
                         <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color }}>
-                          <i className={icon} style={{ flex: "none", fontSize: 15 }} />
+                          <StepIcon state={s.state} stopped={r.phase === "cancelled" || r.phase === "declined"} size={15} />
                           <span style={{ minWidth: 0, flex: 1 }}>{s.label}</span>
                           <span style={{ flex: "none", fontSize: 10.5, color: "var(--color-neutral-600)" }}>{s.at ? timeLabel(s.at) : ""}</span>
                         </div>
