@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
+import { FileIcon, StepIcon } from "@/components/chat/icons";
 import type { AttachmentRow, MessageWithExtras, RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
@@ -15,17 +16,6 @@ import { Avatar, avatarInitial } from "@/components/chat/AvatarPicker";
 // 名乗る担当者名もない）は、頭文字の代わりにロゴ画像を出す。
 function senderAvatar(msg: MessageWithExtras): string | null {
   return msg.senderAvatarUrl ?? (msg.senderName ? null : "/logo.png");
-}
-
-function fileIconClass(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  if (["png", "jpg", "jpeg", "gif", "webp", "heic"].includes(ext)) return "ph ph-image";
-  if (ext === "pdf") return "ph ph-file-pdf";
-  if (["xls", "xlsx", "csv"].includes(ext)) return "ph ph-file-xls";
-  if (["doc", "docx"].includes(ext)) return "ph ph-file-doc";
-  if (["zip", "rar", "7z"].includes(ext)) return "ph ph-file-zip";
-  if (["mp4", "mov", "avi"].includes(ext)) return "ph ph-file-video";
-  return "ph ph-paperclip";
 }
 
 function fileSizeLabel(n: number | null): string {
@@ -139,7 +129,7 @@ export function FilesBubble({ msg, highlight, orgId, orgDisplayName }: { msg: Me
               {openingId === f.id ? (
                 <CircleNotch size={17} style={{ flex: "none", color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} />
               ) : (
-                <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 17, color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-accent)" }} />
+                <FileIcon name={f.file_name} size={17} color={isSelf ? "var(--color-bubble-self-text)" : "var(--color-accent)"} />
               )}
               <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5, color: isSelf ? "var(--color-bubble-self-text)" : "var(--color-text)" }}>{f.file_name}</span>
               <span style={{ flex: "none", fontSize: 10, color: isSelf ? "color-mix(in srgb, var(--color-bubble-self-text) 60%, transparent)" : "var(--color-neutral-500)" }}>{fileSizeLabel(f.bytes)}</span>
@@ -397,10 +387,9 @@ export function RequestCard({
             <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 6 }}>
               {stage.steps.map((s, i) => {
                 const color = s.state === "done" ? "var(--color-accent-300)" : s.state === "muted" ? "var(--color-neutral-400)" : s.state === "current" ? "var(--color-neutral-400)" : "var(--color-neutral-600)";
-                const icon = s.state === "done" || s.state === "muted" ? (r.phase === "cancelled" || r.phase === "declined" ? "ph-fill ph-x-circle" : "ph-fill ph-check-circle") : s.state === "current" ? "ph ph-circle-dashed" : "ph ph-circle";
                 return (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color }}>
-                    <i className={icon} style={{ flex: "none", fontSize: 16 }} />
+                    <StepIcon state={s.state} stopped={r.phase === "cancelled" || r.phase === "declined"} size={16} />
                     <span style={{ minWidth: 0, flex: 1 }}>{s.label}</span>
                     <span style={{ flex: "none", fontSize: 10.5, color: "var(--color-neutral-600)" }}>{s.at ? timeLabel(s.at) : ""}</span>
                   </div>
@@ -442,7 +431,7 @@ export function RequestCard({
                       {openingAttachmentId === f.id ? (
                         <CircleNotch size={15} style={{ flex: "none", color: "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} />
                       ) : (
-                        <i className={fileIconClass(f.file_name)} style={{ flex: "none", fontSize: 15, color: "var(--color-accent)" }} />
+                        <FileIcon name={f.file_name} size={15} color="var(--color-accent)" />
                       )}
                       <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12 }}>{f.label ? `${f.label}：${f.file_name}` : f.file_name}</span>
                     </button>

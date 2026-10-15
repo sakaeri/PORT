@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Paperclip, ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/react";
+import { FileIcon } from "@/components/chat/icons";
 import { createClient } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/image-resize";
 
@@ -34,13 +35,6 @@ function isImageFile(file: File): boolean {
 }
 function isPdfFile(file: File): boolean {
   return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-}
-
-function fileIconClass(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  if (["png", "jpg", "jpeg", "gif", "webp", "heic"].includes(ext)) return "ph ph-image";
-  if (ext === "pdf") return "ph ph-file-pdf";
-  return "ph ph-paperclip";
 }
 
 function sizeMbLabel(bytes: number): string {
@@ -202,7 +196,7 @@ export default function Composer({ threadId, orgId, onSend }: Props) {
               key={f.path}
               style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 28, maxWidth: 200, padding: "0 6px 0 10px", borderRadius: 20, fontSize: 11, color: "var(--color-accent-200)", background: "var(--color-accent-800)" }}
             >
-              <i className={fileIconClass(f.name)} style={{ flex: "none", fontSize: 13 }} />
+              <FileIcon name={f.name} size={13} />
               <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
               <button onClick={() => removeAttachment(f.path)} aria-label="添付を外す" style={{ width: 18, height: 18, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none", borderRadius: "50%" }}>
                 <X size={11} />
