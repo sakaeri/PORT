@@ -4,6 +4,7 @@ import { useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
 import { FileIcon, StepIcon } from "@/components/chat/icons";
+import { QuoteExpiryLine, useQuoteExpiry } from "@/components/chat/QuoteExpiry";
 import type { AttachmentRow, MessageWithExtras, RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, stageInfoFor } from "@/lib/stage";
@@ -264,6 +265,8 @@ export function RequestCard({
     }
   }
 
+  // 立替の見積もりは有効期限を過ぎると確定できない（DB側でも拒否される）。
+  const expiry = useQuoteExpiry(r.phase === "quoted" ? r.quote_expires_at : null);
   const showProgress = !["quoted", "declined"].includes(r.phase);
   const showReport = r.phase === "completed" && !!report?.sent_at;
   const stage = stageInfoFor(r);
@@ -352,22 +355,23 @@ export function RequestCard({
                         </button>
                       </div>
                     )}
+                    <QuoteExpiryLine expired={expiry.expired} remaining={expiry.remaining} />
                     {payError && <div style={{ color: "var(--color-accent-200)" }}>{payError}</div>}
                     <button
                       onClick={handlePay}
-                      disabled={paying || balance < r.amount}
+                      disabled={paying || balance < r.amount || expiry.expired}
                       style={{
                         alignSelf: "flex-start",
                         marginTop: 4,
                         height: 34,
                         padding: "0 14px",
-                        cursor: balance < r.amount ? "not-allowed" : "pointer",
+                        cursor: balance < r.amount || expiry.expired ? "not-allowed" : "pointer",
                         fontSize: 12.5,
                         color: "var(--color-accent-100)",
                         background: "var(--color-accent-900)",
                         border: "1px solid var(--color-accent)",
                         borderRadius: "var(--radius-md)",
-                        opacity: paying || balance < r.amount ? 0.6 : 1,
+                        opacity: paying || balance < r.amount || expiry.expired ? 0.6 : 1,
                       }}
                     >
                       {paying ? "処理中…" : `依頼を確定する（${yen(r.amount)}）`}

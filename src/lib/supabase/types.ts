@@ -224,6 +224,8 @@ export interface Database {
           hourly_rate: number | null;
           hourly_cap: number | null;
           cadence: "weekly" | "monthly" | null;
+          advance_amount: number | null;
+          quote_expires_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]>;

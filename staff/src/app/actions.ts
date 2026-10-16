@@ -6,6 +6,7 @@ import { getStaffContext } from "@/lib/data";
 import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
 import { isCustomerCaughtUp, notifyCustomerCompletionReport, notifyCustomerNewMessage, notifyCustomerQuoteCreated } from "@/lib/notify";
 import type { StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
+import { advanceFee, ADVANCE_FEE_RATE, ADVANCE_VALID_MINUTES } from "@/lib/advance";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
 // （キャンセル処理や、支払い設定そのものなど）用。既定はロック中なら弾く。
@@ -762,6 +763,9 @@ export async function createCaseRequest(
     saveAsMenu?: boolean;
     // メニューに無い依頼を時間精算にする場合。設定すると items は無視する。
     hourly?: { rate: number; cap: number; label: string };
+    // 立替（実費の支払い代行）にする場合。実費と手数料の2行の見積もりになり、
+    // minutes 分を過ぎると依頼主は承諾できない（DBのトリガーでも拒否する）。
+    advance?: { label: string; amount: number; minutes: number };
     // 定期対応（毎週・毎月）にする場合。hourly とは併用不可。初回の支払いが
     // 確定するまでは定期対応としては動き出さない
     // （pay_request_from_balance 側で有効化する）。
@@ -777,23 +781,36 @@ export async function createCaseRequest(
   const ctx = await requireContext();
   const supabase = await createClient();
   const isHourly = !!input.hourly;
-  const items = isHourly ? [] : input.items.filter((it) => it.qty > 0 && it.label.trim());
+  const advance = input.advance;
+  if (advance && (!advance.label.trim() || !(advance.amount > 0))) throw new Error("代金の内容と実費を入力してください");
+  if (advance && !(ADVANCE_VALID_MINUTES as readonly number[]).includes(advance.minutes)) throw new Error("有効時間を選んでください");
+  const advanceFeeAmount = advance ? advanceFee(Math.round(advance.amount)) : 0;
+  const items = isHourly
+    ? []
+    : advance
+      ? [
+          { menuId: null, label: `実費（${advance.label.trim()}）`, price: Math.round(advance.amount), payout: 0, qty: 1, leadHours: null },
+          { menuId: null, label: `立替手数料（${Math.round(ADVANCE_FEE_RATE * 100)}%）`, price: advanceFeeAmount, payout: 0, qty: 1, leadHours: null },
+        ]
+      : input.items.filter((it) => it.qty > 0 && it.label.trim());
   if (!isHourly && items.length === 0) throw new Error("見積もりの項目を1つ以上追加してください");
   if (isHourly && (!input.hourly!.rate || !input.hourly!.cap)) throw new Error("時間単価と上限額を入力してください");
 
   const amount = isHourly ? input.hourly!.cap : items.reduce((sum, it) => sum + it.price * it.qty, 0);
   const title = isHourly
     ? input.hourly!.label.trim() || "時間精算の依頼"
-    : items.length > 2
+    : advance
+      ? `立替：${advance.label.trim()}`
+      : items.length > 2
       ? `${items[0].label}ほか${items.length - 1}件`
       : items.map((it) => it.label).join("・");
   // 着手時に納期（due_at）を計算するための作業時間の目安を保存しておく
   // （項目ごとの目安時間 × 数量。複数項目は並行して進む前提でmaxを取る）。
   // 時間精算案件は着手〜完了の実測で金額を決めるので目安自体は使わない。
   const knownLeadHours = items.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
-  const leadHoursTotal = isHourly || input.cadence ? null : knownLeadHours.length > 0 ? Math.max(...knownLeadHours) : null;
+  const leadHoursTotal = isHourly || advance || input.cadence ? null : knownLeadHours.length > 0 ? Math.max(...knownLeadHours) : null;
 
-  if (!isHourly && input.saveAsMenu) {
+  if (!isHourly && !advance && input.saveAsMenu) {
     const customItems = items.filter((it) => !it.menuId);
     if (customItems.length > 0) {
       const { error: menuError } = await supabase
@@ -817,7 +834,9 @@ export async function createCaseRequest(
       payment_timing: "balance",
       hourly_rate: isHourly ? input.hourly!.rate : null,
       hourly_cap: isHourly ? input.hourly!.cap : null,
-      cadence: input.cadence ?? null,
+      cadence: advance ? null : (input.cadence ?? null),
+      advance_amount: advance ? Math.round(advance.amount) : null,
+      quote_expires_at: advance ? new Date(Date.now() + advance.minutes * 60 * 1000).toISOString() : null,
     })
     .select("id")
     .single();
@@ -832,7 +851,7 @@ export async function createCaseRequest(
 
   // 定期対応の雛形を作っておく。初回の支払いが確定するまでは active=false
   // のままで、pay_request_from_balance が確定と同時に有効化する。
-  if (input.cadence) {
+  if (input.cadence && !advance) {
     const { data: subscription, error: subError } = await supabase
       .from("request_subscriptions")
       .insert({

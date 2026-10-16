@@ -1,0 +1,49 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+// 立替の見積もりの有効期限（requests.quote_expires_at）までの残り時間。
+// サーバーで描いた時刻と食い違わないよう、時計はブラウザで動き出してから使う。
+export function useQuoteExpiry(expiresAt: string | null): { expired: boolean; remaining: string | null } {
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!expiresAt) return;
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [expiresAt]);
+
+  if (!expiresAt || now == null) return { expired: false, remaining: null };
+  const left = new Date(expiresAt).getTime() - now;
+  if (left <= 0) return { expired: true, remaining: null };
+  const totalSec = Math.ceil(left / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return { expired: false, remaining: `${m}:${String(s).padStart(2, "0")}` };
+}
+
+// 確定ボタンのすぐ上に出す一行。期限切れなら確定できない理由を出す。
+export function QuoteExpiryLine({ expired, remaining }: { expired: boolean; remaining: string | null }) {
+  if (expired) {
+    return <div style={{ color: "var(--color-accent-200)" }}>有効期限が切れました。担当者に再見積もりをご依頼ください。</div>;
+  }
+  if (!remaining) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div>
+        有効期限：あと<span style={{ fontVariantNumeric: "tabular-nums", color: "var(--color-accent-300)" }}>{remaining}</span>
+      </div>
+      <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>※予約サイトの料金が変わる可能性があるため、期限内にご確定ください</div>
+    </div>
+  );
+}
+
+// 一覧の中（map の中）でフックを使えない場所向けの包み。
+export function WithQuoteExpiry({ expiresAt, children }: { expiresAt: string | null; children: (state: { expired: boolean; remaining: string | null }) => React.ReactNode }) {
+  return <>{children(useQuoteExpiry(expiresAt))}</>;
+}

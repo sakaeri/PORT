@@ -6,6 +6,7 @@ import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { createCaseRequest } from "@/app/actions";
 import InfoTooltip from "@/components/InfoTooltip";
+import { advanceFee, ADVANCE_FEE_MIN, ADVANCE_FEE_RATE, ADVANCE_VALID_MINUTES } from "@/lib/advance";
 import type { SubscriptionCadence } from "@/lib/supabase/types";
 
 export interface MenuOption {
@@ -130,7 +131,13 @@ export default function QuoteDialog({
   const [customLeadHours, setCustomLeadHours] = useState("");
   const [note, setNote] = useState("");
   const [saveAsMenu, setSaveAsMenu] = useState(false);
-  const [isHourly, setIsHourly] = useState(false);
+  // menu：メニューから選ぶ／hourly：時間精算／advance：立替（実費の支払い代行）
+  const [mode, setMode] = useState<"menu" | "hourly" | "advance">("menu");
+  const isHourly = mode === "hourly";
+  const isAdvance = mode === "advance";
+  const [advanceLabel, setAdvanceLabel] = useState("");
+  const [advanceAmount, setAdvanceAmount] = useState("");
+  const [advanceMinutes, setAdvanceMinutes] = useState<number>(15);
   const [cadence, setCadence] = useState<SubscriptionCadence | "">(initialCadence ?? "");
   const [anchorWeekday, setAnchorWeekday] = useState<number | null>(null);
   const [anchorDayOfMonth, setAnchorDayOfMonth] = useState("");
@@ -169,12 +176,14 @@ export default function QuoteDialog({
   ];
   const itemsTotal = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
   const hourlyCap = capFromEstimatedHours(Number(estimatedHours));
-  const total = isHourly ? hourlyCap : itemsTotal;
+  const advanceBase = Math.max(0, Math.round(Number(advanceAmount) || 0));
+  const advanceFeeAmount = advanceFee(advanceBase);
+  const total = isHourly ? hourlyCap : isAdvance ? advanceBase + advanceFeeAmount : itemsTotal;
   // 同じ項目を複数個頼むと、その分準備に時間がかかる想定で数量に比例させる
   // （項目ごとの目安時間 × 数量）。違う項目同士は並行して進む前提でmaxを取る。
   const knownLeadHours = allItems.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
-  const due = knownLeadHours.length > 0 ? hoursToDueLabel(Math.max(...knownLeadHours)) : "";
-  const canSubmit = isHourly ? hourlyCap > 0 : allItems.length > 0;
+  const due = !isAdvance && knownLeadHours.length > 0 ? hoursToDueLabel(Math.max(...knownLeadHours)) : "";
+  const canSubmit = isHourly ? hourlyCap > 0 : isAdvance ? advanceBase > 0 && !!advanceLabel.trim() : allItems.length > 0;
 
   async function submit() {
     if (saving || !canSubmit) return;
@@ -187,10 +196,11 @@ export default function QuoteDialog({
         due,
         saveAsMenu,
         hourly: isHourly ? { rate: HOURLY_RATE_PER_HOUR, cap: hourlyCap, label: hourlyLabel } : undefined,
-        cadence: !isHourly && cadence ? cadence : undefined,
-        anchorWeekday: !isHourly && cadence === "weekly" && anchorWeekday != null ? anchorWeekday : undefined,
-        anchorDayOfMonth: !isHourly && cadence === "monthly" && !anchorLastDayOfMonth && anchorDayOfMonth.trim() ? Number(anchorDayOfMonth) : undefined,
-        anchorLastDayOfMonth: !isHourly && cadence === "monthly" && anchorLastDayOfMonth ? true : undefined,
+        advance: isAdvance ? { label: advanceLabel, amount: advanceBase, minutes: advanceMinutes } : undefined,
+        cadence: mode === "menu" && cadence ? cadence : undefined,
+        anchorWeekday: mode === "menu" && cadence === "weekly" && anchorWeekday != null ? anchorWeekday : undefined,
+        anchorDayOfMonth: mode === "menu" && cadence === "monthly" && !anchorLastDayOfMonth && anchorDayOfMonth.trim() ? Number(anchorDayOfMonth) : undefined,
+        anchorLastDayOfMonth: mode === "menu" && cadence === "monthly" && anchorLastDayOfMonth ? true : undefined,
       });
       onCreated(requestId);
     } catch (e) {
@@ -209,22 +219,62 @@ export default function QuoteDialog({
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>{title}</div>
         <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>{description}</div>
 
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => setIsHourly(false)} style={pillStyle(!isHourly)}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <button onClick={() => setMode("menu")} style={pillStyle(mode === "menu")}>
             メニューから選ぶ
           </button>
           <button
             onClick={() => {
-              setIsHourly(true);
+              setMode("hourly");
               setCadence("");
             }}
             style={pillStyle(isHourly)}
           >
             時間精算（メニューに無い依頼）
           </button>
+          <button
+            onClick={() => {
+              setMode("advance");
+              setCadence("");
+            }}
+            style={pillStyle(isAdvance)}
+          >
+            立替（実費の支払い）
+          </button>
         </div>
 
-        {isHourly ? (
+        {isAdvance ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>何の代金か</span>
+              <input value={advanceLabel} onChange={(e) => setAdvanceLabel(e.target.value)} placeholder="例：航空券代" className="vid-input" style={inputStyle} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>実費（支払い画面の金額）</span>
+                <InfoTooltip
+                  text={`予約サイトで支払いボタンの手前まで進め、その画面の金額をそのまま入れてください。立替手数料（実費の${Math.round(ADVANCE_FEE_RATE * 100)}%・円未満切り上げ・最低${ADVANCE_FEE_MIN}円）を足した額を見積もりとして送ります。実費は売上・実績には含まれず、手数料だけが計上されます。`}
+                />
+              </div>
+              <input value={advanceAmount} onChange={(e) => setAdvanceAmount(e.target.value)} type="number" min={1} placeholder="例：25000" className="vid-input" style={{ ...inputStyle, maxWidth: 180 }} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>有効時間（過ぎると依頼主は承諾できません）</span>
+              <div style={{ display: "flex", gap: 6 }}>
+                {ADVANCE_VALID_MINUTES.map((m) => (
+                  <button key={m} onClick={() => setAdvanceMinutes(m)} style={{ ...pillStyle(advanceMinutes === m), minWidth: 52 }}>
+                    {m}分
+                  </button>
+                ))}
+              </div>
+            </div>
+            {advanceBase > 0 && (
+              <div style={{ fontSize: 11, lineHeight: 1.7, color: "var(--color-neutral-500)" }}>
+                実費 ¥{advanceBase.toLocaleString("ja-JP")} ＋ 立替手数料 ¥{advanceFeeAmount.toLocaleString("ja-JP")}
+              </div>
+            )}
+          </div>
+        ) : isHourly ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>件名</span>
@@ -323,7 +373,7 @@ export default function QuoteDialog({
           </>
         )}
 
-        {!isHourly && (
+        {mode === "menu" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>頻度</span>

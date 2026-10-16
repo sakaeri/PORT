@@ -95,7 +95,7 @@ async function HqStats() {
 async function OrgStats({ orgId, orgDisplayName, viewerRole, viewerUserId }: { orgId: string; orgDisplayName: string; viewerRole: StaffRole | "reception"; viewerUserId: string }) {
   const supabase = await createClient();
   const [{ data: requests, error }, { data: departmentRows }, { data: customerThreads }, { data: myDepartmentRows }, { data: ratingRows }, { data: managerProfiles }, { data: staffDepartmentRows }] = await Promise.all([
-    supabase.from("requests").select("id, title, phase, amount, pay_status, paid_at, completed_at, customer_id, customers(name, staff_label)").eq("org_id", orgId),
+    supabase.from("requests").select("id, title, phase, amount, advance_amount, pay_status, paid_at, completed_at, customer_id, customers(name, staff_label)").eq("org_id", orgId),
     supabase.from("departments").select("id, name, royalty_pct").eq("org_id", orgId).order("created_at", { ascending: true }),
     // 依頼主の窓口は、その依頼主の「customerトーク」が持つ department_id で決まる
     // （customersテーブル自体には窓口の列がない）。
@@ -110,6 +110,10 @@ async function OrgStats({ orgId, orgDisplayName, viewerRole, viewerUserId }: { o
   if (error) return <div style={{ fontSize: 13, color: "var(--color-accent-200)" }}>読み込みに失敗しました。</div>;
 
   const rows = requests ?? [];
+  // 立替の見積もりは実費（advance_amount）を売上に含めず、手数料分だけを計上する。
+  function revenueOf(r: (typeof rows)[number]): number {
+    return r.amount - (r.advance_amount ?? 0);
+  }
   function customerNameOf(r: (typeof rows)[number]): string {
     const c = Array.isArray(r.customers) ? r.customers[0] : r.customers;
     return c?.staff_label ?? c?.name ?? "—";
@@ -165,13 +169,13 @@ async function OrgStats({ orgId, orgDisplayName, viewerRole, viewerUserId }: { o
     let monthRevenue = 0;
     for (const r of deptRows) {
       if (r.phase === "completed" && r.completed_at && monthKeyJST(r.completed_at) === currentKey) {
-        completedThisMonth.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "paid", staff: staffFor(r.id) });
-        monthRevenue += r.amount;
+        completedThisMonth.push({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: revenueOf(r), status: "paid", staff: staffFor(r.id) });
+        monthRevenue += revenueOf(r);
       }
     }
     const pendingRows: MonthRow[] = deptRows
       .filter((r) => r.pay_status !== "paid" && !["draft", "cancelled", "declined"].includes(r.phase))
-      .map((r) => ({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: r.amount, status: "pending" as const, staff: null }))
+      .map((r) => ({ requestId: r.id, customerName: customerNameOf(r), title: r.title, amount: revenueOf(r), status: "pending" as const, staff: null }))
       .filter((r) => r.amount > 0);
 
     const months: MonthBreakdown[] = [{ key: currentKey, label: currentLabel, rows: [...pendingRows, ...completedThisMonth] }];
