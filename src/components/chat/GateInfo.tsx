@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { X, ListNumbers, Coins, Question } from "@phosphor-icons/react";
+import { X, ListNumbers, Coins, Question, MagnifyingGlass } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import { TASK_EXAMPLES, TASK_READINGS } from "@/lib/task-examples";
 
 // ログイン前の入口画面（AccountGate）の下に並べる、サービス紹介の3つのボタン。
 // 画面自体には説明文を置かず、見たい人だけがポップアップで開ける形にする。
 // 文面は利用規約（/terms の DEFAULT_TERMS_CONTENT）と食い違わない範囲に留める。
-type Topic = "howto" | "pricing" | "faq";
+type Topic = "tasks" | "howto" | "pricing" | "faq";
 
 const TOPICS: { id: Topic; label: string; Icon: typeof Question }[] = [
+  { id: "tasks", label: "頼めること", Icon: MagnifyingGlass },
   { id: "howto", label: "利用方法", Icon: ListNumbers },
   { id: "pricing", label: "料金形態", Icon: Coins },
   { id: "faq", label: "よくあるご質問", Icon: Question },
@@ -90,7 +92,69 @@ function Section({ mark, title, body }: { mark?: string; title: string; body: st
   );
 }
 
+// ひらがな・カタカナ、大文字・小文字、全角・半角の違いを気にせず探せるようにそろえる。
+function normalize(s: string): string {
+  return s
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\u30a1-\u30f6]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    .replace(/\s+/g, "");
+}
+
+// 入力そのものに加えて、読み仮名の表から漢字に置き換えた語でも探す（「よや」→「予約」）。
+function searchTerms(q: string): string[] {
+  if (!q) return [];
+  const terms = new Set([q]);
+  for (const [reading, word] of TASK_READINGS) {
+    if (q.length >= 2 && reading.startsWith(q)) terms.add(normalize(word));
+    else if (q.includes(reading)) terms.add(q.replace(reading, normalize(word)));
+  }
+  return [...terms];
+}
+
+function TaskList() {
+  const [query, setQuery] = useState("");
+  const terms = searchTerms(normalize(query));
+  const hit = (s: string) => terms.some((t) => normalize(s).includes(t));
+  const groups = TASK_EXAMPLES.map((g) => ({
+    category: g.category,
+    items: terms.length && !hit(g.category) ? g.items.filter(hit) : g.items,
+  })).filter((g) => g.items.length > 0);
+
+  return (
+    <>
+      <div style={{ position: "relative" }}>
+        <MagnifyingGlass size={15} color="var(--color-neutral-500)" style={{ position: "absolute", left: 11, top: 11 }} />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="例：予約、請求書、SNS"
+          className="vid-input"
+          style={{ width: "100%", height: 38, padding: "0 12px 0 32px", fontSize: 13.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}
+        />
+      </div>
+      {groups.length === 0 ? (
+        <div style={{ ...bodyText, padding: "4px 4px 8px" }}>ここにないことも、まずはトークでお気軽にご相談ください。</div>
+      ) : (
+        groups.map((g) => (
+          <div key={g.category} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={band}>{g.category}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "0 2px" }}>
+              {g.items.map((it) => (
+                <span key={it} style={{ padding: "5px 10px", fontSize: 12.5, lineHeight: 1.5, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: 999 }}>
+                  {it}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </>
+  );
+}
+
 function Content({ topic }: { topic: Topic }) {
+  if (topic === "tasks") return <TaskList />;
   if (topic === "howto") return <>{STEPS.map((s, i) => <Section key={s.title} mark={String(i + 1)} title={s.title} body={s.body} />)}</>;
   if (topic === "pricing") return <>{PRICING.map((p) => <Section key={p.title} title={p.title} body={p.body} />)}</>;
   return <>{FAQ.map((f) => <Section key={f.q} mark="Q" title={f.q} body={f.a} />)}</>;
@@ -102,19 +166,19 @@ export default function GateInfo() {
 
   return (
     <>
-      <div style={{ width: "100%", display: "flex", gap: 8, marginTop: 4 }}>
+      <div style={{ width: "100%", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 4 }}>
         {TOPICS.map(({ id, label, Icon }) => (
           <button
             key={id}
             onClick={() => setOpen(id)}
             style={{
-              flex: 1,
               minWidth: 0,
+              height: 46,
               display: "flex",
-              flexDirection: "column",
               alignItems: "center",
-              gap: 6,
-              padding: "12px 4px 10px",
+              justifyContent: "center",
+              gap: 7,
+              padding: "0 6px",
               cursor: "pointer",
               fontSize: 12,
               whiteSpace: "nowrap",
@@ -125,7 +189,7 @@ export default function GateInfo() {
               boxShadow: "var(--shadow-sm)",
             }}
           >
-            <Icon size={22} color="var(--color-accent)" />
+            <Icon size={19} color="var(--color-accent)" />
             {label}
           </button>
         ))}
