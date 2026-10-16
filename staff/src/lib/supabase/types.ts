@@ -328,6 +328,8 @@ export interface Database {
           hourly_cap: number | null;
           subscription_id: string | null;
           cadence: SubscriptionCadence | null;
+          advance_amount: number | null;
+          quote_expires_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["requests"]["Row"]> & { customer_id: string; title: string };

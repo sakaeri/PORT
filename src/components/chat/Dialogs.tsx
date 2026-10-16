@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Timer } from "@phosphor-icons/react";
 import { StepIcon } from "@/components/chat/icons";
+import { QuoteExpiryLine, WithQuoteExpiry } from "@/components/chat/QuoteExpiry";
 import { errorMessage } from "@/lib/errors";
 import type { RequestBundle } from "@/lib/chat-types";
 import { yen, timeLabel } from "@/lib/format";
@@ -148,23 +149,31 @@ export function ProgressPanel({
                       確定すると、以降は{CADENCE_LABEL[r.cadence]}自動的に依頼が作られ、残高から引き落とされます。
                     </div>
                   )}
+                  <WithQuoteExpiry expiresAt={canCancel ? r.quote_expires_at : null}>
+                    {(expiry) => (
+                      <>
+                        {canCancel && r.payment_timing === "balance" && (
+                          <div style={{ fontSize: 11.5, lineHeight: 1.6 }}>
+                            <QuoteExpiryLine expired={expiry.expired} remaining={expiry.remaining} />
+                          </div>
+                        )}
                   {payError?.id === r.id && <div style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{payError.message}</div>}
                   {canCancel && (
                     <div style={{ display: "flex", gap: 8 }}>
                       {r.payment_timing === "balance" && (
                         <button
                           onClick={() => handlePay(r.id)}
-                          disabled={!!payingId || balance < r.amount}
+                          disabled={!!payingId || balance < r.amount || expiry.expired}
                           style={{
                             flex: 2,
                             height: 34,
-                            cursor: payingId || balance < r.amount ? "not-allowed" : "pointer",
+                            cursor: payingId || balance < r.amount || expiry.expired ? "not-allowed" : "pointer",
                             fontSize: 12.5,
                             color: "var(--color-accent-100)",
                             background: "var(--color-accent-900)",
                             border: "1px solid var(--color-accent)",
                             borderRadius: "var(--radius-md)",
-                            opacity: payingId || balance < r.amount ? 0.6 : 1,
+                            opacity: payingId || balance < r.amount || expiry.expired ? 0.6 : 1,
                           }}
                         >
                           {payingId === r.id ? "処理中…" : `依頼を確定する（${yen(r.amount)}）`}
@@ -175,6 +184,9 @@ export function ProgressPanel({
                       </button>
                     </div>
                   )}
+                      </>
+                    )}
+                  </WithQuoteExpiry>
                 </div>
               );
             })}
