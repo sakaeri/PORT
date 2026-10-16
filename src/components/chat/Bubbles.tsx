@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { errorMessage } from "@/lib/errors";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
 import { FileIcon, StepIcon } from "@/components/chat/icons";
@@ -72,10 +72,37 @@ export function TextBubble({ msg, highlight, orgDisplayName }: { msg: MessageWit
   );
 }
 
+function isImageAttachment(f: AttachmentRow): boolean {
+  return (f.mime ?? "").startsWith("image/") || /\.(jpe?g|png|gif|webp)$/i.test(f.file_name);
+}
+
 export function FilesBubble({ msg, highlight, orgId, orgDisplayName }: { msg: MessageWithExtras; highlight: boolean; orgId: string; orgDisplayName: string }) {
   const isSelf = msg.sender_role === "client";
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
+  // 画像はファイル名ではなくサムネイルで見せる（本部画面と同じ）。attachments
+  // バケットは非公開なので、表示用に署名付きURLをまとめて発行する。
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const images = msg.attachments.filter((f: AttachmentRow) => f.file_path && isImageAttachment(f));
+  const others = msg.attachments.filter((f: AttachmentRow) => !images.includes(f));
+  const imageKey = images.map((f: AttachmentRow) => f.file_path).join("|");
+
+  useEffect(() => {
+    if (!imageKey) return;
+    let cancelled = false;
+    createClient(orgId)
+      .storage.from("attachments")
+      .createSignedUrls(imageKey.split("|"), 60 * 60)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const next: Record<string, string> = {};
+        for (const d of data) if (d.path && d.signedUrl) next[d.path] = d.signedUrl;
+        setThumbs(next);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [imageKey, orgId]);
 
   async function openAttachment(f: AttachmentRow) {
     if (!f.file_path || openingId) return;
@@ -109,7 +136,27 @@ export function FilesBubble({ msg, highlight, orgId, orgDisplayName }: { msg: Me
           border: isSelf ? "none" : "1px solid var(--color-divider)",
         }}
       >
-        {msg.attachments.map((f: AttachmentRow) => (
+        {images.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {images.map((f: AttachmentRow) => (
+              <button
+                key={f.id}
+                onClick={() => openAttachment(f)}
+                aria-label={f.file_name}
+                style={{ width: 132, height: 132, padding: 0, cursor: "pointer", overflow: "hidden", border: "none", borderRadius: "var(--radius-md)", background: isSelf ? "color-mix(in srgb, var(--color-bubble-self-text) 6%, transparent)" : "var(--color-bg)" }}
+              >
+                {thumbs[f.file_path] && (
+                  // eslint-disable-next-line @next/next/no-img-element -- 署名付きURLの外部ストレージ画像のため plain img
+                  <img src={thumbs[f.file_path]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+        {images.some((f: AttachmentRow) => f.id === errorId) && (
+          <span style={{ fontSize: 10.5, paddingLeft: 2, color: "var(--color-accent-200)" }}>開けませんでした。もう一度お試しください</span>
+        )}
+        {others.map((f: AttachmentRow) => (
           <div key={f.id} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <button
               onClick={() => openAttachment(f)}
