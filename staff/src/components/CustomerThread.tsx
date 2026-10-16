@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, CircleNotch, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X, CaretLeft, ChatText, ListChecks, Plus, PencilSimple } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Buildings, ArrowSquareOut, Trash, ChatCircleText, Star, SidebarSimple, X, CaretLeft, ChatText, ListChecks, Plus, PencilSimple } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -619,7 +619,9 @@ export default function CustomerThread({
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [threadError, setThreadError] = useState("");
-  const [uploadingFiles, setUploadingFiles] = useState(false);
+  // 選んだ画像・PDFは、送信ボタンを押すまで入力欄の上にためておく
+  // （依頼主画面と同じ。画像のあとに添える文章を落ち着いて打てるように）。
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [templates, setTemplates] = useState(initialTemplates);
   const [showTemplates, setShowTemplates] = useState(false);
   const isMobile = useIsMobile();
@@ -775,12 +777,25 @@ export default function CustomerThread({
   }, [thread, orgId, refresh]);
 
   async function send() {
-    if (!thread || sending || !draft.trim()) return;
+    if (!thread || sending || (!draft.trim() && pendingFiles.length === 0)) return;
     setSending(true);
     setThreadError("");
     const body = draft.trim();
     try {
-      await sendStaffMessage(thread.id, body);
+      if (pendingFiles.length > 0) {
+        const supabase = createClient(orgId);
+        const uploaded: { path: string; name: string; mime: string; bytes: number }[] = [];
+        for (const file of pendingFiles) {
+          const ext = /\.[a-zA-Z0-9]{1,8}$/.exec(file.name)?.[0].toLowerCase() ?? "";
+          const path = `${thread.id}/${crypto.randomUUID()}${ext}`;
+          const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
+          if (error) throw error;
+          uploaded.push({ path, name: file.name, mime: file.type, bytes: file.size });
+        }
+        await sendStaffFiles(thread.id, uploaded);
+        setPendingFiles([]);
+      }
+      if (body) await sendStaffMessage(thread.id, body);
       setDraft("");
       await refresh();
     } catch (e) {
@@ -790,12 +805,10 @@ export default function CustomerThread({
     }
   }
 
-  // 選んだ画像・PDFはその場でアップロードして送る（LINEの写真送信と同じ感覚で、
-  // 下書きに溜めずに1回で送信まで終える）。
-  async function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+  function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!thread || files.length === 0) return;
+    if (files.length === 0) return;
     const ok = files.filter((f) => f.type.startsWith("image/") || f.type === "application/pdf" || /\.pdf$/i.test(f.name));
     if (ok.length < files.length) setThreadError("画像またはPDFファイルのみ送信できます");
     else setThreadError("");
@@ -804,25 +817,7 @@ export default function CustomerThread({
       setThreadError(`${tooBig.name} は20MBを超えているため送信できません`);
       return;
     }
-    if (ok.length === 0) return;
-    setUploadingFiles(true);
-    try {
-      const supabase = createClient(orgId);
-      const uploaded: { path: string; name: string; mime: string; bytes: number }[] = [];
-      for (const file of ok) {
-        const ext = /\.[a-zA-Z0-9]{1,8}$/.exec(file.name)?.[0].toLowerCase() ?? "";
-        const path = `${thread.id}/${crypto.randomUUID()}${ext}`;
-        const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
-        if (error) throw error;
-        uploaded.push({ path, name: file.name, mime: file.type, bytes: file.size });
-      }
-      await sendStaffFiles(thread.id, uploaded);
-      await refresh();
-    } catch (err) {
-      setThreadError(errorMessage(err, "送信できませんでした"));
-    } finally {
-      setUploadingFiles(false);
-    }
+    setPendingFiles((prev) => [...prev, ...ok]);
   }
 
   async function handleDeleteMessage(m: Message) {
@@ -1031,6 +1026,27 @@ export default function CustomerThread({
           onSend={send}
           sending={sending}
           placeholder="返信を入力…"
+          hasAttachments={pendingFiles.length > 0}
+          above={
+            pendingFiles.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {pendingFiles.map((f, i) => (
+                  <span key={`${f.name}-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, maxWidth: 220, height: 30, padding: "0 6px 0 10px", fontSize: 12, color: "var(--color-text)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: 999 }}>
+                    <Paperclip size={13} color="var(--color-accent)" style={{ flex: "none" }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                    <button
+                      onClick={() => setPendingFiles((rows) => rows.filter((_, j) => j !== i))}
+                      aria-label="添付を外す"
+                      disabled={sending}
+                      style={{ flex: "none", width: 20, height: 20, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )
+          }
           leftButton={
             <>
               <button
@@ -1042,10 +1058,10 @@ export default function CustomerThread({
               </button>
               <label
                 aria-label="画像・PDFを送る"
-                style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: uploadingFiles ? "wait" : "pointer", color: "var(--color-neutral-400)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+                style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-400)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
               >
-                {uploadingFiles ? <CircleNotch size={16} style={{ animation: "vid-spin 0.7s linear infinite" }} /> : <Paperclip size={16} />}
-                <input type="file" multiple accept="image/*,application/pdf" onChange={handlePickFiles} disabled={uploadingFiles} style={{ display: "none" }} />
+                <Paperclip size={16} />
+                <input type="file" multiple accept="image/*,application/pdf" onChange={handlePickFiles} disabled={sending} style={{ display: "none" }} />
               </label>
             </>
           }

@@ -16,6 +16,8 @@ export default function TextComposer({
   disabled,
   placeholder,
   leftButton,
+  above,
+  hasAttachments,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -24,6 +26,10 @@ export default function TextComposer({
   disabled?: boolean;
   placeholder: string;
   leftButton?: React.ReactNode;
+  // 送る前の添付ファイルの一覧など、入力欄の上に出すもの。
+  above?: React.ReactNode;
+  // 添付ファイルがあれば、文章が空でも送信できる。
+  hasAttachments?: boolean;
 }) {
   const [history, setHistory] = useState<string[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -59,16 +65,18 @@ export default function TextComposer({
   }
 
   function handleSend() {
-    if (sending || disabled || !value.trim()) return;
+    if (sending || disabled || (!value.trim() && !hasAttachments)) return;
     onSend();
     setHistory([]);
     requestAnimationFrame(() => autoGrow(true));
   }
 
-  const sendDisabled = sending || disabled || !value.trim();
+  const sendDisabled = sending || disabled || (!value.trim() && !hasAttachments);
 
   return (
-    <div style={{ flex: "none", display: "flex", gap: 8, alignItems: "flex-end", padding: "12px 18px", borderTop: "1px solid var(--color-divider)" }}>
+    <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 8, padding: "12px 18px", borderTop: "1px solid var(--color-divider)" }}>
+    {above}
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
       {leftButton}
       <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
         <textarea
@@ -134,6 +142,7 @@ export default function TextComposer({
       >
         {sending ? <CircleNotch size={16} style={{ animation: "vid-spin 0.7s linear infinite" }} /> : <PaperPlaneTilt size={16} />}
       </button>
+    </div>
     </div>
   );
 }

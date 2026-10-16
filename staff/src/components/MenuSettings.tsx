@@ -50,6 +50,7 @@ import InfoTooltip from "@/components/InfoTooltip";
 import Modal from "@/components/Modal";
 import {
   createMenu,
+  importTaskExampleMenus,
   updateMenu,
   deleteMenu,
   createIntakeForm,
@@ -335,6 +336,27 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
   const [menus, setMenus] = useState(initialMenus);
   const [openId, setOpenId] = useState<string | null>(null);
   const [presetsMenuId, setPresetsMenuId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState("");
+  const q = query.trim().toLowerCase();
+  const visibleMenus = q ? menus.filter((m) => m.label.toLowerCase().includes(q)) : menus;
+
+  async function handleImport() {
+    if (importing) return;
+    if (!confirm("「頼めること」一覧（100件）のうち、まだ無いものを受付メニューに追加します。金額は空欄で作るので、あとで入れてください。よろしいですか？")) return;
+    setImporting(true);
+    setImportNote("");
+    try {
+      const added = await importTaskExampleMenus(orgId);
+      setMenus((m) => [...m, ...added.map((a) => ({ ...a, report_field_presets: [] }))]);
+      setImportNote(added.length > 0 ? `${added.length}件追加しました` : "すべて追加済みです");
+    } catch {
+      setImportNote("追加できませんでした");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function handleAdd() {
     const id = await createMenu(orgId);
@@ -363,18 +385,27 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
         <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの秘書が対応するかは、依頼主一覧の画面からその場で割り当てます。FC展開でのブランド・料金統一のため、編集は本部限定です" />
         <div style={{ flex: 1 }} />
         {canEdit && (
+          <button onClick={handleImport} disabled={importing} style={{ ...smallBtn, opacity: importing ? 0.6 : 1 }}>
+            {importing ? "追加中…" : "頼めること一覧から追加"}
+          </button>
+        )}
+        {canEdit && (
           <button onClick={handleAdd} style={smallBtn}>
             <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
             メニューを追加
           </button>
         )}
       </div>
+      {importNote && <div style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>{importNote}</div>}
+      {menus.length > 8 && (
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="メニューを検索" className="vid-input" style={input} />
+      )}
       {!canEdit && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>メニューの編集は本部のみ行えます。</div>}
 
       {menus.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだメニューがありません。</div>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {menus.map((m) => {
+        {visibleMenus.map((m) => {
           const open = openId === m.id;
           const selectedIconName = menuIconName(m.icon);
           const SelectedIcon = selectedIconName ? MENU_ICON_COMPONENTS[selectedIconName] : null;

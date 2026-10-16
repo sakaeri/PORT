@@ -7,6 +7,7 @@ import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickA
 import { isCustomerCaughtUp, notifyCustomerCompletionReport, notifyCustomerNewMessage, notifyCustomerQuoteCreated } from "@/lib/notify";
 import type { StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
 import { advanceFee, ADVANCE_FEE_RATE, ADVANCE_VALID_MINUTES } from "@/lib/advance";
+import { TASK_EXAMPLES } from "@/lib/task-examples";
 
 // allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
 // （キャンセル処理や、支払い設定そのものなど）用。既定はロック中なら弾く。
@@ -158,6 +159,25 @@ export async function createMenu(orgId: string) {
     .single();
   if (error || !data) throw error ?? new Error("作成できませんでした");
   return data.id;
+}
+
+// 「頼めること」一覧（100件）から受付メニューをまとめて作る。同じ名前の
+// メニューがすでにあれば作らない。金額は空欄（＝相談のみ・見積もりの候補には
+// まだ出ない）で作り、金額と目安時間は本部があとから手で入れる。
+export async function importTaskExampleMenus(orgId: string) {
+  await requireHqPrivileged();
+  const supabase = await createClient();
+  const { data: existing, error: exError } = await supabase.from("menus").select("label").eq("org_id", orgId);
+  if (exError) throw exError;
+  const have = new Set((existing ?? []).map((m) => m.label.trim()));
+  const labels = TASK_EXAMPLES.flatMap((g) => g.items).filter((label) => !have.has(label));
+  if (labels.length === 0) return [];
+  const { data, error } = await supabase
+    .from("menus")
+    .insert(labels.map((label, i) => ({ org_id: orgId, label, price: null, payout: 0, lead_hours: 24, sort: 1000 + i })))
+    .select("id, org_id, label, note, icon, price, lead_hours, active, department_id");
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function updateMenu(

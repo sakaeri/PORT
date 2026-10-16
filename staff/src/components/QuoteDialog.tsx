@@ -144,6 +144,7 @@ export default function QuoteDialog({
   const [anchorLastDayOfMonth, setAnchorLastDayOfMonth] = useState(false);
   const [estimatedHours, setEstimatedHours] = useState("");
   const [hourlyLabel, setHourlyLabel] = useState("");
+  const [menuQuery, setMenuQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -301,7 +302,10 @@ export default function QuoteDialog({
                 </button>
               </div>
               {priceableMenus.length === 0 && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>金額の設定されたメニューがありません。</div>}
-              {priceableMenus.map((m) => (
+              {priceableMenus.length > 8 && (
+                <input value={menuQuery} onChange={(e) => setMenuQuery(e.target.value)} placeholder="メニューを検索" className="vid-input" style={inputStyle} />
+              )}
+              {priceableMenus.filter((m) => !menuQuery.trim() || (qty[m.id] ?? 0) > 0 || m.label.toLowerCase().includes(menuQuery.trim().toLowerCase())).map((m) => (
                 <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</div>
