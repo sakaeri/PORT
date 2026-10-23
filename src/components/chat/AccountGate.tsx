@@ -190,7 +190,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
               </div>
             ) : (
               <>
-                <div style={{ fontSize: 12.5, lineHeight: 1.7, textAlign: "center", opacity: 0.75 }}>ご利用にはメールアドレスの確認が必要です。</div>
+                <div style={{ fontSize: 12.5, lineHeight: 1.7, textAlign: "center", opacity: 0.75 }}>メールに届くリンクを開くだけで、すぐにご利用いただけます。</div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => setMode("new")} style={tabBtn(mode === "new")}>
                     はじめてご利用の方
@@ -218,7 +218,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                       disabled={sending || !agreed}
                       style={{ height: 40, cursor: sending || !agreed ? "not-allowed" : "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending || !agreed ? 0.6 : 1 }}
                     >
-                      {sending ? "送信中…" : "はじめる"}
+                      {sending ? "送信中…" : "メールでリンクを受け取る"}
                     </button>
                   </div>
                 ) : (
