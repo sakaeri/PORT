@@ -44,8 +44,23 @@ export async function completeAnonymousEntry(turnstileToken: string) {
 // requireContext() のままブロックしない）。
 async function requireActiveContext() {
   const ctx = await requireContext();
+  if (ctx.desk && !ctx.desk.active) throw new Error("現在この窓口は受付を終了しています。");
   if (ctx.orgLocked) throw new Error("現在この窓口は新しいお問い合わせを受け付けておりません。しばらくしてから再度お試しください。");
   return ctx;
+}
+
+// 問い合わせ窓口（/teera など）でメールのリンクを送ったときは、リンクを開いた
+// あとも同じ窓口に戻す（auth/confirm がこの cookie を見て振り分ける）。
+async function rememberReturnPath() {
+  const h = await headers();
+  const slug = h.get("x-vid-desk-slug");
+  const store = await cookies();
+  if (slug) {
+    const secure = !h.get("host")?.startsWith("localhost");
+    store.set("vid_next", `/${slug}`, { httpOnly: true, sameSite: "lax", secure, maxAge: 60 * 60 * 24, path: "/" });
+  } else {
+    store.delete("vid_next");
+  }
 }
 
 // 本番の Next.js は Server Action で throw されたエラー文を画面に渡さない
@@ -111,6 +126,7 @@ async function requestMagicLinkInner(email: string, opts?: { resetPassword?: boo
   const h = await headers();
   const host = h.get("host");
   const protocol = host?.startsWith("localhost") ? "http" : "https";
+  await rememberReturnPath();
   const { error } = await supabase.auth.signInWithOtp({
     email: trimmed,
     // 既存アカウントへのログイン専用。true にすると初見のメールアドレスでも
@@ -290,6 +306,7 @@ async function setInitialProfileInner(name: string, email: string, phone: string
   const protocol = host?.startsWith("localhost") ? "http" : "https";
   // リダイレクト先を明示しないと、Supabaseプロジェクト共通の既定（Site URL）に
   // 飛んでしまい、今アクセスしているドメインと食い違うことがある。
+  await rememberReturnPath();
   const { error: emailErr } = await supabase.auth.updateUser({ email: trimmedEmail }, { emailRedirectTo: `${protocol}://${host}/auth/confirm` });
   if (emailErr) {
     // Supabaseのバージョンによってエラーコードの付き方が変わり、コードが
@@ -360,6 +377,7 @@ async function changeEmailInner(newEmail: string, password?: string) {
   const h = await headers();
   const host = h.get("host");
   const protocol = host?.startsWith("localhost") ? "http" : "https";
+  await rememberReturnPath();
   const { error } = await supabase.auth.updateUser(
     { email: newEmail.trim(), data: { prev_email: user.email } },
     { emailRedirectTo: `${protocol}://${host}/auth/confirm` },

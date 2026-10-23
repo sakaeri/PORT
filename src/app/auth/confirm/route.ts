@@ -15,23 +15,27 @@ export async function GET(request: Request) {
   const tokenHash = searchParams.get("token_hash");
   const typeParam = searchParams.get("type");
   const next = searchParams.get("next") ?? "/";
+  // 問い合わせ窓口（/teera など）から送ったリンクなら、その窓口に戻す。
+  const cookieStore = await cookies();
+  const deskPath = cookieStore.get("vid_next")?.value;
+  const base = deskPath && /^\/[a-z0-9-]+$/.test(deskPath) ? deskPath : "";
 
   if (tokenHash && typeParam && (OTP_TYPES as readonly string[]).includes(typeParam)) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ type: typeParam as OtpType, token_hash: tokenHash });
     if (!error) {
       if (typeParam === "email_change") await afterEmailChange(supabase);
+      if (base) cookieStore.delete("vid_next");
       // 「パスワードをお忘れの方」から来たときは、パスワード設定を開いた状態で迎える。
-      const cookieStore = await cookies();
       if (cookieStore.get("vid_setpw")) {
         cookieStore.delete("vid_setpw");
-        return NextResponse.redirect(`${origin}/?setpw=1`);
+        return NextResponse.redirect(`${origin}${base || "/"}?setpw=1`);
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${origin}${base || next}`);
     }
   }
 
-  return NextResponse.redirect(`${origin}/?loginError=1`);
+  return NextResponse.redirect(`${origin}${base || "/"}?loginError=1`);
 }
 
 // メールアドレス変更の確認が通ったら、前のアドレスへお知らせする。

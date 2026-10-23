@@ -17,6 +17,10 @@ export async function hasAuthSession(): Promise<boolean> {
   return !!data.user;
 }
 
+export function deskTitle(name: string) {
+  return `${name} お問い合わせ`;
+}
+
 // Assumes proxy.ts has already ensured an authenticated (possibly anonymous)
 // session and resolved x-vid-org from the domain. The DB trigger provisions
 // the profile row; the customers/threads row for THIS org is provisioned here
@@ -78,6 +82,20 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     return null;
   }
 
+  // 問い合わせ窓口から入ったとき。まだ何も書いていないトークなら窓口の部署へ振り分ける。
+  let desk: CustomerContext["desk"] = null;
+  const deskSlug = h.get("x-vid-desk-slug");
+  if (deskSlug) {
+    const row = (await supabase.rpc("desk_by_slug", { p_slug: deskSlug })).data?.[0];
+    if (row && row.org_id === customer.org_id) {
+      desk = { id: row.id, name: row.name, active: row.active };
+      if (row.active) {
+        const { error } = await supabase.rpc("claim_desk_thread", { p_desk_id: row.id });
+        if (error) console.error("getCustomerContext: claim_desk_thread failed", error);
+      }
+    }
+  }
+
   const { data: org } = await supabase
     .from("organizations")
     .select("display_name, is_hq, plan_status, trial_ends_on")
@@ -99,7 +117,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
   return {
     userId: auth.user.id,
     orgId: customer.org_id,
-    orgDisplayName: org?.display_name ?? "窓口",
+    orgDisplayName: desk ? deskTitle(desk.name) : (org?.display_name ?? "窓口"),
     customerId: customer.id,
     customerName: customer.name,
     memberNo: customer.member_no,
@@ -119,6 +137,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
       amount: customer.auto_recharge_amount,
       hasCard: !!customer.stripe_payment_method_id,
     },
+    desk,
   };
 });
 

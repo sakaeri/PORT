@@ -409,9 +409,12 @@ interface OrgAccountFields extends OrgFields {
   owner_display_name: string;
 }
 
+// 依頼主アプリのページ名。事業所・問い合わせ窓口の合言葉には使えない（src/proxy.ts と合わせる）。
+const RESERVED_SLUGS = new Set(["auth", "terms", "api"]);
+
 function validateSlug(rawSlug: string) {
   const slug = rawSlug.trim().toLowerCase();
-  if (!/^[a-z0-9-]{2,40}$/.test(slug) || slug === "auth") {
+  if (!/^[a-z0-9-]{2,40}$/.test(slug) || RESERVED_SLUGS.has(slug)) {
     throw new Error("URLの合言葉は半角英数字とハイフンのみ・2〜40文字で入力してください");
   }
   return slug;
@@ -432,7 +435,8 @@ async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createSe
   const name = fields.name.trim() || fields.display_name.trim();
 
   const { data: existing } = await admin.from("organizations").select("id").eq("slug", slug).maybeSingle();
-  if (existing) throw new Error("このURLの合言葉はすでに使われています");
+  const { data: deskWithSlug } = await admin.from("inquiry_desks").select("id").eq("slug", slug).maybeSingle();
+  if (existing || deskWithSlug) throw new Error("このURLの合言葉はすでに使われています");
 
   const { data: org, error: orgErr } = await admin
     .from("organizations")
@@ -1480,5 +1484,57 @@ export async function removeMyAvatar() {
   const ctx = await requireContext();
   const supabase = await createClient();
   const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", ctx.userId);
+  if (error) throw error;
+}
+
+// ============================================================
+// 問い合わせ窓口（TeeRA など、中央秘書が一時的に引き受けるお問い合わせの入口）。
+// 名前だけで作れて、URL（/teera）と振り分け先の部署は自動でできる。
+// 止めるときは受付をオフにするだけ（削除はしない）。本部のみ。
+// ============================================================
+export type InquiryDesk = { id: string; name: string; slug: string; active: boolean; created_at: string };
+
+export async function createInquiryDesk(name: string): Promise<InquiryDesk> {
+  const ctx = await requireHqPrivileged();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("窓口の名前を入力してください");
+  if (trimmed.length > 40) throw new Error("窓口の名前は40文字以内で入力してください");
+  const admin = createServiceRoleClient();
+
+  const base = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+  let slug = "";
+  for (let i = 0; i < 20; i++) {
+    const candidate = base.length >= 2 ? (i === 0 ? base : `${base}-${i + 1}`) : `desk-${Math.random().toString(36).slice(2, 7)}`;
+    if (RESERVED_SLUGS.has(candidate)) continue;
+    const [{ data: org }, { data: desk }] = await Promise.all([
+      admin.from("organizations").select("id").eq("slug", candidate).maybeSingle(),
+      admin.from("inquiry_desks").select("id").eq("slug", candidate).maybeSingle(),
+    ]);
+    if (!org && !desk) {
+      slug = candidate;
+      break;
+    }
+  }
+  if (!slug) throw new Error("URLを決められませんでした。別の名前でお試しください");
+
+  const { data: dept, error: deptErr } = await admin.from("departments").insert({ org_id: ctx.orgId, name: `問い合わせ：${trimmed}` }).select("id").single();
+  if (deptErr || !dept) throw deptErr ?? new Error("作成できませんでした");
+
+  const { data, error } = await admin
+    .from("inquiry_desks")
+    .insert({ org_id: ctx.orgId, name: trimmed, slug, department_id: dept.id })
+    .select("id, name, slug, active, created_at")
+    .single();
+  if (error || !data) {
+    await admin.from("departments").delete().eq("id", dept.id);
+    throw error ?? new Error("作成できませんでした");
+  }
+  return data;
+}
+
+export async function setInquiryDeskActive(deskId: string, active: boolean) {
+  const ctx = await requireHqPrivileged();
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("inquiry_desks").update({ active }).eq("id", deskId).eq("org_id", ctx.orgId);
   if (error) throw error;
 }

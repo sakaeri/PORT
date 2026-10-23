@@ -261,6 +261,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
         onOpenMyPage={() => setShowMyPage(true)}
         customerName={ctx.customerName}
         avatarUrl={avatarUrl}
+        chatOnly={!!ctx.desk}
       />
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "var(--space-6) var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
@@ -369,6 +370,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
           balance={ctx.balance}
           autoRecharge={ctx.autoRecharge}
           initialChargeOpen={openMyPageWithCharge}
+          isDesk={!!ctx.desk}
           initialPasswordOpen={!!openPasswordSetup}
         />
       )}

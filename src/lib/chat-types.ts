@@ -82,4 +82,6 @@ export interface CustomerContext {
   balance: number;
   // 残高の自動チャージ設定。
   autoRecharge: { enabled: boolean; threshold: number | null; amount: number | null; hasCard: boolean };
+  // 問い合わせ窓口（/teera など）から入っているとき。チャットだけの画面になる。
+  desk: { id: string; name: string; active: boolean } | null;
 }

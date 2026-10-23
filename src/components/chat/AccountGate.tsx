@@ -40,7 +40,7 @@ function tabBtn(active: boolean): React.CSSProperties {
 // この画面を必ず経由させる。匿名セッション自体は今まで通り裏で作られて
 // いるが、名前・メールアドレスを登録して確認メールのリンクを開くまでは
 // チャット画面を見せない（page.tsx 側で ctx.isAnonymous を見て出し分ける）。
-export default function AccountGate({ orgDisplayName, initialError }: { orgDisplayName: string; initialError?: string }) {
+export default function AccountGate({ orgDisplayName, isDesk, initialError }: { orgDisplayName: string; isDesk?: boolean; initialError?: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<"new" | "existing">("new");
   // ログインは基本メールのリンク。パスワードを設定済みの人だけ切り替えて使う。
@@ -266,7 +266,7 @@ export default function AccountGate({ orgDisplayName, initialError }: { orgDispl
             )}
         </div>
 
-        <GateInfo />
+        {!isDesk && <GateInfo />}
       </div>
     </main>
   );
