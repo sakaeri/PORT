@@ -4,7 +4,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "中央秘書事務所",
-    short_name: "中央秘書窓口",
+    short_name: "中央秘書 窓口",
     description: "秘書とのやり取り画面",
     start_url: "/",
     display: "standalone",

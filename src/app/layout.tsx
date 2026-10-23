@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "PORT",
   description: "秘書とのやり取り画面",
   // iPhone の「ホーム画面に追加」で、アプリのように全画面で開く。
-  appleWebApp: { capable: true, title: "中央秘書窓口", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "中央秘書 窓口", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
