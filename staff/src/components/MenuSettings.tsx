@@ -354,7 +354,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
 
   async function handleImport() {
     if (importing) return;
-    if (!confirm("「頼めること」一覧（100件）のうち、まだ無いものを受付メニューに追加します。金額は空欄で作るので、あとで入れてください。よろしいですか？")) return;
+    if (!confirm("「頼めること」一覧（約100件）のうち、まだ無いものを受付メニューに追加します。金額は空欄で作るので、あとで入れてください。よろしいですか？")) return;
     setImporting(true);
     setImportNote("");
     try {
