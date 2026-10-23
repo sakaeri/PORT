@@ -1538,3 +1538,18 @@ export async function setInquiryDeskActive(deskId: string, active: boolean) {
   const { error } = await admin.from("inquiry_desks").update({ active }).eq("id", deskId).eq("org_id", ctx.orgId);
   if (error) throw error;
 }
+
+// 窓口のURL（/teera の部分）をあとから変える。前のURLは使えなくなる。
+export async function updateInquiryDeskSlug(deskId: string, rawSlug: string): Promise<string> {
+  const ctx = await requireHqPrivileged();
+  const slug = validateSlug(rawSlug);
+  const admin = createServiceRoleClient();
+  const [{ data: org }, { data: desk }] = await Promise.all([
+    admin.from("organizations").select("id").eq("slug", slug).maybeSingle(),
+    admin.from("inquiry_desks").select("id").eq("slug", slug).neq("id", deskId).maybeSingle(),
+  ]);
+  if (org || desk) throw new Error("このURLはすでに使われています");
+  const { error } = await admin.from("inquiry_desks").update({ slug }).eq("id", deskId).eq("org_id", ctx.orgId);
+  if (error) throw error;
+  return slug;
+}
