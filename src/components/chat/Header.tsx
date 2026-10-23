@@ -16,6 +16,8 @@ interface Props {
   onOpenMyPage: () => void;
   customerName: string;
   avatarUrl: string | null;
+  // 問い合わせ窓口ではチャットだけなので、進捗・報告書のボタンを出さない。
+  chatOnly?: boolean;
 }
 
 const iconBtn: React.CSSProperties = {
@@ -46,6 +48,7 @@ export default function Header({
   onOpenMyPage,
   customerName,
   avatarUrl,
+  chatOnly,
 }: Props) {
   return (
     <div
@@ -100,16 +103,20 @@ export default function Header({
       </div>
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-        <button onClick={onOpenProgress} title="進捗状況" style={iconBtn}>
-          <ListChecks size={15} />
-          <span className="vid-header-label">進捗状況</span>
-          {activeCount ? `（${activeCount}）` : ""}
-        </button>
-        <button onClick={onOpenReports} title="報告書一覧" style={iconBtn}>
-          <ClipboardText size={15} />
-          <span className="vid-header-label">報告書一覧</span>
-          {reportsCount ? `（${reportsCount}）` : ""}
-        </button>
+        {!chatOnly && (
+          <>
+            <button onClick={onOpenProgress} title="進捗状況" style={iconBtn}>
+              <ListChecks size={15} />
+              <span className="vid-header-label">進捗状況</span>
+              {activeCount ? `（${activeCount}）` : ""}
+            </button>
+            <button onClick={onOpenReports} title="報告書一覧" style={iconBtn}>
+              <ClipboardText size={15} />
+              <span className="vid-header-label">報告書一覧</span>
+              {reportsCount ? `（${reportsCount}）` : ""}
+            </button>
+          </>
+        )}
         <button
           onClick={onOpenMyPage}
           aria-label="マイページ"

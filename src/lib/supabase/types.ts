@@ -65,6 +65,20 @@ export interface ReportDetail {
 export interface Database {
   public: {
     Tables: {
+      inquiry_desks: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          slug: string;
+          department_id: string | null;
+          active: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["inquiry_desks"]["Row"]> & { org_id: string; name: string; slug: string };
+        Update: Partial<Database["public"]["Tables"]["inquiry_desks"]["Row"]>;
+        Relationships: [];
+      };
       organizations: {
         Row: {
           id: string;
@@ -385,6 +399,8 @@ export interface Database {
       auth_org: { Args: Record<string, never>; Returns: string };
       org_id_by_domain: { Args: { p_domain: string }; Returns: string };
       org_id_by_slug: { Args: { p_slug: string }; Returns: string | null };
+      desk_by_slug: { Args: { p_slug: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
+      claim_desk_thread: { Args: { p_desk_id: string }; Returns: void };
       ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
       pay_request_from_balance: { Args: { p_request_id: string }; Returns: void };
       disable_auto_recharge: { Args: Record<string, never>; Returns: void };

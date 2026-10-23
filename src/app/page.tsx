@@ -53,13 +53,25 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
     );
   }
 
+  // 受付を止めた問い合わせ窓口。新しい問い合わせは受けない。
+  if (ctx.desk && !ctx.desk.active) {
+    return (
+      <main style={{ height: "100vh", display: "grid", placeItems: "center", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)", padding: 24, textAlign: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <div style={{ fontFamily: "var(--font-heading)", fontSize: 19 }}>{ctx.orgDisplayName}</div>
+          <div style={{ fontSize: 13.5, opacity: 0.85 }}>現在、受付を終了しています。</div>
+        </div>
+      </main>
+    );
+  }
+
   // 事業の方針で、メールアドレスの確認（ログイン）をしていない人にはチャット
   // 画面を見せない。匿名セッション自体はVerifyGateが裏で作っているが、
   // ここでAccountGateを挟み、名前・メールの登録 or 既存アカウントへの
   // ログインを済ませるまで先に進ませない。
   if (ctx.isAnonymous) {
     const { loginError } = await searchParams;
-    return <AccountGate orgDisplayName={ctx.orgDisplayName} initialError={loginError ? "リンクの有効期限が切れているか、すでに使用されています。もう一度お試しください。" : undefined} />;
+    return <AccountGate orgDisplayName={ctx.orgDisplayName} isDesk={!!ctx.desk} initialError={loginError ? "リンクの有効期限が切れているか、すでに使用されています。もう一度お試しください。" : undefined} />;
   }
 
   const { messages, hasMoreOlder } = await getThreadMessages(ctx.threadId);

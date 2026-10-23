@@ -40,9 +40,13 @@ export async function notifyNewInquiry(orgId: string, threadId: string) {
     const [{ data: org }, { data: staff }, { data: thread }] = await Promise.all([
       admin.from("organizations").select("display_name").eq("id", orgId).single(),
       admin.from("profiles").select("id").eq("org_id", orgId).in("role", ["owner", "reception"]),
-      admin.from("threads").select("customer_id").eq("id", threadId).maybeSingle(),
+      admin.from("threads").select("customer_id, department_id").eq("id", threadId).maybeSingle(),
     ]);
     if (!staff?.length) return;
+    // 問い合わせ窓口（TeeRA など）のトークなら、どの窓口からかを書く。
+    const desk = thread?.department_id
+      ? (await admin.from("inquiry_desks").select("name").eq("department_id", thread.department_id).maybeSingle()).data
+      : null;
 
     const emails = await emailsFor(admin, staff.map((s) => s.id));
     const staffUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
@@ -51,7 +55,7 @@ export async function notifyNewInquiry(orgId: string, threadId: string) {
       admin,
       emails,
       emailSubject(org?.display_name ?? "", "新着メッセージがあります"),
-      renderEmail({ orgName: org?.display_name ?? "", heading: "新着メッセージがあります", lines: ["依頼主から新しいメッセージが届きました。"], url: openUrl, buttonLabel: "トークを確認する" }),
+      renderEmail({ orgName: org?.display_name ?? "", heading: "新着メッセージがあります", lines: [desk ? `${desk.name}のお問い合わせ窓口に新しいメッセージが届きました。` : "依頼主から新しいメッセージが届きました。"], url: openUrl, buttonLabel: "トークを確認する" }),
     );
   } catch (e) {
     console.error("notifyNewInquiry failed", e);

@@ -47,6 +47,8 @@ import {
 import { headingWeight } from "@/lib/style";
 import { useIsMobile } from "@/lib/useIsMobile";
 import InfoTooltip from "@/components/InfoTooltip";
+import InquiryDesksCard from "@/components/InquiryDesksCard";
+import type { InquiryDesk } from "@/app/actions";
 import Modal from "@/components/Modal";
 import {
   createMenu,
@@ -241,12 +243,14 @@ export default function MenuSettings({
   initialMenus,
   initialTemplates,
   initialTermsContent,
+  initialDesks,
   canEdit,
 }: {
   orgId: string;
   initialMenus: Menu[];
   initialTemplates: IntakeForm[];
   initialTermsContent: string;
+  initialDesks: InquiryDesk[];
   // 受付メニューはFC展開でのブランド・料金統一のため本部専用で、
   // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレは常に編集可。
   canEdit: boolean;
@@ -320,16 +324,18 @@ export default function MenuSettings({
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} canDelete={canEdit} />}
       {tab === "terms" && <TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} />}
+      {tab === "desks" && <InquiryDesksCard initialDesks={initialDesks} canEdit={canEdit} />}
     </div>
   );
 }
 
-type TabKey = "menu" | "templates" | "terms";
+type TabKey = "menu" | "templates" | "terms" | "desks";
 
 const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
   { key: "menu", label: "受付メニュー", mobileLabel: "メニュー" },
   { key: "templates", label: "返信テンプレ", mobileLabel: "テンプレ" },
   { key: "terms", label: "利用規約", mobileLabel: "規約" },
+  { key: "desks", label: "問い合わせ窓口", mobileLabel: "窓口" },
 ];
 
 function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
