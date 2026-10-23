@@ -190,7 +190,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
               </div>
             ) : (
               <>
-                <div style={{ fontSize: 12.5, lineHeight: 1.7, textAlign: "center", opacity: 0.75 }}>メールに届いたリンクを開いて、ご利用ください。</div>
+                <div style={{ fontSize: 12.5, lineHeight: 1.7, textAlign: "center", opacity: 0.75 }}>メールに届いたリンクから、チャット画面へログインできます。</div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => setMode("new")} style={tabBtn(mode === "new")}>
                     はじめてご利用の方
