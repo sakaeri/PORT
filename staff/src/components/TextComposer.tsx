@@ -3,9 +3,14 @@
 import { useRef, useState } from "react";
 import { ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/react";
 
+// 指で操作する端末（スマホ・タブレット）かどうか。
+function isTouchDevice() {
+  return typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+}
+
 // 案件トーク・スタッフ⇄本部トーク・依頼主トークで見た目と操作感を統一する
 // ための共通入力欄。自動で高さが伸びる（自動改行）、元に戻す（↩）・
-// 消す（✕）が入力中に出る、Enterで送信・Shift+Enterで改行——という
+// 消す（✕）が入力中に出る、Enterで送信・Shift+Enterで改行（スマホでは Enter は改行）——という
 // クライアント側チャット(src/components/chat/Composer.tsx)と同じ振る舞い。
 // 添付ボタンなど入力欄の左に置くものは leftButton で呼び出し側から渡す。
 export default function TextComposer({
@@ -84,7 +89,9 @@ export default function TextComposer({
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            // スマホ・タブレットでは Enter は改行（送信は送信ボタンで）。パソコンでは Enter で送信、
+            // Shift+Enter で改行。日本語の変換を確定する Enter では送信しない。
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !isTouchDevice()) {
               e.preventDefault();
               handleSend();
             }
