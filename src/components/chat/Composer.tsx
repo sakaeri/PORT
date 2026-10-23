@@ -188,7 +188,7 @@ export default function Composer({ threadId, orgId, onSend }: Props) {
   const sendDisabled = sending || (!draft.trim() && attachments.length === 0);
 
   return (
-    <div style={{ flex: "none", borderTop: "1px solid var(--color-divider)", padding: "var(--space-4)" }}>
+    <div style={{ flex: "none", borderTop: "1px solid var(--color-divider)", padding: "var(--space-4)", paddingBottom: "calc(var(--space-4) + env(safe-area-inset-bottom))" }}>
       {attachments.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
           {attachments.map((f) => (

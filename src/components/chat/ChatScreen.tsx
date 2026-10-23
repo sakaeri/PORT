@@ -248,7 +248,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
   }
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--color-bg)", fontFamily: "var(--font-body)", color: "var(--color-text)" }}>
+    <div style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--color-bg)", fontFamily: "var(--font-body)", color: "var(--color-text)" }}>
       <Header
         brandName={ctx.orgDisplayName}
         activeCount={activeCount}
