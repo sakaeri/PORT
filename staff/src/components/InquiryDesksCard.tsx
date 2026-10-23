@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Copy, Check, PencilSimple } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage } from "@/lib/errors";
-import { createInquiryDesk, setInquiryDeskActive, updateInquiryDeskSlug, type InquiryDesk } from "@/app/actions";
+import { createInquiryDesk, setInquiryDeskActive, setInquiryDeskSecretary, updateInquiryDeskSlug, type InquiryDesk } from "@/app/actions";
 import InfoTooltip from "@/components/InfoTooltip";
 
 // 依頼主アプリの公開URL（OrgsAdmin.tsx の事業者URLと同じドメイン）。
@@ -45,8 +45,18 @@ const input: React.CSSProperties = {
 };
 
 // 他社サービス（TeeRA など）のお問い合わせを引き受けるときの入口。名前だけで作れて、
-// URL と振り分け先（依頼主一覧の絞り込みに出る「問い合わせ：〇〇」）は自動でできる。
-export default function InquiryDesksCard({ initialDesks, canEdit }: { initialDesks: InquiryDesk[]; canEdit: boolean }) {
+// URL は自動でできる。担当秘書を決めると、その窓口のトークはその秘書が受け持つ。
+export default function InquiryDesksCard({
+  initialDesks,
+  departments,
+  orgDisplayName,
+  canEdit,
+}: {
+  initialDesks: InquiryDesk[];
+  departments: { id: string; name: string }[];
+  orgDisplayName: string;
+  canEdit: boolean;
+}) {
   const [desks, setDesks] = useState(initialDesks);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -56,6 +66,17 @@ export default function InquiryDesksCard({ initialDesks, canEdit }: { initialDes
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [slugDraft, setSlugDraft] = useState("");
+
+  async function changeSecretary(desk: InquiryDesk, departmentId: string | null) {
+    if (departmentId === desk.department_id) return;
+    setError("");
+    try {
+      await setInquiryDeskSecretary(desk.id, departmentId);
+      setDesks((d) => d.map((x) => (x.id === desk.id ? { ...x, department_id: departmentId } : x)));
+    } catch (e) {
+      setError(errorMessage(e, "変更できませんでした"));
+    }
+  }
 
   function startEdit(desk: InquiryDesk) {
     setEditingId(desk.id);
@@ -133,7 +154,7 @@ export default function InquiryDesksCard({ initialDesks, canEdit }: { initialDes
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>問い合わせ窓口</div>
-        <InfoTooltip text="他社サービスのお問い合わせを引き受けるときの入口です。名前を入れるだけでURLができ、そこから届いたトークは依頼主一覧で「問い合わせ：〇〇」として分かれます。依頼主側はチャットだけの画面になります。受付をオフにすると新しい問い合わせは止まり、過去のトークは残ります。" />
+        <InfoTooltip text="他社サービスのお問い合わせを引き受けるときの入口です。名前を入れるだけでURLができます。「担当」で決めた秘書が、その窓口から届いたトークを受け持ちます（トークごとに別の秘書へ振ることもできます）。依頼主側はチャットだけの画面になります。受付をオフにすると新しい問い合わせは止まり、過去のトークは残ります。" />
         <div style={{ flex: 1 }} />
         {canEdit && !adding && (
           <button onClick={() => setAdding(true)} style={smallBtn}>
@@ -208,6 +229,23 @@ export default function InquiryDesksCard({ initialDesks, canEdit }: { initialDes
                   {canEdit && <PencilSimple size={11} style={{ flex: "none" }} />}
                 </button>
               )}
+              <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
+                <span style={{ flex: "none", whiteSpace: "nowrap" }}>担当</span>
+                <select
+                  value={d.department_id ?? ""}
+                  disabled={!canEdit}
+                  onChange={(e) => changeSecretary(d, e.target.value || null)}
+                  className="vid-input"
+                  style={{ ...input, flex: "0 1 200px", minWidth: 0, height: 28, padding: "2px 8px", fontSize: 12.5 }}
+                >
+                  <option value="">{orgDisplayName}</option>
+                  {departments.map((dep) => (
+                    <option key={dep.id} value={dep.id}>
+                      {dep.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             {editingId !== d.id && (
               <>

@@ -20,7 +20,7 @@ export default async function CustomersPage() {
   const supabase = await createClient();
   // 依存のないクエリは並列で投げる。依頼主一覧に必要な「各依頼主の最新メッセージ・未読」は、
   // 案件トークまで巻き込む二重ネストの embed ではなく、確実に正しい専用RPCでまとめて取る。
-  const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }, { data: requests }] = await Promise.all([
+  const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }, { data: requests }, { data: deskThreads }] = await Promise.all([
     supabase
       .from("customers")
       .select("id, name, staff_label, member_no, active, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug), profile:profiles!customers_profile_id_fkey(avatar_url)")
@@ -33,11 +33,18 @@ export default async function CustomersPage() {
       .select("id, customer_id, title, amount, phase, created_at")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
+    // 問い合わせ窓口（TeeRA など）のトークは、一覧で窓口名を出す。
+    supabase.from("threads").select("customer_id, inquiry_desks(name)").eq("org_id", ctx.orgId).eq("kind", "customer").not("desk_id", "is", null),
   ]);
   if (error) console.error("customers select failed:", error);
   if (summariesError) console.error("customer_thread_summaries failed:", summariesError);
 
   const summaryByCustomerId = new Map((summaries ?? []).map((s) => [s.customer_id, s]));
+  const deskNameByCustomerId = new Map<string, string>();
+  for (const t of deskThreads ?? []) {
+    const desk = Array.isArray(t.inquiry_desks) ? t.inquiry_desks[0] : t.inquiry_desks;
+    if (t.customer_id && desk?.name) deskNameByCustomerId.set(t.customer_id, desk.name);
+  }
 
   // 依頼主ごとの件数・累計額・進行中案件（一番新しいもの）をまとめる。
   // requests は created_at 降順で取っているので、最初に出てきたものが最新。
@@ -85,6 +92,7 @@ export default async function CustomersPage() {
         convertedOrg: convertedOrg ? { displayName: convertedOrg.display_name, slug: convertedOrg.slug } : null,
         thread: summary ? { id: summary.thread_id, archived: summary.archived } : null,
         departmentId: summary?.department_id ?? null,
+        deskName: deskNameByCustomerId.get(c.id) ?? null,
         lastMessagePreview,
         unread: summary?.unread ?? false,
         requestCount,

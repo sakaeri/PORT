@@ -244,6 +244,8 @@ export default function MenuSettings({
   initialTemplates,
   initialTermsContent,
   initialDesks,
+  departments,
+  orgDisplayName,
   canEdit,
 }: {
   orgId: string;
@@ -251,6 +253,8 @@ export default function MenuSettings({
   initialTemplates: IntakeForm[];
   initialTermsContent: string;
   initialDesks: InquiryDesk[];
+  departments: { id: string; name: string }[];
+  orgDisplayName: string;
   // 受付メニューはFC展開でのブランド・料金統一のため本部専用で、
   // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレは常に編集可。
   canEdit: boolean;
@@ -324,7 +328,7 @@ export default function MenuSettings({
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} canDelete={canEdit} />}
       {tab === "terms" && <TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} />}
-      {tab === "desks" && <InquiryDesksCard initialDesks={initialDesks} canEdit={canEdit} />}
+      {tab === "desks" && <InquiryDesksCard initialDesks={initialDesks} departments={departments} orgDisplayName={orgDisplayName} canEdit={canEdit} />}
     </div>
   );
 }

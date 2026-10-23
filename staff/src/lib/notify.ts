@@ -101,14 +101,12 @@ export async function isCustomerCaughtUp(admin: Admin, threadId: string): Promis
 
 export async function notifyCustomerNewMessage(admin: Admin, threadId: string) {
   try {
-    const { data: thread } = await admin.from("threads").select("org_id, customer_id, department_id").eq("id", threadId).maybeSingle();
+    const { data: thread } = await admin.from("threads").select("org_id, customer_id, desk_id").eq("id", threadId).maybeSingle();
     if (!thread?.customer_id) return;
     const email = await getCustomerEmail(admin, thread.customer_id);
     if (!email) return;
     // 問い合わせ窓口（TeeRA など）のトークは、その窓口の名前でやわらかく知らせる。
-    const desk = thread.department_id
-      ? (await admin.from("inquiry_desks").select("name, slug").eq("department_id", thread.department_id).maybeSingle()).data
-      : null;
+    const desk = thread.desk_id ? (await admin.from("inquiry_desks").select("name, slug").eq("id", thread.desk_id).maybeSingle()).data : null;
     if (desk) {
       await sendEmail(
         email,

@@ -65,6 +65,12 @@ export interface ReportDetail {
 export interface Database {
   public: {
     Tables: {
+      staff_departments: {
+        Row: { profile_id: string; department_id: string };
+        Insert: Database["public"]["Tables"]["staff_departments"]["Row"];
+        Update: Partial<Database["public"]["Tables"]["staff_departments"]["Row"]>;
+        Relationships: [];
+      };
       inquiry_desks: {
         Row: {
           id: string;
@@ -270,6 +276,7 @@ export interface Database {
           request_id: string | null;
           creator_id: string | null;
           department_id: string | null;
+          desk_id: string | null;
           last_msg_at: string | null;
           last_read_at: string | null;
           customer_last_read_at: string | null;
@@ -400,6 +407,7 @@ export interface Database {
       org_id_by_domain: { Args: { p_domain: string }; Returns: string };
       org_id_by_slug: { Args: { p_slug: string }; Returns: string | null };
       desk_by_slug: { Args: { p_slug: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
+      desk_by_id: { Args: { p_id: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
       claim_desk_thread: { Args: { p_desk_id: string }; Returns: void };
       ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
       pay_request_from_balance: { Args: { p_request_id: string }; Returns: void };

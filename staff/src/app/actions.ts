@@ -1489,10 +1489,11 @@ export async function removeMyAvatar() {
 
 // ============================================================
 // 問い合わせ窓口（TeeRA など、中央秘書が一時的に引き受けるお問い合わせの入口）。
-// 名前だけで作れて、URL（/teera）と振り分け先の部署は自動でできる。
+// 名前だけで作れて、URL（/teera）は自動でできる。窓口ごとに担当秘書を決めると、
+// その窓口から来たトークはその秘書の担当になる（未設定なら本部）。
 // 止めるときは受付をオフにするだけ（削除はしない）。本部のみ。
 // ============================================================
-export type InquiryDesk = { id: string; name: string; slug: string; active: boolean; created_at: string };
+export type InquiryDesk = { id: string; name: string; slug: string; active: boolean; department_id: string | null; created_at: string };
 
 export async function createInquiryDesk(name: string): Promise<InquiryDesk> {
   const ctx = await requireHqPrivileged();
@@ -1517,18 +1518,12 @@ export async function createInquiryDesk(name: string): Promise<InquiryDesk> {
   }
   if (!slug) throw new Error("URLを決められませんでした。別の名前でお試しください");
 
-  const { data: dept, error: deptErr } = await admin.from("departments").insert({ org_id: ctx.orgId, name: `問い合わせ：${trimmed}` }).select("id").single();
-  if (deptErr || !dept) throw deptErr ?? new Error("作成できませんでした");
-
   const { data, error } = await admin
     .from("inquiry_desks")
-    .insert({ org_id: ctx.orgId, name: trimmed, slug, department_id: dept.id })
-    .select("id, name, slug, active, created_at")
+    .insert({ org_id: ctx.orgId, name: trimmed, slug })
+    .select("id, name, slug, active, department_id, created_at")
     .single();
-  if (error || !data) {
-    await admin.from("departments").delete().eq("id", dept.id);
-    throw error ?? new Error("作成できませんでした");
-  }
+  if (error || !data) throw error ?? new Error("作成できませんでした");
   return data;
 }
 
@@ -1552,4 +1547,24 @@ export async function updateInquiryDeskSlug(deskId: string, rawSlug: string): Pr
   const { error } = await admin.from("inquiry_desks").update({ slug }).eq("id", deskId).eq("org_id", ctx.orgId);
   if (error) throw error;
   return slug;
+}
+
+// 窓口の担当秘書を決める・替える（departmentId は秘書の窓口。null なら本部）。
+// 前の担当のままになっているこの窓口のトークも、新しい担当に移す
+// （トークごとに別の秘書へ振った分はそのまま）。
+export async function setInquiryDeskSecretary(deskId: string, departmentId: string | null) {
+  const ctx = await requireHqPrivileged();
+  const admin = createServiceRoleClient();
+  const { data: desk } = await admin.from("inquiry_desks").select("department_id").eq("id", deskId).eq("org_id", ctx.orgId).maybeSingle();
+  if (!desk) throw new Error("窓口が見つかりません");
+  if (departmentId) {
+    const { data: dept } = await admin.from("departments").select("id").eq("id", departmentId).eq("org_id", ctx.orgId).maybeSingle();
+    if (!dept) throw new Error("担当秘書が見つかりません");
+  }
+  const { error } = await admin.from("inquiry_desks").update({ department_id: departmentId }).eq("id", deskId);
+  if (error) throw error;
+  let move = admin.from("threads").update({ department_id: departmentId }).eq("desk_id", deskId).eq("kind", "customer");
+  move = desk.department_id ? move.eq("department_id", desk.department_id) : move.is("department_id", null);
+  const { error: moveErr } = await move;
+  if (moveErr) throw moveErr;
 }

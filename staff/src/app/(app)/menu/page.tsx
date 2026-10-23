@@ -11,7 +11,7 @@ export default async function MenuSettingsPage() {
   if (ctx.role !== "owner" && ctx.role !== "reception") return null;
 
   const supabase = await createClient();
-  const [{ data: menus }, { data: templates }, { data: org }, { data: desks }] = await Promise.all([
+  const [{ data: menus }, { data: templates }, { data: org }, { data: desks }, { data: departments }] = await Promise.all([
     supabase
       .from("menus")
       .select("*, report_field_presets(*)")
@@ -23,7 +23,8 @@ export default async function MenuSettingsPage() {
       .eq("org_id", ctx.orgId)
       .order("sort", { ascending: true }),
     supabase.from("organizations").select("terms_content").eq("id", ctx.orgId).maybeSingle(),
-    supabase.from("inquiry_desks").select("id, name, slug, active, created_at").eq("org_id", ctx.orgId).order("created_at", { ascending: false }),
+    supabase.from("inquiry_desks").select("id, name, slug, active, department_id, created_at").eq("org_id", ctx.orgId).order("created_at", { ascending: false }),
+    supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
   ]);
 
   return (
@@ -36,6 +37,8 @@ export default async function MenuSettingsPage() {
       initialTemplates={(templates ?? []).map((t) => ({ ...t, intake_fields: (t.intake_fields ?? []).sort((a, b) => a.sort - b.sort) }))}
       initialTermsContent={org?.terms_content?.trim() ? org.terms_content : DEFAULT_TERMS_CONTENT}
       initialDesks={desks ?? []}
+      departments={departments ?? []}
+      orgDisplayName={ctx.orgDisplayName}
       canEdit={ctx.role === "owner"}
     />
   );
