@@ -51,7 +51,9 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/join") ||
     request.nextUrl.pathname.startsWith("/auth/confirm") ||
     request.nextUrl.pathname.startsWith("/reset-password") ||
-    request.nextUrl.pathname.startsWith("/api/stripe-webhook");
+    request.nextUrl.pathname.startsWith("/api/stripe-webhook") ||
+    // ホーム画面に追加するときの設定ファイル。ブラウザはログイン情報なしで取りに来る。
+    request.nextUrl.pathname === "/manifest.webmanifest";
 
   if (!data.user && !isPublicRoute) {
     const url = request.nextUrl.clone();
