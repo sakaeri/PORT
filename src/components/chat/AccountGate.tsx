@@ -218,7 +218,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                       disabled={sending || !agreed}
                       style={{ height: 40, cursor: sending || !agreed ? "not-allowed" : "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending || !agreed ? 0.6 : 1 }}
                     >
-                      {sending ? "送信中…" : "はじめる"}
+                      {sending ? "送信中…" : isDesk ? "チャットで問い合わせる" : "無料で使ってみる"}
                     </button>
                   </div>
                 ) : (
