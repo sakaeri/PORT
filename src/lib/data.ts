@@ -18,7 +18,7 @@ export async function hasAuthSession(): Promise<boolean> {
 }
 
 export function deskTitle(name: string) {
-  return `${name} お問い合わせ`;
+  return `${name} お問い合わせ窓口`;
 }
 
 // Assumes proxy.ts has already ensured an authenticated (possibly anonymous)

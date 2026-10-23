@@ -59,7 +59,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
       <main style={{ height: "100vh", display: "grid", placeItems: "center", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)", padding: 24, textAlign: "center" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
           <div style={{ fontFamily: "var(--font-heading)", fontSize: 19 }}>{ctx.orgDisplayName}</div>
-          <div style={{ fontSize: 13.5, opacity: 0.85 }}>現在、受付を終了しています。</div>
+          <div style={{ fontSize: 13.5, opacity: 0.85 }}>ただいま受付をお休みしています。</div>
         </div>
       </main>
     );

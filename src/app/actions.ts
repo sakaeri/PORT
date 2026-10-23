@@ -44,7 +44,7 @@ export async function completeAnonymousEntry(turnstileToken: string) {
 // requireContext() のままブロックしない）。
 async function requireActiveContext() {
   const ctx = await requireContext();
-  if (ctx.desk && !ctx.desk.active) throw new Error("現在この窓口は受付を終了しています。");
+  if (ctx.desk && !ctx.desk.active) throw new Error("ただいまこの窓口は受付をお休みしています。");
   if (ctx.orgLocked) throw new Error("現在この窓口は新しいお問い合わせを受け付けておりません。しばらくしてから再度お試しください。");
   return ctx;
 }
