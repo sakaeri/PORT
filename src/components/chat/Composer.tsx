@@ -41,6 +41,11 @@ function sizeMbLabel(bytes: number): string {
   return (bytes / 1048576).toFixed(1);
 }
 
+// 指で操作する端末（スマホ・タブレット）かどうか。
+function isTouchDevice() {
+  return typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+}
+
 export default function Composer({ threadId, orgId, onSend }: Props) {
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -262,7 +267,9 @@ export default function Composer({ threadId, orgId, onSend }: Props) {
               autoGrow();
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              // スマホ・タブレットでは Enter は改行（送信は送信ボタンで）。パソコンでは Enter で送信、
+              // Shift+Enter で改行。日本語の変換を確定する Enter では送信しない。
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !isTouchDevice()) {
                 e.preventDefault();
                 handleSend();
               }
