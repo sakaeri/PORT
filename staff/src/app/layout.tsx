@@ -25,6 +25,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#16281f",
+  // ホーム画面から開いたとき、画面下のホームバーの分の余白（safe-area）を測れるようにする。
+  viewportFit: "cover",
 };
 
 // Runs before paint so the persisted theme choice applies with no flash of

@@ -74,7 +74,7 @@ export default function TextComposer({
   const sendDisabled = sending || disabled || (!value.trim() && !hasAttachments);
 
   return (
-    <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 8, padding: "12px 18px", borderTop: "1px solid var(--color-divider)" }}>
+    <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 8, padding: "12px 18px", paddingBottom: "calc(12px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--color-divider)" }}>
     {above}
     <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
       {leftButton}

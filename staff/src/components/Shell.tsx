@@ -307,6 +307,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
                 flexDirection: "column",
                 gap: 4,
                 padding: "var(--space-4)",
+                paddingBottom: "calc(var(--space-4) + env(safe-area-inset-bottom))",
                 background: "var(--color-nav-bg)",
                 borderRight: "1px solid var(--color-nav-border)",
                 overflowY: "auto",
