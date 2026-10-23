@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Noto_Sans_JP } from "next/font/google";
 import "@phosphor-icons/web/regular";
 import "@phosphor-icons/web/fill";
@@ -19,6 +19,12 @@ const notoSansJp = Noto_Sans_JP({
 export const metadata: Metadata = {
   title: "PORT 受付",
   description: "受付・スタッフ向け業務画面",
+  // iPhone の「ホーム画面に追加」で、アプリのように全画面で開く。
+  appleWebApp: { capable: true, title: "中央秘書 本部", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#16281f",
 };
 
 // Runs before paint so the persisted theme choice applies with no flash of

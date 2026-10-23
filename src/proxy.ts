@@ -15,7 +15,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // page.tsx doesn't need to know about it. A custom domain (org_id_by_domain)
 // is only for a future case where a company wants their own domain instead.
 // アプリ自身のページ。事業所・窓口の合言葉としては使えない。
-const RESERVED_SEGMENTS = new Set(["auth", "terms", "api"]);
+const RESERVED_SEGMENTS = new Set(["auth", "terms", "api", "manifest.webmanifest"]);
 
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
