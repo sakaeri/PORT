@@ -36,20 +36,23 @@ const FAQ = [
   { q: "自社サービスのお問い合わせ窓口もお願いできますか？", a: "はい。御社サービス専用のお問い合わせチャットをご用意し、秘書がお客さまに対応します。キャンペーン中だけなど、期間限定の窓口にも対応しています。" },
   { q: "単発だけでも頼めますか？", a: "はい。1回だけのご依頼も、毎月など定期的なご依頼も、同じトークからご相談いただけます。" },
   { q: "見積もりを見てから断れますか？", a: "はい。ご依頼の確定前であれば、いつでも見送ることができ、費用はかかりません。" },
+  { q: "担当秘書は変えてもらえますか？", a: "はい。マイページの「ご意見・ご要望」からお知らせください。担当秘書には共有されず、運営に直接届きます。" },
+  { q: "電話やオンラインで相談できますか？", a: "ご依頼は基本的にチャットで承っています。込み入ったご相談は、ZoomやGoogle Meetでのオンライン打ち合わせも可能です（内容の確認のため、録画させていただく場合があります）。" },
   { q: "同時にいくつまで頼めますか？", a: "同時に進められるご依頼は3件までです。" },
   { q: "支払い方法は？", a: "クレジットカードで残高をチャージし、その残高からお支払いいただきます。" },
 ];
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 50, display: "grid", placeItems: "center", padding: "var(--space-4)" };
+// 見出しと✕は固定して、中身だけをスクロールさせる。スマホでは画面の上下に
+// 余白を残し（ブラウザのツールバー分も考えて dvh で測る）、画面いっぱいに
+// 張り付かないようにする。
 const dialogBox: React.CSSProperties = {
   width: "min(420px, 100%)",
-  maxHeight: "calc(100vh - 32px)",
-  overflowY: "auto",
+  maxHeight: "min(640px, calc(100dvh - 96px))",
+  overflow: "hidden",
   position: "relative",
   display: "flex",
   flexDirection: "column",
-  gap: 16,
-  padding: 22,
   borderRadius: "var(--radius-lg)",
   background: "var(--color-surface)",
   color: "var(--color-text)",
@@ -125,8 +128,9 @@ function TaskList() {
 
   return (
     <>
-      <div style={{ position: "relative" }}>
-        <MagnifyingGlass size={15} color="var(--color-neutral-500)" style={{ position: "absolute", left: 11, top: 11 }} />
+      {/* 下へスクロールしても検索欄は上に残す */}
+      <div style={{ position: "sticky", top: -16, zIndex: 1, margin: "-16px 0 -6px", padding: "16px 0 10px", background: "var(--color-surface)" }}>
+        <MagnifyingGlass size={15} color="var(--color-neutral-500)" style={{ position: "absolute", left: 11, top: 27 }} />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -203,15 +207,17 @@ export default function GateInfo() {
             <button
               onClick={() => setOpen(null)}
               aria-label="閉じる"
-              style={{ position: "absolute", top: 14, right: 14, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
+              style={{ position: "absolute", top: 15, right: 14, zIndex: 1, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
             >
               <X size={16} />
             </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: "18px 52px 14px 20px", borderBottom: "1px solid var(--color-divider)" }}>
               <current.Icon size={22} color="var(--color-accent)" />
               <span style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 19 }}>{current.label}</span>
             </div>
-            <Content topic={current.id} />
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", display: "flex", flexDirection: "column", gap: 16, padding: "16px 20px 22px" }}>
+              <Content topic={current.id} />
+            </div>
           </div>
         </div>
       )}
