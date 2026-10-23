@@ -20,6 +20,7 @@ interface CustomerRow {
   convertedOrg: { displayName: string; slug: string | null } | null;
   thread: { id: string; archived: boolean } | null;
   departmentId: string | null;
+  deskName: string | null;
   lastMessagePreview: string | null;
   unread: boolean;
   requestCount: number;
@@ -127,6 +128,11 @@ export default function CustomersList({
             <Link href={`/customers/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: c.unread ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                {c.deskName && (
+                  <span style={{ flex: "none", fontSize: 10, color: "var(--color-accent)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)", padding: "1px 6px" }}>
+                    {c.deskName}
+                  </span>
+                )}
                 {c.departmentId && departmentById.get(c.departmentId) && (
                   <span style={{ flex: "none", fontSize: 10, color: "var(--color-neutral-500)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-sm)", padding: "1px 6px" }}>
                     {departmentById.get(c.departmentId)}

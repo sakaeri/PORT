@@ -71,9 +71,25 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     return null;
   }
 
+  // 問い合わせ窓口のURL（/teera など）から入ったとき。まだ何も書いていないトークなら
+  // 窓口の印を付けて、その窓口の担当秘書に割り当てる（claim_desk_thread）。
+  let closedDeskName: string | null = null;
+  const deskSlug = h.get("x-vid-desk-slug");
+  if (deskSlug) {
+    const row = (await supabase.rpc("desk_by_slug", { p_slug: deskSlug })).data?.[0];
+    if (row && row.org_id === customer.org_id) {
+      if (row.active) {
+        const { error } = await supabase.rpc("claim_desk_thread", { p_desk_id: row.id });
+        if (error) console.error("getCustomerContext: claim_desk_thread failed", error);
+      } else {
+        closedDeskName = row.name;
+      }
+    }
+  }
+
   const { data: thread } = await supabase
     .from("threads")
-    .select("id")
+    .select("id, desk_id")
     .eq("customer_id", customer.id)
     .eq("kind", "customer")
     .maybeSingle();
@@ -82,19 +98,14 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     return null;
   }
 
-  // 問い合わせ窓口から入ったとき。まだ何も書いていないトークなら窓口の部署へ振り分ける。
+  // 依頼主の画面（チャットだけになるか）は、URLではなくトークが窓口のものかで決まる。
   let desk: CustomerContext["desk"] = null;
-  const deskSlug = h.get("x-vid-desk-slug");
-  if (deskSlug) {
-    const row = (await supabase.rpc("desk_by_slug", { p_slug: deskSlug })).data?.[0];
-    if (row && row.org_id === customer.org_id) {
-      desk = { id: row.id, name: row.name, active: row.active };
-      if (row.active) {
-        const { error } = await supabase.rpc("claim_desk_thread", { p_desk_id: row.id });
-        if (error) console.error("getCustomerContext: claim_desk_thread failed", error);
-      }
-    }
+  if (thread.desk_id) {
+    const row = (await supabase.rpc("desk_by_id", { p_id: thread.desk_id })).data?.[0];
+    if (row) desk = { id: row.id, name: row.name, active: row.active };
   }
+  // 受付を止めた窓口のURLから、まだその窓口のトークを持っていない人が来たとき。
+  if (desk) closedDeskName = null;
 
   const { data: org } = await supabase
     .from("organizations")
@@ -138,6 +149,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
       hasCard: !!customer.stripe_payment_method_id,
     },
     desk,
+    closedDeskName,
   };
 });
 

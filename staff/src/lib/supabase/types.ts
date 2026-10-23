@@ -387,6 +387,7 @@ export interface Database {
           request_id: string | null;
           creator_id: string | null;
           department_id: string | null;
+          desk_id: string | null;
           staff_profile_id: string | null;
           last_msg_at: string | null;
           archived_at: string | null;
@@ -396,7 +397,10 @@ export interface Database {
         };
         Insert: Partial<Database["public"]["Tables"]["threads"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["threads"]["Row"]>;
-        Relationships: [{ foreignKeyName: "threads_customer_id_fkey"; columns: ["customer_id"]; isOneToOne: false; referencedRelation: "customers"; referencedColumns: ["id"] }];
+        Relationships: [
+          { foreignKeyName: "threads_customer_id_fkey"; columns: ["customer_id"]; isOneToOne: false; referencedRelation: "customers"; referencedColumns: ["id"] },
+          { foreignKeyName: "threads_desk_id_fkey"; columns: ["desk_id"]; isOneToOne: false; referencedRelation: "inquiry_desks"; referencedColumns: ["id"] },
+        ];
       };
       messages: {
         Row: {
@@ -620,6 +624,7 @@ export interface Database {
       org_id_by_domain: { Args: { p_domain: string }; Returns: string };
       org_id_by_slug: { Args: { p_slug: string }; Returns: string | null };
       desk_by_slug: { Args: { p_slug: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
+      desk_by_id: { Args: { p_id: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
       claim_desk_thread: { Args: { p_desk_id: string }; Returns: void };
       ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
       finalize_hourly_billing: { Args: { p_request_id: string }; Returns: void };

@@ -40,15 +40,21 @@ export async function notifyNewInquiry(orgId: string, threadId: string) {
     const [{ data: org }, { data: staff }, { data: thread }] = await Promise.all([
       admin.from("organizations").select("display_name").eq("id", orgId).single(),
       admin.from("profiles").select("id").eq("org_id", orgId).in("role", ["owner", "reception"]),
-      admin.from("threads").select("customer_id, department_id").eq("id", threadId).maybeSingle(),
+      admin.from("threads").select("customer_id, desk_id, department_id").eq("id", threadId).maybeSingle(),
     ]);
-    if (!staff?.length) return;
     // 問い合わせ窓口（TeeRA など）のトークなら、どの窓口からかを書く。
-    const desk = thread?.department_id
-      ? (await admin.from("inquiry_desks").select("name").eq("department_id", thread.department_id).maybeSingle()).data
-      : null;
+    const desk = thread?.desk_id ? (await admin.from("inquiry_desks").select("name").eq("id", thread.desk_id).maybeSingle()).data : null;
+    // 窓口のトークは担当秘書が受け持つので、担当秘書（その窓口のマネージャー）にも知らせる。
+    let managerIds: string[] = [];
+    if (desk && thread?.department_id) {
+      const { data: deptStaff } = await admin.from("staff_departments").select("profile_id").eq("department_id", thread.department_id);
+      const ids = (deptStaff ?? []).map((d) => d.profile_id);
+      if (ids.length) managerIds = ((await admin.from("profiles").select("id").in("id", ids).eq("role", "dept_manager")).data ?? []).map((m) => m.id);
+    }
+    const recipientIds = [...new Set([...(staff ?? []).map((s) => s.id), ...managerIds])];
+    if (!recipientIds.length) return;
 
-    const emails = await emailsFor(admin, staff.map((s) => s.id));
+    const emails = await emailsFor(admin, recipientIds);
     const staffUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
     const openUrl = staffUrl && thread?.customer_id ? `${staffUrl}/customers/${thread.customer_id}` : staffUrl;
     await sendStaffEmail(
