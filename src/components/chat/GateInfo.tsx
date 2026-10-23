@@ -43,15 +43,16 @@ const FAQ = [
 ];
 
 const scrim: React.CSSProperties = { position: "fixed", inset: 0, background: "var(--stb-scrim)", zIndex: 50, display: "grid", placeItems: "center", padding: "var(--space-4)" };
+// 見出しと✕は固定して、中身だけをスクロールさせる。スマホでは画面の上下に
+// 余白を残し（ブラウザのツールバー分も考えて dvh で測る）、画面いっぱいに
+// 張り付かないようにする。
 const dialogBox: React.CSSProperties = {
   width: "min(420px, 100%)",
-  maxHeight: "calc(100vh - 32px)",
-  overflowY: "auto",
+  maxHeight: "min(640px, calc(100dvh - 96px))",
+  overflow: "hidden",
   position: "relative",
   display: "flex",
   flexDirection: "column",
-  gap: 16,
-  padding: 22,
   borderRadius: "var(--radius-lg)",
   background: "var(--color-surface)",
   color: "var(--color-text)",
@@ -127,8 +128,9 @@ function TaskList() {
 
   return (
     <>
-      <div style={{ position: "relative" }}>
-        <MagnifyingGlass size={15} color="var(--color-neutral-500)" style={{ position: "absolute", left: 11, top: 11 }} />
+      {/* 下へスクロールしても検索欄は上に残す */}
+      <div style={{ position: "sticky", top: -16, zIndex: 1, margin: "-16px 0 -6px", padding: "16px 0 10px", background: "var(--color-surface)" }}>
+        <MagnifyingGlass size={15} color="var(--color-neutral-500)" style={{ position: "absolute", left: 11, top: 27 }} />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -205,15 +207,17 @@ export default function GateInfo() {
             <button
               onClick={() => setOpen(null)}
               aria-label="閉じる"
-              style={{ position: "absolute", top: 14, right: 14, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
+              style={{ position: "absolute", top: 15, right: 14, zIndex: 1, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
             >
               <X size={16} />
             </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, padding: "18px 52px 14px 20px", borderBottom: "1px solid var(--color-divider)" }}>
               <current.Icon size={22} color="var(--color-accent)" />
               <span style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 19 }}>{current.label}</span>
             </div>
-            <Content topic={current.id} />
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", display: "flex", flexDirection: "column", gap: 16, padding: "16px 20px 22px" }}>
+              <Content topic={current.id} />
+            </div>
           </div>
         </div>
       )}
