@@ -109,7 +109,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
 
   const { data: org } = await supabase
     .from("organizations")
-    .select("display_name, is_hq, plan_status, trial_ends_on")
+    .select("display_name")
     .eq("id", customer.org_id)
     .maybeSingle();
 
@@ -118,12 +118,6 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     .select("avatar_url, role")
     .eq("id", auth.user.id)
     .maybeSingle();
-
-  const trialExpired = org?.trial_ends_on != null && org.trial_ends_on < new Date().toISOString().slice(0, 10);
-  const orgLocked =
-    !!org &&
-    !org.is_hq &&
-    (org.plan_status === "past_due" || org.plan_status === "paused" || org.plan_status === "cancelled" || (org.plan_status === "trial" && trialExpired));
 
   return {
     userId: auth.user.id,
@@ -140,7 +134,6 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     // パスワードとメールアドレスは本部画面のログインと共用なので、ここでは変えさせない。
     isStaffAccount: !!profile && profile.role !== "client",
     avatarUrl: profile?.avatar_url ?? null,
-    orgLocked,
     balance: customer.balance,
     autoRecharge: {
       enabled: customer.auto_recharge_enabled,
