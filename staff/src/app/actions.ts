@@ -683,7 +683,8 @@ async function createCaseRequestInner(
       sender_id: null,
       sender_role: null,
       kind: "notice",
-      body: `見積もりを送信しました（¥${amount.toLocaleString("ja-JP")}）`,
+      // 案件トークは秘書・スタッフも見るので金額は書かない（金額は本部だけが見る）。
+      body: "見積もりを送信しました",
     });
   } catch (e) {
     // 途中で失敗したら作りかけの案件を消す（明細・見積もりカード・案件トークも on delete cascade で消える）。

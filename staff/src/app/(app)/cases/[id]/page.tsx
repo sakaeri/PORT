@@ -146,7 +146,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       subscription={canApprove && subscription ? { id: subscription.id, cadence: subscription.cadence, active: subscription.active, nextDueAt: subscription.next_due_at } : null}
       customerThreadId={customerThread?.id ?? null}
       menus={(menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, payout: m.payout, leadHours: m.lead_hours }))}
-      requestItems={(request.request_items ?? []).map((it) => ({ label: it.label, price: it.price, qty: it.qty, leadHours: null }))}
+      requestItems={canApprove ? (request.request_items ?? []).map((it) => ({ label: it.label, price: it.price, qty: it.qty, leadHours: null })) : []}
     />
   );
 }

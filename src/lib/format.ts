@@ -31,6 +31,22 @@ export function dateLabel(iso: string): string {
   return `${Number(month)}/${Number(day)}`;
 }
 
+// トークの日付の区切り用。日本時間の日付で比べる。
+export function dayKey(iso: string): string {
+  const { year, month, day } = tokyoParts(iso);
+  return `${year}-${Number(month)}-${Number(day)}`;
+}
+
+export function dayHeading(iso: string, nowIso: string): string {
+  const key = dayKey(iso);
+  if (key === dayKey(nowIso)) return "今日";
+  if (key === dayKey(new Date(new Date(nowIso).getTime() - 24 * 60 * 60 * 1000).toISOString())) return "昨日";
+  const { year, month, day } = tokyoParts(iso);
+  const dow = new Intl.DateTimeFormat("ja-JP", { timeZone: TIME_ZONE, weekday: "short" }).format(new Date(iso));
+  const sameYear = year === tokyoParts(nowIso).year;
+  return `${sameYear ? "" : `${year}年`}${Number(month)}月${Number(day)}日(${dow})`;
+}
+
 export function monthKey(iso: string): string {
   const { year, month } = tokyoParts(iso);
   return `${year}年${Number(month)}月`;

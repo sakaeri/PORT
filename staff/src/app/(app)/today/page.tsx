@@ -185,7 +185,7 @@ export default async function TodayPage() {
                 <span className="print-checkbox">☐</span>
                 <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{customerNameOf(r.customers)}</span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
-                <span style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>{yen(r.amount)}</span>
+                {viewerRole === "owner" && <span style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>{yen(r.amount)}</span>}
               </div>
               {r.quoted_at && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>送信 {fmtTime(r.quoted_at)}</div>}
             </Link>
