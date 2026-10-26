@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Header from "@/components/chat/Header";
 import Composer, { type PendingAttachment } from "@/components/chat/Composer";
 import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, IntakeCard, IntakeAnswerBubble } from "@/components/chat/Bubbles";
 import { ProgressPanel, CancelDialog, ReportsDialog } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
 import { createClient } from "@/lib/supabase/client";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { MESSAGE_PAGE_SIZE, mapMessageRow, type CustomerContext, type MessageWithExtras, type RawMessageRow, type RequestBundle } from "@/lib/chat-types";
 import {
   sendMessage as sendMessageAction,
@@ -44,6 +45,7 @@ function writeAcked(ids: Set<string>) {
 }
 
 export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, openPasswordSetup }: Props) {
+  const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
@@ -218,7 +220,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
   });
 
   async function handleSend(text: string, attachments: PendingAttachment[]) {
-    await sendMessageAction(text, attachments);
+    unwrap(await sendMessageAction(text, attachments));
     await refresh();
   }
 
@@ -229,7 +231,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
     setBusy(true);
     setCancelError("");
     try {
-      await declineQuote(cancelTargetId);
+      unwrap(await declineQuote(cancelTargetId));
       await refresh();
       setCancelTargetId(null);
     } catch (e) {
@@ -305,15 +307,17 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
                     setShowMyPage(true);
                   }}
                   onPay={async (id) => {
-                    await payFromBalance(id);
+                    unwrap(await payFromBalance(id));
+                    // 残高はサーバーで描いた値なので、払った後は画面ごと取り直す。
+                    router.refresh();
                     await refresh();
                   }}
                   onSubmitRating={async (id, stars, comment) => {
-                    await submitRating(id, stars, comment);
+                    unwrap(await submitRating(id, stars, comment));
                     await refresh();
                   }}
                   onSkipRating={async (id) => {
-                    await skipRating(id);
+                    unwrap(await skipRating(id));
                     await refresh();
                   }}
                 />
@@ -333,7 +337,8 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
           onClose={() => setShowProgress(false)}
           onCancel={(id) => { setShowProgress(false); setCancelTargetId(id); }}
           onPay={async (id) => {
-            await payFromBalance(id);
+            unwrap(await payFromBalance(id));
+            router.refresh();
             await refresh();
           }}
           onOpenCharge={() => {

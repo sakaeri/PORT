@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Archive, ArrowCounterClockwise, Star, Plus, X, Paperclip, CircleNotch, FilePdf, Image as ImageIcon } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
 import {
   startCaseRequest,
@@ -146,7 +146,7 @@ export default function CaseDetail({
   const canCancel = !["completed", "cancelled", "declined"].includes(request.phase);
   const isOverdue = request.dueAt != null && ["preparing", "started"].includes(request.phase) && new Date(request.dueAt) < new Date();
 
-  const handleDecline = () => runAction(() => declineQuote(request.id), "この見積もりを見送りにします。よろしいですか？");
+  const handleDecline = () => runAction(async () => void unwrap(await declineQuote(request.id)), "この見積もりを見送りにします。よろしいですか？");
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 640, width: "100%", margin: "0 auto" }}>

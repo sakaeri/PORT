@@ -71,7 +71,9 @@ async function toResult(label: string, fn: () => Promise<unknown>): Promise<Acti
     await fn();
     return { error: null };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "";
+    // DB の関数が日本語で raise したエラー（残高不足・期限切れなど）は
+    // Error ではなく { message } の形で届くので、そちらも見る。
+    const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String(e.message) : "";
     if (/[ぁ-んァ-ヶ一-龠]/.test(msg)) return { error: msg };
     console.error(label, e);
     return { error: "" };
@@ -225,6 +227,10 @@ async function removeLoginPasswordInner() {
 }
 
 export async function sendMessage(text: string, attachments: { path: string; name: string; mime: string; bytes: number }[]) {
+  return toResult("sendMessage", () => sendMessageInner(text, attachments));
+}
+
+async function sendMessageInner(text: string, attachments: { path: string; name: string; mime: string; bytes: number }[]) {
   const ctx = await requireActiveContext();
   const supabase = await createClient();
   const trimmed = text.trim();
@@ -255,6 +261,10 @@ export async function sendMessage(text: string, attachments: { path: string; nam
 // 依頼主ごとの永続データ（customer_vault_items＝マイページの「よく使う情報」）には繋げない
 // —— 確認事項テンプレはあくまで一回きりのやり取りとして扱う。
 export async function submitInfoRequestAnswer(formLabel: string, fields: { label: string; value: string }[]) {
+  return toResult("submitInfoRequestAnswer", () => submitInfoRequestAnswerInner(formLabel, fields));
+}
+
+async function submitInfoRequestAnswerInner(formLabel: string, fields: { label: string; value: string }[]) {
   const ctx = await requireActiveContext();
   const filled = fields.filter((f) => f.value.trim());
   if (!filled.length) return;
@@ -275,6 +285,10 @@ export async function submitInfoRequestAnswer(formLabel: string, fields: { label
 // 社内向け（書類の宛名など）の呼び方は、本人のこの変更とは独立した
 // customers.staff_label（本部・マネージャーが設定）を使う。
 export async function updateCustomerName(name: string) {
+  return toResult("updateCustomerName", () => updateCustomerNameInner(name));
+}
+
+async function updateCustomerNameInner(name: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const trimmed = name.trim();
@@ -390,6 +404,10 @@ async function changeEmailInner(newEmail: string, password?: string) {
 }
 
 export async function submitRating(requestId: string, stars: number, comment: string) {
+  return toResult("submitRating", () => submitRatingInner(requestId, stars, comment));
+}
+
+async function submitRatingInner(requestId: string, stars: number, comment: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const { error } = await supabase
@@ -399,6 +417,10 @@ export async function submitRating(requestId: string, stars: number, comment: st
 }
 
 export async function skipRating(requestId: string) {
+  return toResult("skipRating", () => skipRatingInner(requestId));
+}
+
+async function skipRatingInner(requestId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const { error } = await supabase
@@ -410,6 +432,10 @@ export async function skipRating(requestId: string) {
 // チャージ残高からの支払い。二重消費を防ぐためのロック・検証はすべて
 // pay_request_from_balance（DB側のsecurity definer関数）の中で行う。
 export async function payFromBalance(requestId: string) {
+  return toResult("payFromBalance", () => payFromBalanceInner(requestId));
+}
+
+async function payFromBalanceInner(requestId: string) {
   const ctx = await requireActiveContext();
   const supabase = await createClient();
   const { error } = await supabase.rpc("pay_request_from_balance", { p_request_id: requestId });
@@ -429,6 +455,10 @@ export async function payFromBalance(requestId: string) {
 // 頼んだ後のキャンセル・返金は一切行わない方針のため、キャンセルできるのは
 // まだ決済前（見積もり段階）の見積もりを断る場合だけ。
 export async function declineQuote(requestId: string) {
+  return toResult("declineQuote", () => declineQuoteInner(requestId));
+}
+
+async function declineQuoteInner(requestId: string) {
   const ctx = await requireContext();
   const admin = createServiceRoleClient();
 
@@ -442,7 +472,9 @@ export async function declineQuote(requestId: string) {
   if (r.phase !== "quoted") throw new Error("この依頼はすでに決済が完了しているため、キャンセルできません");
 
   const now = new Date().toISOString();
-  await admin.from("requests").update({ phase: "declined", cancelled_at: now }).eq("id", requestId);
+  // 別のタブで支払いが同時に確定していたら上書きしない。
+  const { data: declined } = await admin.from("requests").update({ phase: "declined", cancelled_at: now }).eq("id", requestId).eq("phase", "quoted").select("id");
+  if (!declined?.length) throw new Error("この依頼はすでに決済が完了しているため、キャンセルできません");
   const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
   if (caseThread) {
     await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body: "依頼主が見積もりをキャンセルしました" });
@@ -455,6 +487,10 @@ export async function declineQuote(requestId: string) {
 // 出す、といった金額の判断は常に秘書側に残すため）。秘書はこれを見て、
 // 改めて定期の見積もりを作って送り返す。
 export async function requestRecurringFollowup(requestId: string) {
+  return toResult("requestRecurringFollowup", () => requestRecurringFollowupInner(requestId));
+}
+
+async function requestRecurringFollowupInner(requestId: string) {
   const ctx = await requireContext();
   const admin = createServiceRoleClient();
 
@@ -475,7 +511,15 @@ export async function requestRecurringFollowup(requestId: string) {
 // client_secretを用意するだけで、残高はまだ一切動かさない。支払い完了は
 // Webhook（route.ts）側のcheckout.session.completedで検知して残高に反映する
 // （決済が実際に成立するまで反映しないことで、二重加算や未払いの加算を防ぐ）。
-export async function startBalanceCharge(amountYen: number): Promise<string> {
+export async function startBalanceCharge(amountYen: number) {
+  let clientSecret = "";
+  const r = await toResult("startBalanceCharge", async () => {
+    clientSecret = await startBalanceChargeInner(amountYen);
+  });
+  return { ...r, clientSecret };
+}
+
+async function startBalanceChargeInner(amountYen: number): Promise<string> {
   const ctx = await requireContext();
   if (!Number.isInteger(amountYen) || amountYen < 1000) throw new Error("チャージ額は1,000円以上で指定してください");
 
@@ -514,7 +558,15 @@ export async function startBalanceCharge(amountYen: number): Promise<string> {
 // しきい値／金額の保存は Webhook 側（checkout.session.completed, mode=
 // "setup"）で行う。既にstripe_customer_idがあればそれを使い回し、無ければ
 // Stripe側に新しく作ってもらう。
-export async function startAutoRechargeSetup(thresholdYen: number, amountYen: number): Promise<string> {
+export async function startAutoRechargeSetup(thresholdYen: number, amountYen: number) {
+  let clientSecret = "";
+  const r = await toResult("startAutoRechargeSetup", async () => {
+    clientSecret = await startAutoRechargeSetupInner(thresholdYen, amountYen);
+  });
+  return { ...r, clientSecret };
+}
+
+async function startAutoRechargeSetupInner(thresholdYen: number, amountYen: number): Promise<string> {
   const ctx = await requireContext();
   if (!Number.isInteger(thresholdYen) || thresholdYen < 1) throw new Error("しきい値を入力してください");
   if (!Number.isInteger(amountYen) || amountYen < 1000) throw new Error("チャージ額は1,000円以上で指定してください");
@@ -548,6 +600,10 @@ export async function startAutoRechargeSetup(thresholdYen: number, amountYen: nu
 }
 
 export async function disableAutoRecharge() {
+  return toResult("disableAutoRecharge", () => disableAutoRechargeInner());
+}
+
+async function disableAutoRechargeInner() {
   await requireContext();
   const supabase = await createClient();
   const { error } = await supabase.rpc("disable_auto_recharge");
@@ -580,6 +636,10 @@ export async function getHqThread() {
 }
 
 export async function sendHqMessage(body: string) {
+  return toResult("sendHqMessage", () => sendHqMessageInner(body));
+}
+
+async function sendHqMessageInner(body: string) {
   const ctx = await requireActiveContext();
   const trimmed = body.trim();
   if (!trimmed) throw new Error("内容を入力してください");

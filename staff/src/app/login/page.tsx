@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { requestPasswordReset } from "@/app/actions";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 
 export default function LoginPage() {
@@ -44,7 +44,7 @@ export default function LoginPage() {
     setForgotSending(true);
     setForgotError("");
     try {
-      await requestPasswordReset(forgotEmail);
+      unwrap(await requestPasswordReset(forgotEmail));
       setForgotSent(true);
     } catch (e) {
       setForgotError(errorMessage(e, "送信できませんでした"));

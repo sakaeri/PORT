@@ -6,3 +6,10 @@ export function errorMessage(e: unknown, fallback: string): string {
   if (e instanceof Error && /[ぁ-んァ-ヶ一-龠]/.test(e.message)) return e.message;
   return fallback;
 }
+
+// Server Action が { error } で返した失敗を、呼び出し側の try/catch で
+// 拾えるよう例外に戻す（error が空文字なら errorMessage の既定の文言になる）。
+export function unwrap<T extends { error: string | null }>(r: T): T {
+  if (r.error !== null) throw new Error(r.error);
+  return r;
+}

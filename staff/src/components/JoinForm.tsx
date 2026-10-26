@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { headingWeight } from "@/lib/style";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { acceptStaffInvite } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { StaffRole } from "@/lib/supabase/types";
@@ -74,7 +74,7 @@ export default function JoinForm({
     setError("");
     setSubmitting(true);
     try {
-      await acceptStaffInvite(inviteId, { email, password, displayName });
+      unwrap(await acceptStaffInvite(inviteId, { email, password, displayName }));
       const supabase = createClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (signInError) throw signInError;

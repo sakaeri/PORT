@@ -8,6 +8,7 @@ import Avatar, { avatarInitial } from "@/components/Avatar";
 import RowKebabMenu from "@/components/RowKebabMenu";
 import DepartmentFilterDropdown from "@/components/DepartmentFilterDropdown";
 import type { RequestPhase } from "@/lib/supabase/types";
+import { errorMessage, unwrap } from "@/lib/errors";
 
 export interface CaseRow {
   id: string;
@@ -89,14 +90,17 @@ export default function CasesList({
 
   async function handleDelete(r: CaseRow) {
     if (busyId) return;
-    const warning = r.paid
-      ? `「${r.title}」を完全に削除します。この案件は入金済みで、その支払い記録も含めてトーク・完了報告・評価が全て元に戻せなくなります。よろしいですか？`
-      : `「${r.title}」を完全に削除します。トーク・完了報告・評価が全て元に戻せなくなります。よろしいですか？`;
-    if (!confirm(warning)) return;
+    if (r.paid) {
+      alert("支払い済みの案件は削除できません。表示を消したいときは「非表示にする」を使ってください。");
+      return;
+    }
+    if (!confirm(`「${r.title}」を完全に削除します。トークも元に戻せなくなります。よろしいですか？`)) return;
     setBusyId(r.id);
     try {
-      await deleteCaseRequest(r.id);
+      unwrap(await deleteCaseRequest(r.id));
       setRows((rs) => rs.filter((row) => row.id !== r.id));
+    } catch (e) {
+      alert(errorMessage(e, "削除できませんでした"));
     } finally {
       setBusyId(null);
     }

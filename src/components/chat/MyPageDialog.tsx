@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
 import { updateCustomerName, changeEmail, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge, setLoginPassword, removeLoginPassword } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
@@ -132,7 +132,7 @@ export default function MyPageDialog({
     setChargeStarting(true);
     setChargeError("");
     try {
-      const clientSecret = await startBalanceCharge(chargeAmount);
+      const { clientSecret } = unwrap(await startBalanceCharge(chargeAmount));
       setChargeClientSecret(clientSecret);
     } catch (e) {
       setChargeError(errorMessage(e, "決済ページを開けませんでした"));
@@ -168,7 +168,7 @@ export default function MyPageDialog({
     setArStarting(true);
     setArError("");
     try {
-      const clientSecret = await startAutoRechargeSetup(threshold, amount);
+      const { clientSecret } = unwrap(await startAutoRechargeSetup(threshold, amount));
       setArClientSecret(clientSecret);
     } catch (e) {
       setArError(errorMessage(e, "設定ページを開けませんでした"));
@@ -188,8 +188,9 @@ export default function MyPageDialog({
     if (arDisabling) return;
     setArDisabling(true);
     try {
-      await disableAutoRecharge();
+      unwrap(await disableAutoRecharge());
       setArEnabledOverride(false);
+      router.refresh();
     } catch (e) {
       setArError(errorMessage(e, "操作に失敗しました"));
     } finally {
@@ -203,9 +204,11 @@ export default function MyPageDialog({
     setNameSaving(true);
     setNameError("");
     try {
-      await updateCustomerName(trimmed);
+      unwrap(await updateCustomerName(trimmed));
       setName(trimmed);
       setNameEditing(false);
+      // 閉じて開き直したときやヘッダーにも新しい名前が出るよう取り直す。
+      router.refresh();
     } catch (e) {
       setNameError(errorMessage(e, "保存できませんでした"));
     } finally {
@@ -246,6 +249,7 @@ export default function MyPageDialog({
       setPwNext("");
       setPwConf("");
       setPwDone("パスワードを設定しました");
+      router.refresh();
     } catch (e) {
       setPwError(errorMessage(e, "設定できませんでした"));
     } finally {
@@ -263,6 +267,7 @@ export default function MyPageDialog({
       setHasPassword(false);
       setPwOpen(false);
       setPwDone("メールのリンクだけでログインするようにしました");
+      router.refresh();
     } catch (e) {
       setPwError(errorMessage(e, "操作できませんでした"));
     } finally {

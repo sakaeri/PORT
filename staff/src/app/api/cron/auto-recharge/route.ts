@@ -19,11 +19,10 @@ async function notifyCustomer(admin: ReturnType<typeof createServiceRoleClient>,
 }
 
 export async function GET(request: Request) {
+  // ログインなしで呼べるURLなので、CRON_SECRET が未設定なら誰の呼び出しも通さない。
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = request.headers.get("authorization");
+  if (!secret || auth !== `Bearer ${secret}`) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const admin = createServiceRoleClient();
   const { data: candidates, error } = await admin

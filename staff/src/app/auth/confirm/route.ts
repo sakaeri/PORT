@@ -13,7 +13,10 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const typeParam = searchParams.get("type");
-  const next = searchParams.get("next") ?? (typeParam === "recovery" ? "/reset-password" : "/");
+  const fallback = typeParam === "recovery" ? "/reset-password" : "/";
+  // 外のサイトへ飛ばされないよう、アプリ内のパス（/ 始まり、// や \ を含まない）だけ受け付ける。
+  const rawNext = searchParams.get("next") ?? fallback;
+  const next = /^\/(?![\/\\])[^\\]*$/.test(rawNext) ? rawNext : fallback;
 
   if (tokenHash && typeParam && (OTP_TYPES as readonly string[]).includes(typeParam)) {
     const supabase = await createClient();
