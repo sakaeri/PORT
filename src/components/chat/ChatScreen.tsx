@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { dayHeading, dayKey } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import Header from "@/components/chat/Header";
 import Composer, { type PendingAttachment } from "@/components/chat/Composer";
@@ -46,6 +47,8 @@ function writeAcked(ids: Set<string>) {
 
 export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, openPasswordSetup }: Props) {
   const router = useRouter();
+  // 「今日」「昨日」の判定用。開いた時点の時刻で固定する。
+  const [nowIso] = useState(() => new Date().toISOString());
   const [messages, setMessages] = useState(initialMessages);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
@@ -249,6 +252,56 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
     });
   }
 
+  function renderMessage(m: (typeof visible)[number]) {
+    const highlight = !!q;
+    switch (m.kind) {
+      case "text":
+        return <TextBubble key={m.id} msg={m} highlight={highlight} orgDisplayName={ctx.orgDisplayName} />;
+      case "files":
+        return <FilesBubble key={m.id} msg={m} highlight={highlight} orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} />;
+      case "notice":
+      case "system":
+        return <NoticeBubble key={m.id} msg={m} />;
+      case "menu_pick":
+        return <MenuPickBubble key={m.id} msg={m} />;
+      case "intake_request":
+        return <IntakeCard key={m.id} msg={m} />;
+      case "intake_answer":
+        return <IntakeAnswerBubble key={m.id} msg={m} />;
+      case "quote":
+        return m.requestBundle ? (
+          <RequestCard
+            key={m.id}
+            msg={m}
+            bundle={m.requestBundle}
+            balance={ctx.balance}
+            orgId={ctx.orgId}
+            orgDisplayName={ctx.orgDisplayName}
+            onOpenCharge={() => {
+              setOpenMyPageWithCharge(true);
+              setShowMyPage(true);
+            }}
+            onPay={async (id) => {
+              unwrap(await payFromBalance(id));
+              // 残高はサーバーで描いた値なので、払った後は画面ごと取り直す。
+              router.refresh();
+              await refresh();
+            }}
+            onSubmitRating={async (id, stars, comment) => {
+              unwrap(await submitRating(id, stars, comment));
+              await refresh();
+            }}
+            onSkipRating={async (id) => {
+              unwrap(await skipRating(id));
+              await refresh();
+            }}
+          />
+        ) : null;
+      default:
+        return null;
+    }
+  }
+
   return (
     <div style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--color-bg)", fontFamily: "var(--font-body)", color: "var(--color-text)" }}>
       <Header
@@ -276,55 +329,16 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
             {loadingOlder ? "読み込み中…" : "過去のやり取りを読み込む"}
           </button>
         )}
-        <div style={{ textAlign: "center", fontSize: 11, color: "var(--color-neutral-600)", letterSpacing: "0.04em" }}>今日</div>
-        {visible.map((m) => {
-          const highlight = !!q;
-          switch (m.kind) {
-            case "text":
-              return <TextBubble key={m.id} msg={m} highlight={highlight} orgDisplayName={ctx.orgDisplayName} />;
-            case "files":
-              return <FilesBubble key={m.id} msg={m} highlight={highlight} orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} />;
-            case "notice":
-            case "system":
-              return <NoticeBubble key={m.id} msg={m} />;
-            case "menu_pick":
-              return <MenuPickBubble key={m.id} msg={m} />;
-            case "intake_request":
-              return <IntakeCard key={m.id} msg={m} />;
-            case "intake_answer":
-              return <IntakeAnswerBubble key={m.id} msg={m} />;
-            case "quote":
-              return m.requestBundle ? (
-                <RequestCard
-                  key={m.id}
-                  msg={m}
-                  bundle={m.requestBundle}
-                  balance={ctx.balance}
-                  orgId={ctx.orgId}
-                  orgDisplayName={ctx.orgDisplayName}
-                  onOpenCharge={() => {
-                    setOpenMyPageWithCharge(true);
-                    setShowMyPage(true);
-                  }}
-                  onPay={async (id) => {
-                    unwrap(await payFromBalance(id));
-                    // 残高はサーバーで描いた値なので、払った後は画面ごと取り直す。
-                    router.refresh();
-                    await refresh();
-                  }}
-                  onSubmitRating={async (id, stars, comment) => {
-                    unwrap(await submitRating(id, stars, comment));
-                    await refresh();
-                  }}
-                  onSkipRating={async (id) => {
-                    unwrap(await skipRating(id));
-                    await refresh();
-                  }}
-                />
-              ) : null;
-            default:
-              return null;
-          }
+        {visible.map((m, i) => {
+          const dayChanged = i === 0 || dayKey(visible[i - 1].sent_at) !== dayKey(m.sent_at);
+          const bubble = renderMessage(m);
+          if (!bubble || !dayChanged) return bubble;
+          return (
+            <Fragment key={m.id}>
+              <div style={{ textAlign: "center", fontSize: 11, color: "var(--color-neutral-600)", letterSpacing: "0.04em" }}>{dayHeading(m.sent_at, nowIso)}</div>
+              {bubble}
+            </Fragment>
+          );
         })}
       </div>
 

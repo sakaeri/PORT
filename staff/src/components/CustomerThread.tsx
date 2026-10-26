@@ -905,7 +905,9 @@ export default function CustomerThread({
           </button>
         )}
         {messages.map((m) => {
-          const isStaff = m.sender_role !== "client" && m.sender_role !== "creator" && m.sender_role !== null;
+          // 送り主のいない自動のあいさつ文は、依頼主ではなく事務所側のメッセージとして出す。
+          const isSystem = m.sender_id === null && m.sender_role === null;
+          const isStaff = isSystem || (m.sender_role !== "client" && m.sender_role !== "creator" && m.sender_role !== null);
           const isOwn = m.sender_id === currentUserId;
           return (
             <div key={m.id} style={{ display: "flex", flexDirection: isStaff ? "row-reverse" : "row", gap: 8, alignItems: "flex-end", maxWidth: "76%", alignSelf: isStaff ? "flex-end" : "flex-start" }}>
