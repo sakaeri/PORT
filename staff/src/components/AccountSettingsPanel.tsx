@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, CircleNotch } from "@phosphor-icons/react";
 import { updateMyDisplayName, updateOrgDisplayName, updateLoginEmail, updateLoginPassword, updateMyAvatar } from "@/app/actions";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
 import Avatar, { avatarInitial } from "@/components/Avatar";
@@ -129,7 +129,7 @@ export default function AccountSettingsPanel({
     setSaving("name");
     setError("");
     try {
-      await updateMyDisplayName(trimmed);
+      unwrap(await updateMyDisplayName(trimmed));
       onNameSaved(trimmed);
       setEditingName(false);
     } catch (e) {
@@ -145,7 +145,7 @@ export default function AccountSettingsPanel({
     setSaving("orgName");
     setError("");
     try {
-      await updateOrgDisplayName(trimmed);
+      unwrap(await updateOrgDisplayName(trimmed));
       router.refresh();
     } catch (e) {
       setError(errorMessage(e, "変更できませんでした"));
@@ -160,7 +160,7 @@ export default function AccountSettingsPanel({
     if (!email.trim()) return setError("メールアドレスを入力してください");
     setSaving("email");
     try {
-      await updateLoginEmail(email.trim());
+      unwrap(await updateLoginEmail(email.trim()));
       setEditingEmail(false);
       setDone("確認メールを新しいアドレスに送信しました。リンクを開くと切り替わります。");
     } catch (e) {
@@ -177,7 +177,7 @@ export default function AccountSettingsPanel({
     if (nextPw !== confirmPw) return setError("新しいパスワードが一致しません");
     setSaving("password");
     try {
-      await updateLoginPassword(curPw, nextPw);
+      unwrap(await updateLoginPassword(curPw, nextPw));
       setEditingPw(false);
       setCurPw("");
       setNextPw("");

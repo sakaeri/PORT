@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { BellRinging, Star, CheckCircle, MinusCircle, CircleNotch } from "@phosphor-icons/react";
 import { FileIcon, StepIcon } from "@/components/chat/icons";
 import { QuoteExpiryLine, useQuoteExpiry } from "@/components/chat/QuoteExpiry";
@@ -287,7 +287,7 @@ export function RequestCard({
     setRecurringRequesting(true);
     setRecurringError("");
     try {
-      await requestRecurringFollowup(r.id);
+      unwrap(await requestRecurringFollowup(r.id));
       setRecurringRequested(true);
     } catch (e) {
       setRecurringError(errorMessage(e, "送信できませんでした"));
@@ -607,7 +607,7 @@ export function IntakeCard({ msg }: { msg: MessageWithExtras }) {
     setSaving(true);
     try {
       const filled = fields.filter((f) => values[f.key]?.trim()).map((f) => ({ label: f.label, value: values[f.key].trim() }));
-      await submitInfoRequestAnswer(p.formLabel ?? "", filled);
+      unwrap(await submitInfoRequestAnswer(p.formLabel ?? "", filled));
       setSubmitted(filled);
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));

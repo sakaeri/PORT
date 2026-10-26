@@ -13,6 +13,7 @@ import { InviteAdmin, type Department } from "@/components/StaffAdmin";
 import DepartmentFilterDropdown from "@/components/DepartmentFilterDropdown";
 import Avatar, { avatarInitial } from "@/components/Avatar";
 import type { StaffRole } from "@/lib/supabase/types";
+import { errorMessage, unwrap } from "@/lib/errors";
 
 export interface StaffDirectoryRow {
   id: string;
@@ -136,9 +137,11 @@ export default function StaffChat({
     if (!confirm(`「${s.displayName}」を削除します。ログインもできなくなります。よろしいですか？`)) return;
     setBusyId(s.id);
     try {
-      await removeStaffMember(s.id);
+      unwrap(await removeStaffMember(s.id));
       setStaff((rows) => rows.filter((r) => r.id !== s.id));
       if (selectedId === s.id) setSelectedId(null);
+    } catch (e) {
+      alert(errorMessage(e, "削除できませんでした"));
     } finally {
       setBusyId(null);
     }

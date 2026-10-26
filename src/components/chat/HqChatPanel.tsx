@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChatCircleDots } from "@phosphor-icons/react";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { getHqThread, sendHqMessage } from "@/app/actions";
 
 interface HqMessage {
@@ -61,7 +61,7 @@ export default function HqChatPanel() {
     setSending(true);
     setError("");
     try {
-      await sendHqMessage(trimmed);
+      unwrap(await sendHqMessage(trimmed));
       setDraft("");
       await refresh();
     } catch (e) {

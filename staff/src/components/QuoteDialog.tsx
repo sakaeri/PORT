@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Trash } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { createCaseRequest } from "@/app/actions";
 import InfoTooltip from "@/components/InfoTooltip";
 import { advanceFee, ADVANCE_FEE_MIN, ADVANCE_FEE_RATE, ADVANCE_VALID_MINUTES } from "@/lib/advance";
@@ -191,7 +191,7 @@ export default function QuoteDialog({
     setError("");
     setSaving(true);
     try {
-      const requestId = await createCaseRequest(threadId, customerId, {
+      const { data: requestId } = unwrap(await createCaseRequest(threadId, customerId, {
         items: allItems,
         note,
         due,
@@ -202,8 +202,8 @@ export default function QuoteDialog({
         anchorWeekday: mode === "menu" && cadence === "weekly" && anchorWeekday != null ? anchorWeekday : undefined,
         anchorDayOfMonth: mode === "menu" && cadence === "monthly" && !anchorLastDayOfMonth && anchorDayOfMonth.trim() ? Number(anchorDayOfMonth) : undefined,
         anchorLastDayOfMonth: mode === "menu" && cadence === "monthly" && anchorLastDayOfMonth ? true : undefined,
-      });
-      onCreated(requestId);
+      }));
+      onCreated(requestId!);
     } catch (e) {
       setError(errorMessage(e, "作成できませんでした"));
     } finally {

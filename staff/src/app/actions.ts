@@ -8,6 +8,21 @@ import type { StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
 import { advanceFee, ADVANCE_FEE_RATE, ADVANCE_VALID_MINUTES } from "@/lib/advance";
 import { TASK_EXAMPLES } from "@/lib/task-examples";
 
+// 本番の Next.js は Server Action で throw されたエラー文を画面に渡さない
+// （汎用の文言に置き換わる）。「何が悪かったか」を伝えたい操作はこれで包み、
+// 日本語の文言だけを戻り値で返す。想定外のエラーはログに残して空文字にする
+// （呼び出し側は unwrap() で例外に戻し、errorMessage の既定の文言を出す）。
+async function toResult<T>(label: string, fn: () => Promise<T>): Promise<{ error: string | null; data: T | null }> {
+  try {
+    return { error: null, data: await fn() };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String(e.message) : "";
+    if (/[ぁ-んァ-ヶ一-龠]/.test(msg)) return { error: msg, data: null };
+    console.error(label, e);
+    return { error: "", data: null };
+  }
+}
+
 async function requireContext() {
   const ctx = await getStaffContext();
   if (!ctx) throw new Error("権限がありません");
@@ -33,7 +48,11 @@ async function requireContextWithDelete() {
 // なければ黙って0件更新で終わるため、更新後に選択して件数で判定する。
 // 依頼主に見える事業者名はこれだけ（正式名称・代表者名・住所・電話番号は
 // どこにも表示に使っていないため、編集画面ごと廃止した）。
-export async function updateOrgDisplayName(displayName: string) {
+export async function updateOrgDisplayName(...args: Parameters<typeof updateOrgDisplayNameInner>) {
+  return toResult("updateOrgDisplayName", () => updateOrgDisplayNameInner(...args));
+}
+
+async function updateOrgDisplayNameInner(displayName: string) {
   const ctx = await requireContext();
   const trimmed = displayName.trim();
   if (!trimmed) throw new Error("表示名を入力してください");
@@ -106,7 +125,11 @@ export async function deleteMenu(id: string) {
 // ============================================================
 // ログイン情報（この管理画面に入るためのメール・パスワード。書類には使わない）
 // ============================================================
-export async function updateLoginEmail(newEmail: string) {
+export async function updateLoginEmail(...args: Parameters<typeof updateLoginEmailInner>) {
+  return toResult("updateLoginEmail", () => updateLoginEmailInner(...args));
+}
+
+async function updateLoginEmailInner(newEmail: string) {
   await requireContext();
   const supabase = await createClient();
   const h = await headers();
@@ -126,7 +149,11 @@ export async function updateLoginEmail(newEmail: string) {
 // パスワードを忘れたログイン前の人向け（↔ updateLoginPassword はログイン済み・
 // 現在のパスワードを知っている人向け）。メールが存在するかどうかはSupabase側が
 // 意図的に教えてくれない仕様なので、成功・失敗に関わらず同じ案内文にする。
-export async function requestPasswordReset(email: string) {
+export async function requestPasswordReset(...args: Parameters<typeof requestPasswordResetInner>) {
+  return toResult("requestPasswordReset", () => requestPasswordResetInner(...args));
+}
+
+async function requestPasswordResetInner(email: string) {
   const trimmed = email.trim();
   if (!trimmed) throw new Error("メールアドレスをご入力ください");
   const supabase = await createClient();
@@ -138,7 +165,11 @@ export async function requestPasswordReset(email: string) {
 
 // /auth/confirm 経由でrecoveryトークンを確認した直後（まだ仮のセッションの
 // 状態）に呼ぶ。新しいパスワードを設定して、本来のログインを完了させる。
-export async function completePasswordReset(newPassword: string) {
+export async function completePasswordReset(...args: Parameters<typeof completePasswordResetInner>) {
+  return toResult("completePasswordReset", () => completePasswordResetInner(...args));
+}
+
+async function completePasswordResetInner(newPassword: string) {
   if (newPassword.length < 8) throw new Error("パスワードは8文字以上にしてください");
   const supabase = await createClient();
   const { data: userData, error: userErr } = await supabase.auth.getUser();
@@ -147,7 +178,11 @@ export async function completePasswordReset(newPassword: string) {
   if (error) throw error;
 }
 
-export async function updateLoginPassword(currentPassword: string, newPassword: string) {
+export async function updateLoginPassword(...args: Parameters<typeof updateLoginPasswordInner>) {
+  return toResult("updateLoginPassword", () => updateLoginPasswordInner(...args));
+}
+
+async function updateLoginPasswordInner(currentPassword: string, newPassword: string) {
   await requireContext();
   if (newPassword.length < 8) throw new Error("新しいパスワードは8文字以上にしてください");
   const supabase = await createClient();
@@ -364,9 +399,25 @@ export async function markThreadRead(threadId: string) {
 
 // 自分が送ったメッセージだけ削除できる（RLS の messages_sender_delete でも
 // 強制されるが、他人の分は0件更新になるだけで気付きにくいのでここで検知する）。
-export async function deleteMessage(messageId: string) {
+// 支払い済み（着手前〜完了）の案件は消さない。消すと依頼主の残高は引かれたまま
+// 案件と支払いの記録だけが消えてしまうため。表示を消したいときは非表示にする。
+const PAID_PHASES = ["preparing", "started", "completed"];
+const PAID_DELETE_ERROR = "支払い済みの案件は削除できません。表示を消したいときは「非表示にする」を使ってください。";
+
+async function assertRequestDeletable(supabase: Awaited<ReturnType<typeof createClient>>, requestId: string) {
+  const { data } = await supabase.from("requests").select("phase").eq("id", requestId).maybeSingle();
+  if (data && PAID_PHASES.includes(data.phase)) throw new Error(PAID_DELETE_ERROR);
+}
+
+export async function deleteMessage(...args: Parameters<typeof deleteMessageInner>) {
+  return toResult("deleteMessage", () => deleteMessageInner(...args));
+}
+
+async function deleteMessageInner(messageId: string) {
   const ctx = await requireContextWithDelete();
   const supabase = await createClient();
+  const { data: target } = await supabase.from("messages").select("kind, request_id").eq("id", messageId).maybeSingle();
+  if (target?.kind === "quote" && target.request_id) await assertRequestDeletable(supabase, target.request_id);
   const { data, error } = await supabase
     .from("messages")
     .update({ deleted_at: new Date().toISOString() })
@@ -376,9 +427,8 @@ export async function deleteMessage(messageId: string) {
   if (error) throw error;
   if (!data || data.length === 0) throw new Error("自分が送ったメッセージのみ削除できます");
 
-  // 見積もりチャットを削除したら、フェーズに関わらずその見積もり自体も完全に削除する
-  // （request_items・完了報告・評価・案件トーク・そのメッセージまでDBのon delete cascadeで一緒に消える）。
-  // 削除の判断はチャット側で行う想定のため、ここでは残り実績の有無を問わない。
+  // 見積もりチャットを削除したら、その見積もり自体も完全に削除する
+  // （request_items・案件トーク・そのメッセージまでDBのon delete cascadeで一緒に消える）。
   const deleted = data[0];
   if (deleted.kind === "quote" && deleted.request_id) {
     await supabase.from("requests").delete().eq("id", deleted.request_id);
@@ -454,9 +504,14 @@ export async function deleteCustomer(customerId: string) {
 // メッセージ・完了報告・評価・担当スタッフの割り当ても on delete cascade で
 // 連動して消える。アーカイブと違い元に戻せない。入金済みの案件でも削除できて
 // しまうため、呼び出し側で強めの確認を出す。
-export async function deleteCaseRequest(requestId: string) {
+export async function deleteCaseRequest(...args: Parameters<typeof deleteCaseRequestInner>) {
+  return toResult("deleteCaseRequest", () => deleteCaseRequestInner(...args));
+}
+
+async function deleteCaseRequestInner(requestId: string) {
   const ctx = await requireContextWithDelete();
   const supabase = await createClient();
+  await assertRequestDeletable(supabase, requestId);
   const { error } = await supabase.from("requests").delete().eq("id", requestId).eq("org_id", ctx.orgId);
   if (error) throw error;
 }
@@ -466,7 +521,11 @@ export async function deleteCaseRequest(requestId: string) {
 // ため、今は受付が代わりに着手・完了報告まで進める。
 // ============================================================
 
-export async function createCaseRequest(
+export async function createCaseRequest(...args: Parameters<typeof createCaseRequestInner>) {
+  return toResult("createCaseRequest", () => createCaseRequestInner(...args));
+}
+
+async function createCaseRequestInner(
   customerThreadId: string,
   customerId: string,
   input: {
@@ -508,6 +567,14 @@ export async function createCaseRequest(
       : input.items.filter((it) => it.qty > 0 && it.label.trim());
   if (!isHourly && items.length === 0) throw new Error("見積もりの項目を1つ以上追加してください");
   if (isHourly && (!input.hourly!.rate || !input.hourly!.cap)) throw new Error("時間単価と上限額を入力してください");
+  // DB の制約で途中で落ちると、作りかけの案件だけが残ってしまうので先に確かめる。
+  const isWholeYen = (n: number) => Number.isInteger(n) && n >= 0;
+  if (items.some((it) => !isWholeYen(it.price) || !isWholeYen(it.payout) || !Number.isInteger(it.qty) || it.qty < 1)) throw new Error("金額と数量は整数で入力してください");
+  if (isHourly && (!isWholeYen(input.hourly!.rate) || !isWholeYen(input.hourly!.cap))) throw new Error("金額は整数で入力してください");
+  if (input.anchorDayOfMonth != null && (!Number.isInteger(input.anchorDayOfMonth) || input.anchorDayOfMonth < 1 || input.anchorDayOfMonth > 28)) {
+    throw new Error("毎月の日付は1〜28日で選んでください（29日以降は「月末」を選んでください）");
+  }
+  if (input.anchorWeekday != null && (!Number.isInteger(input.anchorWeekday) || input.anchorWeekday < 0 || input.anchorWeekday > 6)) throw new Error("曜日を選び直してください");
 
   const amount = isHourly ? input.hourly!.cap : items.reduce((sum, it) => sum + it.price * it.qty, 0);
   const title = isHourly
@@ -555,68 +622,74 @@ export async function createCaseRequest(
     .single();
   if (reqError || !request) throw reqError ?? new Error("案件の作成に失敗しました");
 
-  if (!isHourly) {
-    const { error: itemsError } = await supabase
-      .from("request_items")
-      .insert(items.map((it, i) => ({ request_id: request.id, menu_id: it.menuId, label: it.label, price: it.price, payout: it.payout, qty: it.qty, sort: i })));
-    if (itemsError) throw itemsError;
-  }
-
-  // 定期対応の雛形を作っておく。初回の支払いが確定するまでは active=false
-  // のままで、pay_request_from_balance が確定と同時に有効化する。
-  if (input.cadence && !advance) {
-    const { data: subscription, error: subError } = await supabase
-      .from("request_subscriptions")
-      .insert({
-        org_id: ctx.orgId,
-        customer_id: customerId,
-        customer_thread_id: customerThreadId,
-        title,
-        note: input.note.trim() || null,
-        amount,
-        items: items.map((it) => ({ label: it.label, price: it.price, payout: it.payout, qty: it.qty })),
-        cadence: input.cadence,
-        anchor_weekday: input.cadence === "weekly" ? (input.anchorWeekday ?? null) : null,
-        anchor_day_of_month: input.cadence === "monthly" && !input.anchorLastDayOfMonth ? (input.anchorDayOfMonth ?? null) : null,
-        anchor_last_day_of_month: input.cadence === "monthly" && !!input.anchorLastDayOfMonth,
-        created_by: ctx.userId,
-      })
-      .select("id")
-      .single();
-    if (subError || !subscription) throw subError ?? new Error("定期対応の作成に失敗しました");
-    await supabase.from("requests").update({ subscription_id: subscription.id }).eq("id", request.id);
-  }
-
-  const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: input.due.trim() || undefined };
-  const { error: msgError } = await supabase.from("messages").insert({
-    thread_id: customerThreadId,
-    sender_id: ctx.userId,
-    sender_role: ctx.role,
-    kind: "quote",
-    request_id: request.id,
-    payload,
-  });
-  if (msgError) throw msgError;
-  await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", customerThreadId);
-
-  // 制作者とのやり取り・進捗ログ用の案件トーク（今は担当者未定のまま作る）
-  const { data: caseThread, error: caseThreadError } = await supabase
-    .from("threads")
-    .insert({ org_id: ctx.orgId, kind: "case", request_id: request.id, customer_id: customerId, last_msg_at: new Date().toISOString() })
-    .select("id")
-    .single();
-  if (caseThreadError || !caseThread) throw caseThreadError ?? new Error("案件トークの作成に失敗しました");
-
   // sender_id=null（システム発）の行は messages_send の RLS (sender_id = auth.uid()) を
   // 通らないため、通知メッセージだけは service-role で書く。
   const admin = createServiceRoleClient();
-  await admin.from("messages").insert({
-    thread_id: caseThread.id,
-    sender_id: null,
-    sender_role: null,
-    kind: "notice",
-    body: `見積もりを送信しました（¥${amount.toLocaleString("ja-JP")}）`,
-  });
+  try {
+    if (!isHourly) {
+      const { error: itemsError } = await supabase
+        .from("request_items")
+        .insert(items.map((it, i) => ({ request_id: request.id, menu_id: it.menuId, label: it.label, price: it.price, payout: it.payout, qty: it.qty, sort: i })));
+      if (itemsError) throw itemsError;
+    }
+
+    // 定期対応の雛形を作っておく。初回の支払いが確定するまでは active=false
+    // のままで、pay_request_from_balance が確定と同時に有効化する。
+    if (input.cadence && !advance) {
+      const { data: subscription, error: subError } = await supabase
+        .from("request_subscriptions")
+        .insert({
+          org_id: ctx.orgId,
+          customer_id: customerId,
+          customer_thread_id: customerThreadId,
+          title,
+          note: input.note.trim() || null,
+          amount,
+          items: items.map((it) => ({ label: it.label, price: it.price, payout: it.payout, qty: it.qty })),
+          cadence: input.cadence,
+          anchor_weekday: input.cadence === "weekly" ? (input.anchorWeekday ?? null) : null,
+          anchor_day_of_month: input.cadence === "monthly" && !input.anchorLastDayOfMonth ? (input.anchorDayOfMonth ?? null) : null,
+          anchor_last_day_of_month: input.cadence === "monthly" && !!input.anchorLastDayOfMonth,
+          created_by: ctx.userId,
+        })
+        .select("id")
+        .single();
+      if (subError || !subscription) throw subError ?? new Error("定期対応の作成に失敗しました");
+      await supabase.from("requests").update({ subscription_id: subscription.id }).eq("id", request.id);
+    }
+
+    const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: input.due.trim() || undefined };
+    const { error: msgError } = await supabase.from("messages").insert({
+      thread_id: customerThreadId,
+      sender_id: ctx.userId,
+      sender_role: ctx.role,
+      kind: "quote",
+      request_id: request.id,
+      payload,
+    });
+    if (msgError) throw msgError;
+    await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", customerThreadId);
+
+    // 制作者とのやり取り・進捗ログ用の案件トーク（今は担当者未定のまま作る）
+    const { data: caseThread, error: caseThreadError } = await supabase
+      .from("threads")
+      .insert({ org_id: ctx.orgId, kind: "case", request_id: request.id, customer_id: customerId, last_msg_at: new Date().toISOString() })
+      .select("id")
+      .single();
+    if (caseThreadError || !caseThread) throw caseThreadError ?? new Error("案件トークの作成に失敗しました");
+
+    await admin.from("messages").insert({
+      thread_id: caseThread.id,
+      sender_id: null,
+      sender_role: null,
+      kind: "notice",
+      body: `見積もりを送信しました（¥${amount.toLocaleString("ja-JP")}）`,
+    });
+  } catch (e) {
+    // 途中で失敗したら作りかけの案件を消す（明細・見積もりカード・案件トークも on delete cascade で消える）。
+    await admin.from("requests").delete().eq("id", request.id);
+    throw e;
+  }
 
   await notifyCustomerQuoteCreated(admin, ctx.orgId, customerId, amount, title);
 
@@ -766,7 +839,11 @@ export async function approveCaseReport(requestId: string) {
 }
 
 // 見積もり段階（まだ入金前）の見送り。費用が発生していないので即確定でよい。
-export async function declineQuote(requestId: string) {
+export async function declineQuote(...args: Parameters<typeof declineQuoteInner>) {
+  return toResult("declineQuote", () => declineQuoteInner(...args));
+}
+
+async function declineQuoteInner(requestId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
 
@@ -776,8 +853,10 @@ export async function declineQuote(requestId: string) {
   if (r.phase !== "quoted") throw new Error("この操作は見積もり段階のみ行えます");
 
   const now = new Date().toISOString();
-  const { error } = await supabase.from("requests").update({ phase: "declined", cancelled_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
+  // 依頼主の支払いと同時になったときに、支払い済みを見送りで上書きしない。
+  const { data: declined, error } = await supabase.from("requests").update({ phase: "declined", cancelled_at: now }).eq("id", requestId).eq("org_id", ctx.orgId).eq("phase", "quoted").select("id");
   if (error) throw error;
+  if (!declined?.length) throw new Error("この操作は見積もり段階のみ行えます");
   await postCaseNotice(supabase, requestId, "受付が見積もりを見送りにしました");
 }
 
@@ -1034,7 +1113,11 @@ export async function getInvitePreview(inviteId: string) {
   return { role: invite.role as StaffRole, valid: !invite.used_at, orgDisplayName: org?.display_name ?? "" };
 }
 
-export async function acceptStaffInvite(inviteId: string, fields: { email: string; password: string; displayName: string }) {
+export async function acceptStaffInvite(...args: Parameters<typeof acceptStaffInviteInner>) {
+  return toResult("acceptStaffInvite", () => acceptStaffInviteInner(...args));
+}
+
+async function acceptStaffInviteInner(inviteId: string, fields: { email: string; password: string; displayName: string }) {
   if (fields.password.length < 8) throw new Error("パスワードは8文字以上にしてください");
   if (!fields.email.trim()) throw new Error("メールアドレスは必須です");
 
@@ -1085,7 +1168,11 @@ export async function acceptStaffInvite(inviteId: string, fields: { email: strin
 // に変更したり、自分以外の窓口に割り当てたりはできない。
 // 窓口（department）はマネージャーに昇格した時点で自動的にできる
 // （departmentIds はdept_leaderの所属窓口の指定にだけ使う）。
-export async function updateStaffMember(profileId: string, role: StaffRole, departmentIds: string[], alias: string) {
+export async function updateStaffMember(...args: Parameters<typeof updateStaffMemberInner>) {
+  return toResult("updateStaffMember", () => updateStaffMemberInner(...args));
+}
+
+async function updateStaffMemberInner(profileId: string, role: StaffRole, departmentIds: string[], alias: string) {
   const ctx = await requireManagerOrAbove();
   if (role !== "dept_leader" && ctx.role !== "owner") throw new Error("この役職には変更できません");
   const trimmedAlias = alias.trim();
@@ -1093,6 +1180,7 @@ export async function updateStaffMember(profileId: string, role: StaffRole, depa
   const admin = createServiceRoleClient();
 
   const { data: targetBefore } = await admin.from("profiles").select("role").eq("id", profileId).eq("org_id", ctx.orgId).maybeSingle();
+  if (!targetBefore) throw new Error("このスタッフは見つかりませんでした");
   const previousRole = targetBefore?.role as StaffRole | undefined;
   const previousDepartmentIds = await departmentIdsOf(admin, profileId);
 
@@ -1120,12 +1208,18 @@ export async function updateStaffMember(profileId: string, role: StaffRole, depa
   }
 }
 
-export async function removeStaffMember(profileId: string) {
+export async function removeStaffMember(...args: Parameters<typeof removeStaffMemberInner>) {
+  return toResult("removeStaffMember", () => removeStaffMemberInner(...args));
+}
+
+async function removeStaffMemberInner(profileId: string) {
   const ctx = await requireManagerOrAbove();
   if (profileId === ctx.userId) throw new Error("自分自身は削除できません");
   const admin = createServiceRoleClient();
   const { data: target } = await admin.from("profiles").select("role").eq("id", profileId).eq("org_id", ctx.orgId).maybeSingle();
-  if (target?.role === "owner" && ctx.role !== "owner") throw new Error("この操作は本部のみ行えます");
+  // 自分の事務所の人でなければ、ログインごと消してしまわないよう止める。
+  if (!target) throw new Error("このスタッフは見つかりませんでした");
+  if (target.role === "owner" && ctx.role !== "owner") throw new Error("この操作は本部のみ行えます");
   const targetDepartmentIds = await departmentIdsOf(admin, profileId);
   if (ctx.role === "dept_manager") {
     const myDepartmentIds = await departmentIdsOf(admin, ctx.userId);
@@ -1144,7 +1238,11 @@ export async function removeStaffMember(profileId: string) {
 // オーナー（staff_org_links）は事業者ごとに別の表示名を持てるので、今
 // どの事業者を見ているか（ctx.orgId）に応じて、profiles（本来の所属先）
 // と staff_org_links（掛け持ち先）のどちらを直すべきか振り分ける。
-export async function updateMyDisplayName(displayName: string) {
+export async function updateMyDisplayName(...args: Parameters<typeof updateMyDisplayNameInner>) {
+  return toResult("updateMyDisplayName", () => updateMyDisplayNameInner(...args));
+}
+
+async function updateMyDisplayNameInner(displayName: string) {
   const ctx = await requireContext();
   const trimmed = displayName.trim();
   if (!trimmed) throw new Error("表示名を入力してください");
@@ -1184,7 +1282,11 @@ export async function removeMyAvatar() {
 // ============================================================
 export type InquiryDesk = { id: string; name: string; slug: string; active: boolean; department_id: string | null; created_at: string };
 
-export async function createInquiryDesk(name: string): Promise<InquiryDesk> {
+export async function createInquiryDesk(...args: Parameters<typeof createInquiryDeskInner>) {
+  return toResult("createInquiryDesk", () => createInquiryDeskInner(...args));
+}
+
+async function createInquiryDeskInner(name: string): Promise<InquiryDesk> {
   const ctx = await requireHqPrivileged();
   const trimmed = name.trim();
   if (!trimmed) throw new Error("窓口の名前を入力してください");
@@ -1224,7 +1326,11 @@ export async function setInquiryDeskActive(deskId: string, active: boolean) {
 }
 
 // 窓口のURL（/teera の部分）をあとから変える。前のURLは使えなくなる。
-export async function updateInquiryDeskSlug(deskId: string, rawSlug: string): Promise<string> {
+export async function updateInquiryDeskSlug(...args: Parameters<typeof updateInquiryDeskSlugInner>) {
+  return toResult("updateInquiryDeskSlug", () => updateInquiryDeskSlugInner(...args));
+}
+
+async function updateInquiryDeskSlugInner(deskId: string, rawSlug: string): Promise<string> {
   const ctx = await requireHqPrivileged();
   const slug = validateSlug(rawSlug);
   const admin = createServiceRoleClient();

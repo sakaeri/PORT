@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Trash, GearSix, Check, ChatCircleDots } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { ensureStaffThread, sendInternalMessage, deleteMessage, markThreadRead, updateStaffMember, removeStaffMember } from "@/app/actions";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 import { ROLE_LABEL, INVITE_ROLES, isDeptScoped, staffSenderLabel } from "@/lib/roles";
 import RoleTags from "@/components/RoleTags";
@@ -156,7 +156,7 @@ export default function StaffThreadPane({
     if (!confirm("このメッセージを削除します。よろしいですか？")) return;
     setBusy(true);
     try {
-      await deleteMessage(m.id);
+      unwrap(await deleteMessage(m.id));
       setMessages((rows) => rows.map((r) => (r.id === m.id ? { ...r, deleted_at: new Date().toISOString() } : r)));
     } catch (e) {
       setError(errorMessage(e, "削除できませんでした"));
@@ -297,7 +297,7 @@ function StaffEditPanel({
     try {
       const resolved = isDeptScoped(role) ? departmentIds : [];
       const trimmedName = displayName.trim();
-      await updateStaffMember(staffProfileId, role, resolved, trimmedName);
+      unwrap(await updateStaffMember(staffProfileId, role, resolved, trimmedName));
       editable.onSaved({ displayName: trimmedName, role, departmentIds: resolved });
       onClose();
     } catch (e) {
@@ -312,7 +312,7 @@ function StaffEditPanel({
     setRemoving(true);
     setError("");
     try {
-      await removeStaffMember(staffProfileId);
+      unwrap(await removeStaffMember(staffProfileId));
       editable.onRemoved();
     } catch (e) {
       setError(errorMessage(e, "削除できませんでした"));

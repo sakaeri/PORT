@@ -5,7 +5,7 @@ import { Trash } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { sendCaseMessage, deleteMessage, markThreadRead } from "@/app/actions";
 import { staffSenderLabel } from "@/lib/roles";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import TextComposer from "@/components/TextComposer";
 import Avatar, { avatarInitial } from "@/components/Avatar";
 import type { AppRole } from "@/lib/supabase/types";
@@ -113,7 +113,7 @@ export default function CaseThreadChat({
     setBusy(true);
     setError("");
     try {
-      await deleteMessage(m.id);
+      unwrap(await deleteMessage(m.id));
       setMessages((rows) => rows.map((r) => (r.id === m.id ? { ...r, deleted_at: new Date().toISOString() } : r)));
     } catch (e) {
       setError(errorMessage(e, "削除できませんでした"));

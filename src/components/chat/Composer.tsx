@@ -5,6 +5,7 @@ import { Paperclip, ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosph
 import { FileIcon } from "@/components/chat/icons";
 import { createClient } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/image-resize";
+import { errorMessage } from "@/lib/errors";
 
 export interface PendingAttachment {
   path: string;
@@ -174,7 +175,7 @@ export default function Composer({ threadId, orgId, onSend }: Props) {
   }
 
   async function handleSend() {
-    if (sending) return;
+    if (sending || uploading || compressing || compressQueue.length > 0) return;
     const text = draft.trim();
     if (!text && attachments.length === 0) return;
     setSending(true);
@@ -185,12 +186,14 @@ export default function Composer({ threadId, orgId, onSend }: Props) {
       setHistory([]);
       setUploadError("");
       requestAnimationFrame(() => autoGrow(true));
+    } catch (e) {
+      setUploadError(errorMessage(e, "送信できませんでした。もう一度お試しください。"));
     } finally {
       setSending(false);
     }
   }
 
-  const sendDisabled = sending || (!draft.trim() && attachments.length === 0);
+  const sendDisabled = sending || uploading || compressing || compressQueue.length > 0 || (!draft.trim() && attachments.length === 0);
 
   return (
     <div style={{ flex: "none", borderTop: "1px solid var(--color-divider)", padding: "var(--space-4)", paddingBottom: "calc(var(--space-4) + env(safe-area-inset-bottom))" }}>

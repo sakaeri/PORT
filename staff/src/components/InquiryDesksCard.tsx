@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus, Copy, Check, PencilSimple } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { createInquiryDesk, setInquiryDeskActive, setInquiryDeskSecretary, updateInquiryDeskSlug, type InquiryDesk } from "@/app/actions";
 import InfoTooltip from "@/components/InfoTooltip";
 
@@ -95,7 +95,7 @@ export default function InquiryDesksCard({
     setSaving(true);
     setError("");
     try {
-      const slug = await updateInquiryDeskSlug(desk.id, next);
+      const slug = unwrap(await updateInquiryDeskSlug(desk.id, next)).data!;
       setDesks((d) => d.map((x) => (x.id === desk.id ? { ...x, slug } : x)));
       setEditingId(null);
     } catch (e) {
@@ -114,7 +114,7 @@ export default function InquiryDesksCard({
     setSaving(true);
     setError("");
     try {
-      const desk = await createInquiryDesk(name);
+      const desk = unwrap(await createInquiryDesk(name)).data!;
       setDesks((d) => [desk, ...d]);
       setName("");
       setAdding(false);

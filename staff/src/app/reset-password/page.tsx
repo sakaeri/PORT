@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { completePasswordReset } from "@/app/actions";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 
 const inputStyle: React.CSSProperties = {
@@ -35,7 +35,7 @@ export default function ResetPasswordPage() {
     setSaving(true);
     setError("");
     try {
-      await completePasswordReset(password);
+      unwrap(await completePasswordReset(password));
       router.push("/");
       router.refresh();
     } catch (e) {

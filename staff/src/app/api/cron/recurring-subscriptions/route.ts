@@ -5,11 +5,10 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 // charge_subscription_occurrence に渡す。実際の作成・課金・通知の
 // 判断（残高不足なら作らず通知するだけ、等）はすべてそのDB関数側で行う。
 export async function GET(request: Request) {
+  // ログインなしで呼べるURLなので、CRON_SECRET が未設定なら誰の呼び出しも通さない。
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = request.headers.get("authorization");
+  if (!secret || auth !== `Bearer ${secret}`) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const admin = createServiceRoleClient();
   const { data: due, error } = await admin

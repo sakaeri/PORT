@@ -14,7 +14,9 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const typeParam = searchParams.get("type");
-  const next = searchParams.get("next") ?? "/";
+  // 外のサイトへ飛ばされないよう、アプリ内のパス（/ 始まり、// や \ を含まない）だけ受け付ける。
+  const rawNext = searchParams.get("next") ?? "/";
+  const next = /^\/(?![\/\\])[^\\]*$/.test(rawNext) ? rawNext : "/";
   // 問い合わせ窓口（/teera など）から送ったリンクなら、その窓口に戻す。
   const cookieStore = await cookies();
   const deskPath = cookieStore.get("vid_next")?.value;

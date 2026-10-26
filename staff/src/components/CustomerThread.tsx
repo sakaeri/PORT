@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, PaperPlaneTilt, Paperclip, Trash, ChatCircleText, Star, SidebarSimple, X, CaretLeft, ChatText, ListChecks, Plus, PencilSimple } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, unwrap } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -69,6 +69,9 @@ type Message = ThreadMessage;
 
 // 会話が長くなっても初回表示・ポーリングが遅くならないよう、一度に読み込むメッセージ件数を絞る。
 export const MESSAGE_PAGE_SIZE = 60;
+
+// 支払い済みの見積もりは消せない（消すと依頼主の残高が戻らないまま案件が消えるため）。
+const PAID_PHASES: RequestPhase[] = ["preparing", "started", "completed"];
 
 interface TemplateField {
   id: string;
@@ -798,7 +801,7 @@ export default function CustomerThread({
     setBusy(true);
     setThreadError("");
     try {
-      await deleteMessage(m.id);
+      unwrap(await deleteMessage(m.id));
       setMessages((rows) => rows.map((r) => (r.id === m.id ? { ...r, deleted_at: new Date().toISOString() } : r)));
     } catch (e) {
       setThreadError(errorMessage(e, "削除できませんでした"));
@@ -942,7 +945,7 @@ export default function CustomerThread({
                   <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>
                     {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
-                  {isOwn && (
+                  {isOwn && !(m.kind === "quote" && m.requestPhase && PAID_PHASES.includes(m.requestPhase)) && (
                     <button onClick={() => handleDeleteMessage(m)} disabled={busy} aria-label="削除" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
                       <Trash size={13} />
                     </button>
