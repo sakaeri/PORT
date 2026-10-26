@@ -23,6 +23,7 @@ import {
 interface Props {
   ctx: CustomerContext;
   initialMessages: MessageWithExtras[];
+  initialBundles: RequestBundle[];
   initialHasMoreOlder?: boolean;
   openPasswordSetup?: boolean;
 }
@@ -45,7 +46,7 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, openPasswordSetup }: Props) {
+export default function ChatScreen({ ctx, initialMessages, initialBundles, initialHasMoreOlder, openPasswordSetup }: Props) {
   const router = useRouter();
   // 「今日」「昨日」の判定用。開いた時点の時刻で固定する。
   const [nowIso] = useState(() => new Date().toISOString());
@@ -203,8 +204,13 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
   }
 
   const bundles = useMemo(
-    () => messages.filter((m) => m.requestBundle).map((m) => m.requestBundle as RequestBundle),
-    [messages],
+    () => {
+      // 古い依頼はサーバーで取った一覧から、読み込み済みのものは最新のメッセージから。
+      const byId = new Map(initialBundles.map((b) => [b.request.id, b]));
+      for (const m of messages) if (m.requestBundle) byId.set(m.requestBundle.request.id, m.requestBundle);
+      return [...byId.values()];
+    },
+    [initialBundles, messages],
   );
   const activeCount = bundles.filter((b) => b.request.phase === "quoted" || ["preparing", "started"].includes(b.request.phase)).length;
   const reportsCount = bundles.filter((b) => b.request.phase === "completed" && b.report?.sent_at && !ackedIds.has(b.request.id)).length;
@@ -212,6 +218,22 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
   const q = searchQuery.trim().toLowerCase();
   const matches = (haystack: string) => !q || haystack.toLowerCase().includes(q);
   let matchCount = 0;
+  // 回答済みの確認事項。回答に requestMessageId が無い古いものは、同じ名前の
+  // 直前の確認事項への回答とみなす。
+  const answeredIntakeIds = useMemo(() => {
+    const ids = new Set<string>();
+    const lastByLabel = new Map<string, string>();
+    for (const m of messages) {
+      const p = (m.payload ?? {}) as { formLabel?: string; requestMessageId?: string };
+      if (m.kind === "intake_request") lastByLabel.set(p.formLabel ?? "", m.id);
+      if (m.kind === "intake_answer") {
+        const id = p.requestMessageId ?? lastByLabel.get(p.formLabel ?? "");
+        if (id) ids.add(id);
+      }
+    }
+    return ids;
+  }, [messages]);
+
   const visible = messages.filter((m) => {
     if (!q) return true;
     let hay = m.body ?? "";
@@ -265,7 +287,7 @@ export default function ChatScreen({ ctx, initialMessages, initialHasMoreOlder, 
       case "menu_pick":
         return <MenuPickBubble key={m.id} msg={m} />;
       case "intake_request":
-        return <IntakeCard key={m.id} msg={m} />;
+        return <IntakeCard key={m.id} msg={m} answered={answeredIntakeIds.has(m.id)} />;
       case "intake_answer":
         return <IntakeAnswerBubble key={m.id} msg={m} />;
       case "quote":

@@ -132,6 +132,8 @@ function TemplatesModal({
       setTemplates((ts) => [...ts, { id, label: "", note: null, fields: [] }]);
       setCreatedId(id);
       setEditingId(id);
+    } catch (e) {
+      alert(errorMessage(e, "テンプレを作成できませんでした"));
     } finally {
       setCreating(false);
     }
@@ -566,9 +568,9 @@ export default function CustomerThread({
   initialHasMoreOlder,
   canSeeHqFeedback,
   canDeleteTemplates,
+  viewerIsOwner,
   hqFeedbackThreadId,
   hqFeedbackUnread,
-  orgDisplayName,
 }: {
   customer: { id: string; name: string; staffLabel: string | null; memberNo: string | null; balance: number };
   thread: { id: string; archived: boolean; departmentId: string | null } | null;
@@ -585,9 +587,9 @@ export default function CustomerThread({
   canSeeHqFeedback: boolean;
   // 返信テンプレの削除は本部（オーナー）だけ。作成・編集は秘書もできる。
   canDeleteTemplates: boolean;
+  viewerIsOwner: boolean;
   hqFeedbackThreadId: string | null;
   hqFeedbackUnread: boolean;
-  orgDisplayName: string;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -657,6 +659,7 @@ export default function CustomerThread({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
+  const lastSeenIdRef = useRef<string | null>(null);
   const MESSAGE_SELECT = "*, message_attachments(*), profiles!messages_sender_id_fkey(avatar_url), requests(phase, amount, completion_reports(summary, details))";
 
   // 開いている間に届いた新着分だけを取りに行く（既に読み込んだ最古の時点以降のみ）。
@@ -686,9 +689,14 @@ export default function CustomerThread({
         }),
       );
       if (!oldestLoadedAt && rows.length > 0) setOldestLoadedAt(rows[0].sent_at);
+      // 開いている間に届いた分もその場で既読にする。ただし新着があって画面を
+      // 見ているときだけ（4秒ごとに毎回書き込むと、全員の一覧の更新が連鎖するため）。
+      const newestId = rows[rows.length - 1]?.id ?? null;
+      if (newestId !== lastSeenIdRef.current && document.visibilityState === "visible") {
+        lastSeenIdRef.current = newestId;
+        void markThreadRead(thread.id);
+      }
     }
-    // 開いている間に届いた分もその場で既読にする
-    void markThreadRead(thread.id);
   }, [thread, orgId, oldestLoadedAt]);
 
   async function loadOlder() {
@@ -818,6 +826,8 @@ export default function CustomerThread({
     try {
       await sendTemplateMessage(thread.id, templateId);
       setShowTemplates(false);
+    } catch (e) {
+      alert(errorMessage(e, "送信できませんでした"));
     } finally {
       setBusy(false);
     }
@@ -849,7 +859,7 @@ export default function CustomerThread({
         {thread && departments.length > 0 && (
           <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 11, color: "var(--color-neutral-400)" }}>担当秘書</span>
-            <ThreadDepartmentControl threadId={thread.id} departments={departments} initialDepartmentId={thread.departmentId} orgDisplayName={orgDisplayName} />
+            <ThreadDepartmentControl threadId={thread.id} departments={departments} initialDepartmentId={thread.departmentId} viewerIsOwner={viewerIsOwner} />
           </div>
         )}
         {isMobile && (
@@ -1202,26 +1212,30 @@ function ThreadDepartmentControl({
   threadId,
   departments,
   initialDepartmentId,
-  orgDisplayName,
+  viewerIsOwner,
 }: {
   threadId: string;
   departments: { id: string; name: string }[];
   initialDepartmentId: string | null;
-  // 窓口（秘書）未設定＝事業所全体の担当。
-  orgDisplayName: string;
+  viewerIsOwner: boolean;
 }) {
+  const router = useRouter();
   const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? "");
   const [saving, setSaving] = useState(false);
 
   async function change(next: string) {
     if (saving) return;
+    // 秘書が自分以外へ担当を移すと、この依頼主は自分の一覧から外れて見えなくなる。
+    if (!viewerIsOwner && !confirm("担当を移すと、この依頼主はあなたの一覧から外れます。よろしいですか？")) return;
     const prev = departmentId;
     setDepartmentId(next);
     setSaving(true);
     try {
-      await reassignThreadDepartment(threadId, next || null);
-    } catch {
+      unwrap(await reassignThreadDepartment(threadId, next || null));
+      if (!viewerIsOwner) router.push("/customers");
+    } catch (e) {
       setDepartmentId(prev);
+      alert(errorMessage(e, "担当を変えられませんでした"));
     } finally {
       setSaving(false);
     }
@@ -1246,7 +1260,7 @@ function ThreadDepartmentControl({
         outline: "none",
       }}
     >
-      <option value="">{orgDisplayName}</option>
+      <option value="">本部</option>
       {departments.map((d) => (
         <option key={d.id} value={d.id}>
           {d.name}

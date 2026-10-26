@@ -67,6 +67,16 @@ import {
   deleteReportFieldPreset,
   updateOrgTerms,
 } from "@/app/actions";
+import { errorMessage } from "@/lib/errors";
+
+// 入力欄から離れたときの自動保存。失敗したら保存されたように見せず、知らせる。
+async function saveOrAlert(save: () => Promise<unknown>) {
+  try {
+    await save();
+  } catch (e) {
+    alert(errorMessage(e, "保存できませんでした。もう一度お試しください。"));
+  }
+}
 
 interface Menu {
   id: string;
@@ -245,7 +255,6 @@ export default function MenuSettings({
   initialTermsContent,
   initialDesks,
   departments,
-  orgDisplayName,
   canEdit,
 }: {
   orgId: string;
@@ -254,7 +263,6 @@ export default function MenuSettings({
   initialTermsContent: string;
   initialDesks: InquiryDesk[];
   departments: { id: string; name: string }[];
-  orgDisplayName: string;
   // 受付メニューはFC展開でのブランド・料金統一のため本部専用で、
   // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレは常に編集可。
   canEdit: boolean;
@@ -328,7 +336,7 @@ export default function MenuSettings({
       {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} canDelete={canEdit} />}
       {tab === "terms" && <TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} />}
-      {tab === "desks" && <InquiryDesksCard initialDesks={initialDesks} departments={departments} orgDisplayName={orgDisplayName} canEdit={canEdit} />}
+      {tab === "desks" && <InquiryDesksCard initialDesks={initialDesks} departments={departments} canEdit={canEdit} />}
     </div>
   );
 }
@@ -385,14 +393,14 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
   }
 
   async function commit(m: Menu) {
-    await updateMenu(m.id, { label: m.label, note: m.note ?? "", price: m.price, lead_hours: m.lead_hours, active: m.active, icon: m.icon });
+    await saveOrAlert(() => updateMenu(m.id, { label: m.label, note: m.note ?? "", price: m.price, lead_hours: m.lead_hours, active: m.active, icon: m.icon }));
   }
 
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>受付メニュー</div>
-        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの秘書が対応するかは、依頼主一覧の画面からその場で割り当てます。FC展開でのブランド・料金統一のため、編集は本部限定です" />
+        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの秘書が対応するかは、依頼主の画面の「担当秘書」で割り当てます。編集は本部だけができます" />
         <div style={{ flex: 1 }} />
         {canEdit && (
           <button onClick={handleImport} disabled={importing} style={{ ...smallBtn, opacity: importing ? 0.6 : 1 }}>
@@ -605,7 +613,7 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
   }
 
   async function commit(t: IntakeForm) {
-    await updateIntakeForm(t.id, { label: t.label, note: t.note ?? "" });
+    await saveOrAlert(() => updateIntakeForm(t.id, { label: t.label, note: t.note ?? "" }));
   }
 
   return (
@@ -747,7 +755,7 @@ function MenuReportFieldPresetsEditor({
   }
   async function commitLabel(id: string, val: string) {
     if (!val.trim()) return;
-    await updateReportFieldPreset(id, { label: val });
+    await saveOrAlert(() => updateReportFieldPreset(id, { label: val }));
   }
   async function remove(id: string) {
     await deleteReportFieldPreset(id);
@@ -828,7 +836,7 @@ function TemplateFieldsEditor({ formId, fields, onChange }: { formId: string; fi
     onChange(fields.map((f) => (f.id === id ? { ...f, ...p } : f)));
   }
   async function commit(f: IntakeField) {
-    await updateIntakeField(f.id, { label: f.label, kind: f.kind });
+    await saveOrAlert(() => updateIntakeField(f.id, { label: f.label, kind: f.kind }));
   }
   async function remove(id: string) {
     await deleteIntakeField(id);

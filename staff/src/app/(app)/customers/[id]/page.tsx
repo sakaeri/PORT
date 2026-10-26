@@ -131,7 +131,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       initialHasMoreOlder={hasMoreOlder}
       currentUserId={ctx.userId}
       orgId={ctx.orgId}
-      orgDisplayName={ctx.orgDisplayName}
       templates={templates}
       menus={menus}
       memos={memos}
@@ -139,6 +138,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       latestRequest={latestRequest}
       canSeeHqFeedback={canSeeHqFeedback}
       canDeleteTemplates={ctx.role === "owner" || ctx.role === "reception"}
+      viewerIsOwner={ctx.role === "owner" || ctx.role === "reception"}
       hqFeedbackThreadId={hqFeedbackRow?.thread_id ?? null}
       hqFeedbackUnread={hqFeedbackRow?.unread ?? false}
     />

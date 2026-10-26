@@ -63,7 +63,16 @@ export default function VerifyGate() {
         </>
       )}
       {error ? (
-        <div style={{ maxWidth: 320, fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>{error}</div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <div style={{ maxWidth: 320, fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>{error}</div>
+          {/* 確認がうまくいかなかったときに、その場でやり直せるように。 */}
+          <button
+            onClick={() => window.location.reload()}
+            style={{ height: 38, padding: "0 18px", cursor: "pointer", fontSize: 13, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+          >
+            もう一度試す
+          </button>
+        </div>
       ) : (
         <CircleNotch size={22} style={{ color: "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} />
       )}

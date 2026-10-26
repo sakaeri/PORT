@@ -31,7 +31,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     supabase
       .from("requests")
       .select(
-        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, customers(id, name, staff_label), completion_reports(*), completion_report_attachments(id, file_path, file_name, label), ratings(*), request_subscriptions(id, cadence, active, next_due_at), request_items(menu_id, label, price, qty)",
+        "id, title, note, amount, phase, created_at, quoted_at, started_at, completed_at, due_at, paid_at, payment_timing, deposit_amount, deposit_paid_at, pay_status, hourly_rate, hourly_cap, advance_amount, quote_expires_at, customers(id, name, staff_label), completion_reports(*), completion_report_attachments(id, file_path, file_name, label), ratings(*), request_subscriptions(id, cadence, active, next_due_at), request_items(menu_id, label, price, qty)",
       )
       .eq("id", id)
       .eq("org_id", ctx.orgId)
@@ -120,6 +120,8 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         payStatus: canSeeFinance ? request.pay_status : "",
         hourlyRate: canSeeFinance ? request.hourly_rate : null,
         hourlyCap: canSeeFinance ? request.hourly_cap : null,
+        isAdvance: request.advance_amount != null,
+        quoteExpired: request.phase === "quoted" && isPast(request.quote_expires_at),
       }}
       customer={customer ? { id: customer.id, name: customer.staff_label ?? customer.name } : null}
       report={
@@ -149,4 +151,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       requestItems={canApprove ? (request.request_items ?? []).map((it) => ({ label: it.label, price: it.price, qty: it.qty, leadHours: null })) : []}
     />
   );
+}
+
+// 立替の見積もりの有効期限を過ぎているか（過ぎると依頼主は確定できない）。
+function isPast(iso: string | null): boolean {
+  return iso != null && new Date(iso).getTime() < Date.now();
 }

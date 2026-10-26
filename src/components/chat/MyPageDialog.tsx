@@ -221,6 +221,7 @@ export default function MyPageDialog({
     if (emNext !== emConf) return setEmError("確認用のメールアドレスが一致しません");
     if (emNext === email) return setEmError("現在と同じアドレスです");
     if (hasPassword && !emPw) return setEmError("パスワードをご入力ください");
+    setEmError("");
     setEmSaving(true);
     try {
       const r = await changeEmail(emNext, hasPassword ? emPw : undefined);
@@ -344,7 +345,7 @@ export default function MyPageDialog({
                   {emError && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{emError}</span>}
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={saveEmail} disabled={emSaving} style={{ flex: 1, height: 36, cursor: "pointer", fontSize: 12.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}>
-                      変更を保存
+                      {emSaving ? "保存中…" : "変更を保存"}
                     </button>
                     <button onClick={() => setEmOpen(false)} style={{ flex: "none", height: 36, padding: "0 14px", cursor: "pointer", fontSize: 12.5, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
                       キャンセル

@@ -143,6 +143,10 @@ async function requestMagicLinkInner(email: string, opts?: { resetPassword?: boo
   }
   if (opts?.resetPassword) {
     (await cookies()).set("vid_setpw", "1", { httpOnly: true, sameSite: "lax", secure: protocol === "https", maxAge: 60 * 60, path: "/" });
+  } else {
+    // 少し前に「パスワードをお忘れの方」を押していても、ふつうのログインでは
+    // パスワード設定の画面を開かない。
+    (await cookies()).delete("vid_setpw");
   }
 }
 
@@ -162,6 +166,7 @@ async function signInWithPasswordLoginInner(email: string, password: string) {
     if (error.status === 429) throw new Error("短時間に何度も試されたため、少し時間をおいてからお試しください。");
     throw new Error("メールアドレスかパスワードが正しくありません");
   }
+  (await cookies()).delete("vid_setpw");
 }
 
 // パスワードを設定済みかどうかは Supabase 側で取れないので user_metadata に印を残す。
@@ -237,15 +242,22 @@ async function sendMessageInner(text: string, attachments: { path: string; name:
   if (!trimmed && attachments.length === 0) return;
 
   if (attachments.length > 0) {
+    // 自分のトークのフォルダ（threadId/…）に上げたファイルだけ受け付ける。
+    if (attachments.some((a) => !a.path.startsWith(`${ctx.threadId}/`) || a.path.includes(".."))) throw new Error("添付ファイルを送れませんでした。もう一度お試しください。");
     const { data: filesMsg, error } = await supabase
       .from("messages")
       .insert({ thread_id: ctx.threadId, sender_id: ctx.userId, sender_role: "client", kind: "files" })
       .select("id")
       .single();
     if (error) throw error;
-    await supabase.from("message_attachments").insert(
+    const { error: attachError } = await supabase.from("message_attachments").insert(
       attachments.map((a) => ({ message_id: filesMsg.id, file_path: a.path, file_name: a.name, mime: a.mime, bytes: a.bytes })),
     );
+    if (attachError) {
+      // 中身のないファイルの吹き出しだけが残らないよう、作った行を消す。
+      await createServiceRoleClient().from("messages").delete().eq("id", filesMsg.id);
+      throw new Error("添付ファイルを送れませんでした。もう一度お試しください。");
+    }
   }
   if (trimmed) {
     const { error } = await supabase
@@ -260,21 +272,30 @@ async function sendMessageInner(text: string, attachments: { path: string; name:
 // 見積もりの「はじめの質問」（menu_pick）と同じく、その場のメッセージとしてのみ残す。
 // 依頼主ごとの永続データ（customer_vault_items＝マイページの「よく使う情報」）には繋げない
 // —— 確認事項テンプレはあくまで一回きりのやり取りとして扱う。
-export async function submitInfoRequestAnswer(formLabel: string, fields: { label: string; value: string }[]) {
-  return toResult("submitInfoRequestAnswer", () => submitInfoRequestAnswerInner(formLabel, fields));
+export async function submitInfoRequestAnswer(formLabel: string, fields: { label: string; value: string }[], requestMessageId: string) {
+  return toResult("submitInfoRequestAnswer", () => submitInfoRequestAnswerInner(formLabel, fields, requestMessageId));
 }
 
-async function submitInfoRequestAnswerInner(formLabel: string, fields: { label: string; value: string }[]) {
+async function submitInfoRequestAnswerInner(formLabel: string, fields: { label: string; value: string }[], requestMessageId: string) {
   const ctx = await requireActiveContext();
   const filled = fields.filter((f) => f.value.trim());
-  if (!filled.length) return;
+  if (!filled.length) throw new Error("1つ以上ご入力ください");
   const supabase = await createClient();
+  // 読み込み直したあとに同じ確認事項へ二重に答えないようにする。
+  const { data: already } = await supabase
+    .from("messages")
+    .select("id")
+    .eq("thread_id", ctx.threadId)
+    .eq("kind", "intake_answer")
+    .eq("payload->>requestMessageId", requestMessageId)
+    .limit(1);
+  if (already?.length) throw new Error("この確認事項はすでに送信済みです");
   const { error } = await supabase.from("messages").insert({
     thread_id: ctx.threadId,
     sender_id: ctx.userId,
     sender_role: "client",
     kind: "intake_answer",
-    payload: { formLabel, rows: filled },
+    payload: { formLabel, rows: filled, requestMessageId },
   });
   if (error) throw error;
   const shouldNotify = await touchThread(ctx.threadId);
@@ -409,11 +430,20 @@ export async function submitRating(requestId: string, stars: number, comment: st
 
 async function submitRatingInner(requestId: string, stars: number, comment: string) {
   const ctx = await requireContext();
+  if (!Number.isInteger(stars) || stars < 1 || stars > 5) throw new Error("星を選んでください");
+  await assertOwnCompletedRequest(requestId, ctx.customerId);
   const supabase = await createClient();
   const { error } = await supabase
     .from("ratings")
     .insert({ request_id: requestId, customer_id: ctx.customerId, stars, comment: comment.trim() || null, skipped: false });
-  if (error) throw error;
+  // すでに評価済み（二重送信）なら、そのまま終わりにする。
+  if (error && error.code !== "23505") throw error;
+}
+
+// 評価できるのは、自分の依頼で完了したものだけ。
+async function assertOwnCompletedRequest(requestId: string, customerId: string) {
+  const { data } = await createServiceRoleClient().from("requests").select("phase").eq("id", requestId).eq("customer_id", customerId).maybeSingle();
+  if (!data || data.phase !== "completed") throw new Error("この依頼は評価できません");
 }
 
 export async function skipRating(requestId: string) {
@@ -422,11 +452,12 @@ export async function skipRating(requestId: string) {
 
 async function skipRatingInner(requestId: string) {
   const ctx = await requireContext();
+  await assertOwnCompletedRequest(requestId, ctx.customerId);
   const supabase = await createClient();
   const { error } = await supabase
     .from("ratings")
     .insert({ request_id: requestId, customer_id: ctx.customerId, stars: null, skipped: true });
-  if (error) throw error;
+  if (error && error.code !== "23505") throw error;
 }
 
 // チャージ残高からの支払い。二重消費を防ぐためのロック・検証はすべて
@@ -501,8 +532,12 @@ async function requestRecurringFollowupInner(requestId: string) {
 
   const { data: caseThread } = await admin.from("threads").select("id").eq("kind", "case").eq("request_id", requestId).maybeSingle();
   if (caseThread) {
+    const body = "依頼主が「次回からも定期でお願いしたい」と伝えています";
+    // 読み込み直して何度押しても、秘書に同じお知らせを重ねて送らない。
+    const { data: already } = await admin.from("messages").select("id").eq("thread_id", caseThread.id).eq("kind", "notice").eq("body", body).limit(1);
+    if (already?.length) return;
     const now = new Date().toISOString();
-    await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body: "依頼主が「次回からも定期でお願いしたい」と伝えています" });
+    await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body });
     await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
   }
 }

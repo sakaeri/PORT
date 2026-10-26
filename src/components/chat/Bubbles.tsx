@@ -268,8 +268,8 @@ export function RequestCard({
   orgDisplayName: string;
   onPay: (id: string) => Promise<void>;
   onOpenCharge: () => void;
-  onSubmitRating: (id: string, stars: number, comment: string) => void;
-  onSkipRating: (id: string) => void;
+  onSubmitRating: (id: string, stars: number, comment: string) => Promise<void>;
+  onSkipRating: (id: string) => Promise<void>;
 }) {
   const { request: r, items, report, rating } = bundle;
   const payload = msg.payload as { title?: string; note?: string; due?: string };
@@ -282,6 +282,22 @@ export function RequestCard({
   const [recurringRequesting, setRecurringRequesting] = useState(false);
   const [recurringRequested, setRecurringRequested] = useState(false);
   const [recurringError, setRecurringError] = useState("");
+  const [ratingBusy, setRatingBusy] = useState(false);
+  const [ratingError, setRatingError] = useState("");
+
+  // 連打で二重に送らないよう、送っている間は止める。
+  async function handleRating(send: () => Promise<void>) {
+    if (ratingBusy) return;
+    setRatingBusy(true);
+    setRatingError("");
+    try {
+      await send();
+    } catch (e) {
+      setRatingError(errorMessage(e, "送信できませんでした"));
+    } finally {
+      setRatingBusy(false);
+    }
+  }
 
   async function handleRequestRecurring() {
     if (recurringRequesting || recurringRequested) return;
@@ -522,16 +538,17 @@ export function RequestCard({
                 />
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <button
-                    onClick={() => onSubmitRating(r.id, stars, comment)}
-                    disabled={stars === 0}
+                    onClick={() => handleRating(() => onSubmitRating(r.id, stars, comment))}
+                    disabled={stars === 0 || ratingBusy}
                     style={{ flex: 1, height: 34, cursor: stars ? "pointer" : "not-allowed", fontSize: 12.5, color: stars ? "var(--color-accent)" : "var(--color-neutral-600)", background: "transparent", border: `1px solid ${stars ? "var(--color-accent)" : "var(--color-divider)"}`, borderRadius: "var(--radius-md)" }}
                   >
-                    送る
+                    {ratingBusy ? "送信中…" : "送る"}
                   </button>
-                  <button onClick={() => onSkipRating(r.id)} style={{ height: 34, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
+                  <button onClick={() => handleRating(() => onSkipRating(r.id))} disabled={ratingBusy} style={{ height: 34, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
                     今回はスキップ
                   </button>
                 </div>
+                {ratingError && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{ratingError}</span>}
                 <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, color: "var(--color-neutral-600)" }}>
                   評価は担当者には直接届きません
                   <InfoTooltip text="星もひとことも、まず運営だけが受け取ります。お伝えしたほうがよい内容は運営が判断してお伝えします。" />
@@ -590,7 +607,7 @@ interface IntakeFieldDef {
 
 const INPUT_TYPE: Record<string, string> = { text: "text", tel: "tel", email: "email", date: "date", select: "text" };
 
-export function IntakeCard({ msg }: { msg: MessageWithExtras }) {
+export function IntakeCard({ msg, answered }: { msg: MessageWithExtras; answered: boolean }) {
   const p = msg.payload as { formLabel?: string; note?: string; fields?: IntakeFieldDef[] };
   const fields = p.fields ?? [];
 
@@ -606,11 +623,15 @@ export function IntakeCard({ msg }: { msg: MessageWithExtras }) {
       setError(`「${missing[0].label}」は必須です`);
       return;
     }
+    const filled = fields.filter((f) => values[f.key]?.trim()).map((f) => ({ label: f.label, value: values[f.key].trim() }));
+    if (!filled.length) {
+      setError("1つ以上ご入力ください");
+      return;
+    }
     setError("");
     setSaving(true);
     try {
-      const filled = fields.filter((f) => values[f.key]?.trim()).map((f) => ({ label: f.label, value: values[f.key].trim() }));
-      unwrap(await submitInfoRequestAnswer(p.formLabel ?? "", filled));
+      unwrap(await submitInfoRequestAnswer(p.formLabel ?? "", filled, msg.id));
       setSubmitted(filled);
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));
@@ -626,7 +647,7 @@ export function IntakeCard({ msg }: { msg: MessageWithExtras }) {
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, lineHeight: 1.3 }}>{p.formLabel}</div>
         {p.note && <p style={{ margin: 0, fontSize: 12.5, opacity: 0.8 }}>{p.note}</p>}
 
-        {!submitted ? (
+        {!submitted && !answered ? (
           <>
             {fields.map((f) => (
               <div key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>

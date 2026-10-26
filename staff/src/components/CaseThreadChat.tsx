@@ -26,11 +26,14 @@ export default function CaseThreadChat({
   orgId,
   currentUserId,
   initialMessages,
+  canDeleteOwn,
 }: {
   threadId: string;
   orgId: string;
   currentUserId: string;
   initialMessages: CaseMessage[];
+  // スタッフは削除できない役職なので、押してもエラーになるゴミ箱は出さない。
+  canDeleteOwn: boolean;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -165,7 +168,7 @@ export default function CaseThreadChat({
                     {staffSenderLabel(m.sender_role)}・
                     {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
-                  {isOwn && (
+                  {isOwn && canDeleteOwn && (
                     <button onClick={() => handleDelete(m)} disabled={busy} aria-label="削除" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
                       <Trash size={12} />
                     </button>

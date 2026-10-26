@@ -91,6 +91,8 @@ export default function CaseDetail({
     payStatus: string;
     hourlyRate: number | null;
     hourlyCap: number | null;
+    isAdvance: boolean;
+    quoteExpired: boolean;
   };
   customer: { id: string; name: string } | null;
   report: { summary: string; details: { label: string; value: string }[]; pending: boolean; attachments: { id: string; path: string; name: string; label: string | null }[] } | null;
@@ -137,8 +139,8 @@ export default function CaseDetail({
     }
   }
 
-  const handleStart = () => runAction(() => startCaseRequest(request.id));
-  const handleApproveReport = () => runAction(() => approveCaseReport(request.id), "この内容で依頼主に完了報告を送信します。よろしいですか？");
+  const handleStart = () => runAction(async () => void unwrap(await startCaseRequest(request.id)));
+  const handleApproveReport = () => runAction(async () => void unwrap(await approveCaseReport(request.id)), "この内容で依頼主に完了報告を送信します。よろしいですか？");
   const handleToggleArchive = () =>
     runAction(() => (caseThread?.archived ? unarchiveCaseThread(caseThread.id) : archiveCaseThread(caseThread!.id)));
   const handleCancelSubscription = () =>
@@ -226,7 +228,13 @@ export default function CaseDetail({
         )}
         {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
 
-        {request.phase === "quoted" && (
+        {request.phase === "quoted" && request.quoteExpired && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-accent-200)" }}>
+            有効期限切れ
+            <InfoTooltip text="立替の見積もりの有効期限を過ぎたため、依頼主は確定できません。必要なら見送りにして、新しく見積もりを送ってください。" />
+          </div>
+        )}
+        {request.phase === "quoted" && !request.quoteExpired && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-500)" }}>
             依頼主のお支払い待ち
             <InfoTooltip text="依頼主がチャージ残高から直接お支払いいただくと、着手待ち（準備中）になります。着手はこの後、担当者が「着手する」を押して開始してください。" />
@@ -297,7 +305,8 @@ export default function CaseDetail({
               </div>
             )}
             <ReportAttachmentList attachments={report.attachments} orgId={orgId} />
-            {canApprove && !subscription && customerThreadId && customer && (
+            {/* 立替は実費の支払い代行なので、同じ内容を定期にはしない（実費まで売上の項目になってしまう）。 */}
+            {canApprove && !subscription && !request.isAdvance && customerThreadId && customer && (
               <button
                 onClick={() => setShowRecurringDialog(true)}
                 style={{ alignSelf: "flex-start", height: 32, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
@@ -343,7 +352,7 @@ export default function CaseDetail({
 
       {caseThread && (
         <div style={card}>
-          <CaseThreadChat threadId={caseThread.id} orgId={orgId} currentUserId={currentUserId} initialMessages={caseMessages} />
+          <CaseThreadChat threadId={caseThread.id} orgId={orgId} currentUserId={currentUserId} initialMessages={caseMessages} canDeleteOwn={canAssignStaff} />
         </div>
       )}
     </div>
@@ -498,7 +507,7 @@ function CompletionReportForm({
     setSaving(true);
     try {
       const details = rows.filter((r) => r.kind !== "image" && r.kind !== "pdf").map((r) => ({ label: r.label, value: r.value }));
-      await submitCaseReport(requestId, summary, details, attachments);
+      unwrap(await submitCaseReport(requestId, summary, details, attachments));
       router.refresh();
     } catch (e) {
       setError(errorMessage(e, "送信できませんでした"));

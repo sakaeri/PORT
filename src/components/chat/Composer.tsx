@@ -265,7 +265,8 @@ export default function Composer({ threadId, orgId, onSend }: Props) {
           <textarea
             value={draft}
             onChange={(e) => {
-              pushHistory(draft);
+              // 「元に戻す」は「入力を消す」の取り消し専用。打ち始めたら取り消しは終わり。
+              if (history.length) setHistory([]);
               setDraft(e.target.value);
               autoGrow();
             }}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { deskTitle, getCustomerContext, getThreadMessages, hasAuthSession } from "@/lib/data";
+import { deskTitle, getCustomerContext, getRequestBundles, getThreadMessages, hasAuthSession } from "@/lib/data";
 import ChatScreen from "@/components/chat/ChatScreen";
 import VerifyGate from "@/components/chat/VerifyGate";
 import AccountGate from "@/components/chat/AccountGate";
@@ -74,13 +74,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
     return <AccountGate orgDisplayName={ctx.orgDisplayName} isDesk={!!ctx.desk} initialError={loginError ? "リンクの有効期限が切れているか、すでに使用されています。もう一度お試しください。" : undefined} />;
   }
 
-  const { messages, hasMoreOlder } = await getThreadMessages(ctx.threadId);
+  const [{ messages, hasMoreOlder }, requestBundles] = await Promise.all([getThreadMessages(ctx.threadId), getRequestBundles(ctx.threadId)]);
   const { setpw } = await searchParams;
 
   return (
     <ChatScreen
       ctx={ctx}
       initialMessages={messages}
+      initialBundles={requestBundles}
       initialHasMoreOlder={hasMoreOlder}
       openPasswordSetup={setpw === "1"}
     />
