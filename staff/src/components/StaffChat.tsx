@@ -217,7 +217,7 @@ export default function StaffChat({
                 非表示のものも表示（{archivedCount}件）
               </label>
             )}
-            {entries.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだスタッフがいません。右上の「スタッフを招待」から追加してください。</div>}
+            {entries.length === 0 && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだスタッフがいません。</div>}
             {entries.map((e) => {
               const staffRow = !e.isSelf ? otherStaff.find((s) => s.id === e.id) : null;
               return (

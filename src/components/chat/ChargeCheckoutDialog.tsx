@@ -29,7 +29,8 @@ const dialogBox: React.CSSProperties = {
 // onComplete は「画面を閉じて残高を再取得する」という表示上の後始末だけ。
 export default function ChargeCheckoutDialog({ clientSecret, title = "お支払い", onClose, onComplete }: { clientSecret: string; title?: string; onClose: () => void; onComplete: () => void }) {
   return (
-    <div style={{ ...scrim, display: "grid", placeItems: "center", padding: "var(--space-4)" }} onClick={onClose}>
+    // 外側をタップしても閉じない（カード入力の途中で消えないように）。✕ で閉じる。
+    <div style={{ ...scrim, display: "grid", placeItems: "center", padding: "var(--space-4)" }}>
       <div role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={dialogBox}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>{title}</div>

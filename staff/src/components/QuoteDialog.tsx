@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash } from "@phosphor-icons/react";
+import { Trash, X } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage, unwrap } from "@/lib/errors";
 import { createCaseRequest } from "@/app/actions";
@@ -212,13 +212,20 @@ export default function QuoteDialog({
   }
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}>
+    // 外側をタップしても閉じない（入力途中の見積もりが消えないように）。
+    <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "grid", placeItems: "center", padding: 20, background: "color-mix(in srgb, var(--color-bg) 72%, transparent)" }}>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{ width: "min(480px, 100%)", maxHeight: "85vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12, padding: 20, borderRadius: "var(--radius-lg)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-lg)" }}
       >
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>{title}</div>
-        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>{description}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16 }}>{title}</div>
+          <InfoTooltip text={description} />
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+            <X size={18} />
+          </button>
+        </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           <button onClick={() => setMode("menu")} style={pillStyle(mode === "menu")}>
@@ -434,7 +441,7 @@ export default function QuoteDialog({
                     月末
                   </button>
                 </div>
-                {!anchorLastDayOfMonth && <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>29〜31日は月によって無いため、「月末」を使ってください</span>}
+                {!anchorLastDayOfMonth && <InfoTooltip text="29〜31日は月によって無いため、「月末」を使ってください。" />}
               </div>
             )}
           </div>
@@ -447,9 +454,9 @@ export default function QuoteDialog({
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
           {due && (
-            <div style={{ fontSize: 12.5 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
               対応の目安：{due}
-              <span style={{ marginLeft: 6, fontSize: 10.5, color: "var(--color-neutral-500)" }}>（選んだ項目の目安時間から自動計算）</span>
+              <InfoTooltip text="選んだ項目の目安時間から自動で計算しています。" />
             </div>
           )}
           <textarea
