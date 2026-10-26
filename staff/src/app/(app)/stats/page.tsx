@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { headingWeight } from "@/lib/style";
@@ -28,7 +29,7 @@ export default async function StatsPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
   // 売上・実績は本部（オーナー）専用。秘書・スタッフが直接URLで来ても出さない。
-  if (ctx.role !== "owner" && ctx.role !== "reception") return null;
+  if (ctx.role !== "owner" && ctx.role !== "reception") redirect("/today");
 
   const { year, month } = nowJSTYearMonth();
 

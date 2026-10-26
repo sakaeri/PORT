@@ -47,7 +47,6 @@ export default function StaffChat({
   selfEntry,
   departments,
   myDepartmentIds,
-  orgDisplayName,
 }: {
   currentUserId: string;
   currentRole: StaffRole | "reception";
@@ -65,8 +64,6 @@ export default function StaffChat({
   // マネージャーが見ている場合、自分の窓口だけがスタッフ割り当て先の
   // 選択肢になる（他窓口には割り当てられないため）。オーナーは全窓口。
   myDepartmentIds: string[];
-  // 窓口（秘書）未設定の分は、事業所全体の担当としてこの名前でくくる。
-  orgDisplayName: string;
 }) {
   const router = useRouter();
   const [staff, setStaff] = useState(initialStaff);
@@ -76,7 +73,7 @@ export default function StaffChat({
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const departmentById = new Map(departments.map((d) => [d.id, d.name]));
-  const departmentFilterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: orgDisplayName }];
+  const departmentFilterOptions = [{ id: "all", name: "すべて" }, ...departments, { id: "none", name: "本部" }];
 
   // 一覧の最終メッセージ・未読はこのコンポーネント自身では再取得せず、
   // ページ全体(staff/page.tsx)を router.refresh() で再取得させる
@@ -182,7 +179,7 @@ export default function StaffChat({
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: showListHeader ? "var(--space-4) var(--space-6) var(--space-6)" : 0 }}>
         {!canBrowseStaff ? (
-          <StaffThreadPane staffProfileId={currentUserId} title="本部" currentUserId={currentUserId} orgId={orgId} />
+          <StaffThreadPane staffProfileId={currentUserId} title="本部" currentUserId={currentUserId} orgId={orgId} canDeleteOwn={currentRole !== "dept_leader"} />
         ) : selectedEntry ? (
           <StaffThreadPane
             staffProfileId={selectedEntry.id}
@@ -190,6 +187,7 @@ export default function StaffChat({
             currentUserId={currentUserId}
             orgId={orgId}
             onBack={() => setSelectedId(null)}
+            canDeleteOwn={currentRole !== "dept_leader"}
             editable={
               canAdmin && selectedStaff
                 ? {
@@ -199,7 +197,11 @@ export default function StaffChat({
                     departments: currentRole === "owner" ? departments : departments.filter((d) => myDepartmentIds.includes(d.id)),
                     canDelete: canAdmin && selectedStaff.role !== "owner",
                     canPromoteToOwner: currentRole === "owner",
-                    onSaved: (patch) => setStaff((rows) => rows.map((r) => (r.id === selectedStaff.id ? { ...r, ...patch } : r))),
+                    onSaved: (patch) => {
+                      setStaff((rows) => rows.map((r) => (r.id === selectedStaff.id ? { ...r, ...patch } : r)));
+                      // 秘書にすると窓口が自動でできるので、窓口の一覧を取り直す。
+                      if (patch.role === "dept_manager") router.refresh();
+                    },
                     onRemoved: () => {
                       setStaff((rows) => rows.filter((r) => r.id !== selectedStaff.id));
                       setSelectedId(null);

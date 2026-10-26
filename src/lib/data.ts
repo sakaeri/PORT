@@ -166,3 +166,21 @@ export async function getThreadMessages(threadId: string): Promise<{ messages: M
   return { messages: rows.map(mapMessageRow), hasMoreOlder: data.length === MESSAGE_PAGE_SIZE };
 }
 
+// 進捗状況・報告書一覧用に、このトークの見積もりを全部取る（トークの表示は
+// 直近の分しか読み込まないので、古い依頼が一覧から消えないように別に取る）。
+export async function getRequestBundles(threadId: string): Promise<RequestBundle[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*, message_attachments(*), profiles!messages_sender_id_fkey(display_name, avatar_url), requests(*, request_items(*), completion_reports(*), completion_report_attachments(*), ratings(*))")
+    .eq("thread_id", threadId)
+    .eq("kind", "quote")
+    .is("deleted_at", null)
+    .order("sent_at", { ascending: true });
+  if (error || !data) {
+    console.error("getRequestBundles failed", { threadId, error });
+    return [];
+  }
+  return (data as RawMessageRow[]).map(mapMessageRow).flatMap((m) => (m.requestBundle ? [m.requestBundle] : []));
+}
+

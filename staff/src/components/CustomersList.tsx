@@ -9,6 +9,7 @@ import type { Department } from "@/components/StaffAdmin";
 import RowKebabMenu from "@/components/RowKebabMenu";
 import Avatar, { avatarInitial } from "@/components/Avatar";
 import DepartmentFilterDropdown from "@/components/DepartmentFilterDropdown";
+import { errorMessage } from "@/lib/errors";
 
 interface CustomerRow {
   id: string;
@@ -91,6 +92,8 @@ export default function CustomersList({
       if (willArchive) await archiveThread(c.thread.id);
       else await unarchiveThread(c.thread.id);
       setRows((r) => r.map((row) => (row.id === c.id && row.thread ? { ...row, active: !willArchive, thread: { ...row.thread, archived: willArchive } } : row)));
+    } catch (e) {
+      alert(errorMessage(e, "切り替えできませんでした"));
     } finally {
       setBusyId(null);
     }
@@ -103,6 +106,8 @@ export default function CustomersList({
     try {
       await deleteCustomer(c.id);
       setRows((r) => r.filter((row) => row.id !== c.id));
+    } catch (e) {
+      alert(errorMessage(e, "削除できませんでした"));
     } finally {
       setBusyId(null);
     }

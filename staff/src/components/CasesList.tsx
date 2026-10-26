@@ -83,6 +83,8 @@ export default function CasesList({
       if (willArchive) await archiveCaseThread(r.threadId);
       else await unarchiveCaseThread(r.threadId);
       setRows((rs) => rs.map((row) => (row.id === r.id ? { ...row, archived: willArchive } : row)));
+    } catch (e) {
+      alert(errorMessage(e, "切り替えできませんでした"));
     } finally {
       setBusyId(null);
     }
@@ -110,7 +112,7 @@ export default function CasesList({
     { key: "all", label: "すべて", count: allCount },
     { key: "preparing", label: "未着手", count: preparingCount },
     { key: "awaitingReport", label: "報告前", count: awaitingReportCount },
-    { key: "reportPending", label: "報告済み", count: reportPendingCount },
+    { key: "reportPending", label: "承認待ち", count: reportPendingCount },
     { key: "completed", label: "完了", count: completedCount },
     { key: "declined", label: "見送り", count: declinedCount },
   ];

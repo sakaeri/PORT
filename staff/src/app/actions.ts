@@ -455,16 +455,23 @@ export async function archiveThread(threadId: string) {
 // 同じ発想）。今このトークが見えているスタッフだけが切り替えられる
 // （RLSのthreads_office_writeが、切り替え先ではなく「今の」窓口の閲覧権限を
 // 見ているため、他窓口のトークを勝手に奪うことはできない）。
-export async function reassignThreadDepartment(threadId: string, departmentId: string | null) {
+export async function reassignThreadDepartment(...args: Parameters<typeof reassignThreadDepartmentInner>) {
+  return toResult("reassignThreadDepartment", () => reassignThreadDepartmentInner(...args));
+}
+
+async function reassignThreadDepartmentInner(threadId: string, departmentId: string | null) {
   const ctx = await requireContext();
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("threads")
     .update({ department_id: departmentId })
     .eq("id", threadId)
     .eq("org_id", ctx.orgId)
-    .eq("kind", "customer");
+    .eq("kind", "customer")
+    .select("id");
   if (error) throw error;
+  // RLS で弾かれると0件のまま黙って終わるので、変わらなかったことを伝える。
+  if (!data?.length) throw new Error("担当を変えられませんでした。この依頼主を担当していない可能性があります。");
 }
 
 export async function unarchiveThread(threadId: string) {
@@ -728,7 +735,11 @@ async function postCaseNotice(supabase: Awaited<ReturnType<typeof createClient>>
 
 // 残高払いで支払いが確定すると "preparing"（着手前）になる。そこから
 // 実際に手を動かし始めるタイミングはここで担当者が決める。
-export async function startCaseRequest(requestId: string) {
+export async function startCaseRequest(...args: Parameters<typeof startCaseRequestInner>) {
+  return toResult("startCaseRequest", () => startCaseRequestInner(...args));
+}
+
+async function startCaseRequestInner(requestId: string) {
   const ctx = await requireContext();
   const supabase = await createClient();
   const { data: current, error: fetchError } = await supabase
@@ -760,7 +771,11 @@ export async function startCaseRequest(requestId: string) {
 // スタッフ（dept_leader）が提出した完了報告は、そのまま依頼主に送らず
 // マネージャー・オーナーの確認待ち（下書き）にする。オーナー・マネージャー
 // 自身が提出した場合は、自分の確認が要らないのでそのまま依頼主に送る。
-export async function submitCaseReport(
+export async function submitCaseReport(...args: Parameters<typeof submitCaseReportInner>) {
+  return toResult("submitCaseReport", () => submitCaseReportInner(...args));
+}
+
+async function submitCaseReportInner(
   requestId: string,
   summary: string,
   details: { label: string; value: string }[],
@@ -776,6 +791,10 @@ export async function submitCaseReport(
   if (request.phase !== "started") throw new Error("着手中の案件のみ完了報告できます");
 
   const cleanDetails = details.filter((d) => d.label.trim() && d.value.trim()).map((d) => ({ label: d.label.trim(), value: d.value.trim() }));
+
+  // 確認待ちの報告があるのに出し直すと、報告も添付も二重になる。
+  const { data: pending } = await supabase.from("completion_reports").select("id").eq("request_id", requestId).is("sent_at", null).limit(1);
+  if (pending?.length) throw new Error("確認待ちの完了報告があります。秘書・本部の確認をお待ちください。");
 
   if (attachments.length > 0) {
     const { error: attError } = await supabase.from("completion_report_attachments").insert(
@@ -806,14 +825,28 @@ export async function submitCaseReport(
   // 時間精算案件なら、ここで着手〜完了の実働時間から最終金額を確定し、
   // 見積もり時に引き落とした上限額との差額をチャージ残高に戻す
   // （固定額案件（hourly_rateがnull）には何もしない）。
-  await supabase.rpc("finalize_hourly_billing", { p_request_id: requestId });
+  await finalizeHourlyBilling(supabase, requestId);
   await postCaseNotice(supabase, requestId, "完了報告を送信しました");
   await notifyCustomerCompletionReport(createServiceRoleClient(), ctx.orgId, request.customer_id);
 }
 
+// 時間精算の最終金額を確定し、上限額との差額を残高に戻す。失敗しても完了報告は
+// 送れているので止めはしないが、気付けるよう案件トークに残す。
+async function finalizeHourlyBilling(supabase: Awaited<ReturnType<typeof createClient>>, requestId: string) {
+  const { error } = await supabase.rpc("finalize_hourly_billing", { p_request_id: requestId });
+  if (error) {
+    console.error("finalize_hourly_billing failed", { requestId, error });
+    await postCaseNotice(supabase, requestId, "時間精算の差額を残高に戻せませんでした。本部で確認してください");
+  }
+}
+
 // スタッフが提出した完了報告（下書き）を、マネージャー・オーナーが確認して
 // 依頼主に送る。
-export async function approveCaseReport(requestId: string) {
+export async function approveCaseReport(...args: Parameters<typeof approveCaseReportInner>) {
+  return toResult("approveCaseReport", () => approveCaseReportInner(...args));
+}
+
+async function approveCaseReportInner(requestId: string) {
   const ctx = await requireContext();
   if (ctx.role !== "owner" && ctx.role !== "dept_manager") throw new Error("この操作は本部メンバー・秘書のみ行えます");
   const supabase = await createClient();
@@ -834,7 +867,7 @@ export async function approveCaseReport(requestId: string) {
 
   const { error: reqError } = await supabase.from("requests").update({ phase: "completed", completed_at: now }).eq("id", requestId).eq("org_id", ctx.orgId);
   if (reqError) throw reqError;
-  await supabase.rpc("finalize_hourly_billing", { p_request_id: requestId });
+  await finalizeHourlyBilling(supabase, requestId);
   await postCaseNotice(supabase, requestId, "完了報告を確認し、依頼主に送信しました");
   await notifyCustomerCompletionReport(createServiceRoleClient(), ctx.orgId, request.customer_id);
 }
@@ -1106,12 +1139,18 @@ export async function getInvitePreview(inviteId: string) {
   const admin = createServiceRoleClient();
   const { data: invite } = await admin
     .from("staff_invites")
-    .select("role, used_at, organizations(display_name)")
+    .select("role, used_at, created_at, organizations(display_name)")
     .eq("id", inviteId)
     .maybeSingle();
   if (!invite) return null;
   const org = Array.isArray(invite.organizations) ? invite.organizations[0] : invite.organizations;
-  return { role: invite.role as StaffRole, valid: !invite.used_at, orgDisplayName: org?.display_name ?? "" };
+  return { role: invite.role as StaffRole, valid: !invite.used_at && !isInviteExpired(invite.created_at), orgDisplayName: org?.display_name ?? "" };
+}
+
+// 招待リンクは発行から7日で使えなくする（URLが残り続けて誰でも参加できないように）。
+const INVITE_VALID_DAYS = 7;
+function isInviteExpired(createdAt: string) {
+  return Date.now() - new Date(createdAt).getTime() > INVITE_VALID_DAYS * 24 * 60 * 60 * 1000;
 }
 
 export async function acceptStaffInvite(...args: Parameters<typeof acceptStaffInviteInner>) {
@@ -1125,11 +1164,16 @@ async function acceptStaffInviteInner(inviteId: string, fields: { email: string;
   const admin = createServiceRoleClient();
   const { data: invite } = await admin
     .from("staff_invites")
-    .select("id, org_id, role, department_ids, used_at")
+    .select("id, org_id, role, department_ids, used_at, created_at")
     .eq("id", inviteId)
     .maybeSingle();
   if (!invite) throw new Error("この招待リンクは無効です");
   if (invite.used_at) throw new Error("この招待リンクはすでに使われています");
+  if (isInviteExpired(invite.created_at)) throw new Error("この招待リンクは有効期限（7日）が切れています。新しいリンクを発行してもらってください");
+  // 同じリンクで同時に2人が登録しないよう、先に「使用済み」にしておく（失敗したら戻す）。
+  const { data: claimed } = await admin.from("staff_invites").update({ used_at: new Date().toISOString() }).eq("id", inviteId).is("used_at", null).select("id");
+  if (!claimed?.length) throw new Error("この招待リンクはすでに使われています");
+  const releaseInvite = () => admin.from("staff_invites").update({ used_at: null }).eq("id", inviteId);
 
   const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
     email: fields.email.trim(),
@@ -1137,7 +1181,8 @@ async function acceptStaffInviteInner(inviteId: string, fields: { email: string;
     email_confirm: true,
   });
   if (userErr || !userRes.user) {
-    throw new Error(userErr?.message.includes("already been registered") ? "このメールアドレスはすでに使われています" : (userErr?.message ?? "アカウントを作成できませんでした"));
+    await releaseInvite();
+    throw new Error(userErr?.message.includes("already been registered") ? "このメールアドレスはすでに使われています" : "アカウントを作成できませんでした");
   }
 
   const { error: profileErr } = await admin.from("profiles").insert({
@@ -1148,13 +1193,14 @@ async function acceptStaffInviteInner(inviteId: string, fields: { email: string;
   });
   if (profileErr) {
     await admin.auth.admin.deleteUser(userRes.user.id);
+    await releaseInvite();
     throw profileErr;
   }
 
   if (invite.department_ids.length > 0) {
     await admin.from("staff_departments").insert(invite.department_ids.map((department_id: string) => ({ profile_id: userRes.user.id, department_id })));
   }
-  await admin.from("staff_invites").update({ used_at: new Date().toISOString(), used_by: userRes.user.id }).eq("id", inviteId);
+  await admin.from("staff_invites").update({ used_by: userRes.user.id }).eq("id", inviteId);
 
   return { email: fields.email.trim() };
 }
@@ -1183,6 +1229,11 @@ async function updateStaffMemberInner(profileId: string, role: StaffRole, depart
   const { data: targetBefore } = await admin.from("profiles").select("role").eq("id", profileId).eq("org_id", ctx.orgId).maybeSingle();
   if (!targetBefore) throw new Error("このスタッフは見つかりませんでした");
   const previousRole = targetBefore?.role as StaffRole | undefined;
+  // 本部（オーナー）が1人もいなくなると、誰も設定を変えられなくなる。
+  if (previousRole === "owner" && role !== "owner") {
+    const { count } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("org_id", ctx.orgId).eq("role", "owner");
+    if ((count ?? 0) <= 1) throw new Error("本部メンバーが1人もいなくなるため、この役職には変更できません");
+  }
   const previousDepartmentIds = await departmentIdsOf(admin, profileId);
 
   if (ctx.role === "dept_manager") {

@@ -6,7 +6,7 @@ import { StepIcon } from "@/components/chat/icons";
 import { QuoteExpiryLine, WithQuoteExpiry } from "@/components/chat/QuoteExpiry";
 import { errorMessage } from "@/lib/errors";
 import type { RequestBundle } from "@/lib/chat-types";
-import { yen, timeLabel } from "@/lib/format";
+import { yen, timeLabel, dateLabel } from "@/lib/format";
 import { stageInfoFor, statusBadgeFor, STAGE_LABELS, PAYMENT_TIMING_LABEL, CADENCE_LABEL } from "@/lib/stage";
 import { headingWeight } from "@/lib/style";
 
@@ -227,35 +227,56 @@ export function CancelDialog({
 
 // ---------- 報告書一覧 ----------
 export function ReportsDialog({ bundles, ackedIds, onAck, onClose }: { bundles: RequestBundle[]; ackedIds: Set<string>; onAck: (id: string) => void; onClose: () => void }) {
-  const list = bundles.filter((b) => b.request.phase === "completed" && b.report?.sent_at && !ackedIds.has(b.request.id));
+  const all = bundles.filter((b) => b.request.phase === "completed" && b.report?.sent_at);
+  const unread = all.filter((b) => !ackedIds.has(b.request.id));
+  // 確認済みにしたものは消さず、下の折りたたみにしまう（あとから見返せるように）。
+  const acked = all.filter((b) => ackedIds.has(b.request.id));
+  const [showAcked, setShowAcked] = useState(false);
+
+  function card({ request: r, report }: RequestBundle, canAck: boolean) {
+    return (
+      <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 14 }}>{r.title}</div>
+        <div style={{ fontSize: 11, color: "var(--color-neutral-600)" }}>{report?.sent_at ? `${dateLabel(report.sent_at)} ${timeLabel(report.sent_at)}` : ""}</div>
+        <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>{report?.summary}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          {report?.details.map((d, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
+              <span style={{ color: "var(--color-neutral-500)", flex: "none", width: 64 }}>{d.label}</span>
+              <span>{d.value}</span>
+            </div>
+          ))}
+        </div>
+        {canAck && (
+          <button onClick={() => onAck(r.id)} style={{ alignSelf: "flex-end", height: 29, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-bg)", background: "var(--color-accent-400)", border: "none", borderRadius: "var(--radius-md)" }}>
+            確認済み
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <Centered onBackdrop={onClose}>
       <button onClick={onClose} aria-label="閉じる" style={{ position: "absolute", top: 14, right: 14, width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
         <X size={16} />
       </button>
       <div style={{ ...dialogTitle, position: "relative" }}>報告書一覧</div>
-      {list.length === 0 ? (
+      {all.length === 0 ? (
         <div style={{ fontSize: 14, opacity: 0.85 }}>まだ完了した報告書はありません。</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 340, overflowY: "auto" }}>
-          {list.map(({ request: r, report }) => (
-            <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
-              <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 14 }}>{r.title}</div>
-              <div style={{ fontSize: 11, color: "var(--color-neutral-600)" }}>{report?.sent_at ? timeLabel(report.sent_at) : ""}</div>
-              <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>{report?.summary}</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                {report?.details.map((d, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
-                    <span style={{ color: "var(--color-neutral-500)", flex: "none", width: 64 }}>{d.label}</span>
-                    <span>{d.value}</span>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => onAck(r.id)} style={{ alignSelf: "flex-end", height: 29, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-bg)", background: "var(--color-accent-400)", border: "none", borderRadius: "var(--radius-md)" }}>
-                確認済み
-              </button>
-            </div>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 400, overflowY: "auto" }}>
+          {unread.length === 0 && <div style={{ fontSize: 13, opacity: 0.75 }}>新しい報告書はありません。</div>}
+          {unread.map((b) => card(b, true))}
+          {acked.length > 0 && (
+            <button
+              onClick={() => setShowAcked((v) => !v)}
+              style={{ alignSelf: "flex-start", padding: "4px 0", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-400)", background: "transparent", border: "none" }}
+            >
+              {showAcked ? "▾" : "▸"} 確認済み（{acked.length}件）
+            </button>
+          )}
+          {showAcked && acked.map((b) => card(b, false))}
         </div>
       )}
     </Centered>

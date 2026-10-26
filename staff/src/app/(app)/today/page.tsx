@@ -80,6 +80,8 @@ export default async function TodayPage() {
       .select("id, title, amount, quoted_at, customer_id, customers(name, staff_label)")
       .eq("org_id", ctx.orgId)
       .eq("phase", "quoted")
+      // 有効期限が切れた立替の見積もりは、もう返事を待っても確定されないので出さない。
+      .or(`quote_expires_at.is.null,quote_expires_at.gt.${nowIso()}`)
       .order("quoted_at", { ascending: true }),
   ]);
 
@@ -256,4 +258,8 @@ async function StaffToday({ orgId }: { orgId: string }) {
       ))}
     </div>
   );
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
 }

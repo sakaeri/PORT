@@ -83,7 +83,7 @@ export default async function CasesPage() {
 
       {!error && rows.length === 0 && (
         <div style={{ fontSize: 13.5, color: "var(--color-neutral-500)", lineHeight: 1.7 }}>
-          まだ案件がありません。依頼主とのトーク画面から「案件を作成」すると、ここに表示されます。
+          まだ案件がありません。
         </div>
       )}
 

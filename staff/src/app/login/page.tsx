@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { requestPasswordReset } from "@/app/actions";
@@ -19,6 +19,13 @@ export default function LoginPage() {
   const [forgotSending, setForgotSending] = useState(false);
   const [forgotError, setForgotError] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
+
+  // 期限切れ・使用済みのパスワード再設定リンクから戻ってきたとき（auth/confirm が付ける）。
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("resetError")) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the URL (external browser state) after mount
+    setError("リンクの有効期限が切れています。もう一度「パスワードをお忘れですか？」からお試しください。");
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

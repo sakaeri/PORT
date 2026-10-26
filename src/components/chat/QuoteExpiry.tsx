@@ -23,8 +23,11 @@ export function useQuoteExpiry(expiresAt: string | null): { expired: boolean; re
   const left = new Date(expiresAt).getTime() - now;
   if (left <= 0) return { expired: true, remaining: null };
   const totalSec = Math.ceil(left / 1000);
-  const m = Math.floor(totalSec / 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
+  // 1時間以上ある間は「2時間15分」、それより短くなったら分:秒で数える。
+  if (h > 0) return { expired: false, remaining: `${h}時間${m}分` };
   return { expired: false, remaining: `${m}:${String(s).padStart(2, "0")}` };
 }
 

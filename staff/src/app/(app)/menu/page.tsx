@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { DEFAULT_TERMS_CONTENT } from "@/lib/terms";
@@ -8,7 +9,7 @@ export default async function MenuSettingsPage() {
   if (!ctx) return null;
   // メニュー管理は本部（オーナー）専用。秘書・スタッフが直接URLで来ても出さない
   // （返信テンプレの作成・編集は、秘書はトークのテンプレ画面から行う）。
-  if (ctx.role !== "owner" && ctx.role !== "reception") return null;
+  if (ctx.role !== "owner" && ctx.role !== "reception") redirect("/today");
 
   const supabase = await createClient();
   const [{ data: menus }, { data: templates }, { data: org }, { data: desks }, { data: departments }] = await Promise.all([
@@ -38,7 +39,6 @@ export default async function MenuSettingsPage() {
       initialTermsContent={org?.terms_content?.trim() ? org.terms_content : DEFAULT_TERMS_CONTENT}
       initialDesks={desks ?? []}
       departments={departments ?? []}
-      orgDisplayName={ctx.orgDisplayName}
       canEdit={ctx.role === "owner"}
     />
   );

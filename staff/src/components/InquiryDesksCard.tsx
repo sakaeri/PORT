@@ -49,12 +49,10 @@ const input: React.CSSProperties = {
 export default function InquiryDesksCard({
   initialDesks,
   departments,
-  orgDisplayName,
   canEdit,
 }: {
   initialDesks: InquiryDesk[];
   departments: { id: string; name: string }[];
-  orgDisplayName: string;
   canEdit: boolean;
 }) {
   const [desks, setDesks] = useState(initialDesks);
@@ -238,7 +236,7 @@ export default function InquiryDesksCard({
                   className="vid-input"
                   style={{ ...input, flex: "0 1 200px", minWidth: 0, height: 28, padding: "2px 8px", fontSize: 12.5 }}
                 >
-                  <option value="">{orgDisplayName}</option>
+                  <option value="">本部</option>
                   {departments.map((dep) => (
                     <option key={dep.id} value={dep.id}>
                       {dep.name}
@@ -255,6 +253,7 @@ export default function InquiryDesksCard({
                 <button
                   onClick={() => canEdit && toggle(d)}
                   disabled={!canEdit || togglingId === d.id}
+                  title={canEdit ? (d.active ? "押すと受付を止めます" : "押すと受付を再開します") : undefined}
                   style={{
                     ...smallBtn,
                     cursor: canEdit ? "pointer" : "default",

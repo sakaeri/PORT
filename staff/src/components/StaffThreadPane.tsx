@@ -43,6 +43,7 @@ export default function StaffThreadPane({
   orgId,
   onBack,
   editable,
+  canDeleteOwn = true,
 }: {
   staffProfileId: string;
   title: string;
@@ -50,6 +51,8 @@ export default function StaffThreadPane({
   orgId: string;
   onBack?: () => void;
   editable?: EditableStaffProps;
+  // スタッフは削除できない役職なので、押してもエラーになるゴミ箱は出さない。
+  canDeleteOwn?: boolean;
 }) {
   const [showEdit, setShowEdit] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -235,7 +238,7 @@ export default function StaffThreadPane({
                     {isOwn ? "自分" : staffSenderLabel(m.sender_role)}・
                     {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
-                  {isOwn && (
+                  {isOwn && canDeleteOwn && (
                     <button onClick={() => handleDelete(m)} disabled={busy} aria-label="削除" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
                       <Trash size={12} />
                     </button>
@@ -331,7 +334,8 @@ function StaffEditPanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 180px" }}>
           <span style={editLabel}>役職</span>
           <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={editInput}>
-            {(editable.canPromoteToOwner ? (["owner", ...INVITE_ROLES] as StaffRole[]) : INVITE_ROLES).map((r) => (
+            {/* 本部以外（秘書）が選べるのは「スタッフ」だけ（ほかを選んでも保存できないため出さない）。 */}
+            {(editable.canPromoteToOwner ? (["owner", ...INVITE_ROLES] as StaffRole[]) : (["dept_leader"] as StaffRole[])).map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r]}
               </option>
