@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, Trash, ChatCircleText, Star, SidebarSimple, X, CaretLeft, ChatText, ListChecks, Plus, PencilSimple } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Trash, ChatCircleText, Star, SidebarSimple, X, CaretLeft, ChatText, ListChecks, Plus, PencilSimple, Receipt } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage, unwrap } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -599,6 +599,8 @@ export default function CustomerThread({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [templates, setTemplates] = useState(initialTemplates);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showQuote, setShowQuote] = useState(false);
+  const router = useRouter();
   const isMobile = useIsMobile();
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
@@ -1008,6 +1010,16 @@ export default function CustomerThread({
           }
           leftButton={
             <>
+              {thread && (
+                <button
+                  onClick={() => setShowQuote(true)}
+                  aria-label="見積もりを作る"
+                  title="見積もりを作る"
+                  style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+                >
+                  <Receipt size={16} />
+                </button>
+              )}
               <button
                 onClick={() => setShowTemplates((v) => !v)}
                 aria-label="テンプレを選ぶ"
@@ -1052,9 +1064,23 @@ export default function CustomerThread({
           {canSeeHqFeedback && (
             <HqFeedbackSection threadId={hqFeedbackThreadId} unread={hqFeedbackUnread} orgId={orgId} currentUserId={currentUserId} />
           )}
-          <CaseSummarySection thread={thread} customerId={customer.id} menus={menus} latestRequest={latestRequest} />
+          <CaseSummarySection thread={thread} latestRequest={latestRequest} onOpenQuote={() => setShowQuote(true)} />
         </div>
       </>
+    )}
+    {showQuote && thread && (
+      <QuoteDialog
+        threadId={thread.id}
+        customerId={customer.id}
+        menus={menus}
+        onClose={() => setShowQuote(false)}
+        onCreated={() => {
+          // 送ったあともこの依頼主とのトークに残る（見積もりカードがトークに入る）。
+          setShowQuote(false);
+          void refresh();
+          router.refresh();
+        }}
+      />
     )}
     </div>
   );
@@ -1129,43 +1155,26 @@ function HqFeedbackSection({
 
 function CaseSummarySection({
   thread,
-  customerId,
-  menus,
   latestRequest,
+  onOpenQuote,
 }: {
   thread: { id: string; archived: boolean } | null;
-  customerId: string;
-  menus: MenuOption[];
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
+  onOpenQuote: () => void;
 }) {
-  const router = useRouter();
-  const [showDialog, setShowDialog] = useState(false);
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-400)" }}>このトークの依頼</span>
         {thread && (
           <button
-            onClick={() => setShowDialog(true)}
+            onClick={onOpenQuote}
             style={{ flex: "none", height: 24, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)" }}
           >
             見積もり
           </button>
         )}
       </div>
-      {showDialog && thread && (
-        <QuoteDialog
-          threadId={thread.id}
-          customerId={customerId}
-          menus={menus}
-          onClose={() => setShowDialog(false)}
-          onCreated={(requestId) => {
-            setShowDialog(false);
-            router.push(`/cases/${requestId}`);
-          }}
-        />
-      )}
       {latestRequest ? (
         <Link
           href={`/cases/${latestRequest.id}`}
@@ -1179,7 +1188,7 @@ function CaseSummarySection({
         </Link>
       ) : (
         <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-          まだ依頼はありません。会話の内容が正式な依頼になったら見積もりを発行してください。
+          まだ依頼はありません。
         </div>
       )}
     </div>

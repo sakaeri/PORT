@@ -12,6 +12,7 @@ import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
 import { submitInfoRequestAnswer, requestRecurringFollowup } from "@/app/actions";
 import { Avatar, avatarInitial } from "@/components/chat/AvatarPicker";
+import InfoTooltip from "@/components/chat/InfoTooltip";
 
 // 担当者がまだ付いていない自動メッセージ（個人のアバター画像もなければ、
 // 名乗る担当者名もない）は、頭文字の代わりにロゴ画像を出す。
@@ -365,8 +366,9 @@ export function RequestCard({
             <span style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>（{r.hourly_rate != null ? "上限・税込" : "税込"}）</span>
           </div>
           {r.hourly_rate != null && (
-            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6, marginTop: 2 }}>
-              時間精算（時間単価{yen(r.hourly_rate)}）です。実際にかかった時間に応じて、上限額を超えない範囲で請求されます。
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-500)", marginTop: 2 }}>
+              時間精算（時間単価{yen(r.hourly_rate)}）
+              <InfoTooltip text="実際にかかった時間に応じて、上限額を超えない範囲で請求されます。" />
             </div>
           )}
           {payload.due && (
@@ -530,8 +532,9 @@ export function RequestCard({
                     今回はスキップ
                   </button>
                 </div>
-                <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>
-                  星もひとことも、まず運営だけが受け取ります。担当者に直接は届きません。お伝えしたほうがよい内容は運営が判断してお伝えします。
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, color: "var(--color-neutral-600)" }}>
+                  評価は担当者には直接届きません
+                  <InfoTooltip text="星もひとことも、まず運営だけが受け取ります。お伝えしたほうがよい内容は運営が判断してお伝えします。" />
                 </div>
               </div>
             )}

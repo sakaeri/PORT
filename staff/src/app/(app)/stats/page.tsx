@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { headingWeight } from "@/lib/style";
+import InfoTooltip from "@/components/InfoTooltip";
 import type { MonthBreakdown, MonthRow } from "@/components/MonthlyMenuBreakdown";
 import DepartmentStatsList, { type DepartmentStat } from "@/components/DepartmentStatsList";
 import type { StaffRole } from "@/lib/supabase/types";
@@ -35,6 +36,9 @@ export default async function StatsPage() {
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>
       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>
         売上・実績　<span style={{ fontSize: 15, color: "var(--color-neutral-500)" }}>{`${year}年${month}月`}</span>
+        <span style={{ marginLeft: 8, verticalAlign: "middle" }}>
+          <InfoTooltip text="実績金額は、入金日ではなく完了報告を出した（完了した）月を基準に集計しています。行をタップするとその案件トークに移動します。" />
+        </span>
       </div>
       <OrgStats orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} viewerRole={ctx.role} viewerUserId={ctx.userId} />
     </div>
@@ -161,10 +165,6 @@ async function OrgStats({ orgId, orgDisplayName, viewerRole, viewerUserId }: { o
       </div>
 
       <DepartmentStatsList departments={stats} canEditRoyalty={viewerRole === "owner"} />
-
-      <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-        実績金額は、入金日ではなく完了報告を出した（完了した）月を基準に集計しています。行をタップするとその案件トークに移動します。
-      </div>
     </>
   );
 }

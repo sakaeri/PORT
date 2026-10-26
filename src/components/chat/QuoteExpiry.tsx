@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import InfoTooltip from "@/components/chat/InfoTooltip";
 
 // 立替の見積もりの有効期限（requests.quote_expires_at）までの残り時間。
 // サーバーで描いた時刻と食い違わないよう、時計はブラウザで動き出してから使う。
@@ -34,11 +35,11 @@ export function QuoteExpiryLine({ expired, remaining }: { expired: boolean; rema
   }
   if (!remaining) return null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <div>
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span>
         有効期限：あと<span style={{ fontVariantNumeric: "tabular-nums", color: "var(--color-accent-300)" }}>{remaining}</span>
-      </div>
-      <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>※予約サイトの料金が変わる可能性があるため、期限内にご確定ください</div>
+      </span>
+      <InfoTooltip text="予約サイトの料金が変わる可能性があるため、期限内にご確定ください。" />
     </div>
   );
 }

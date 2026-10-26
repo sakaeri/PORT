@@ -185,9 +185,21 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
           }}
         >
             {sentTo ? (
-              <div style={{ fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>
-                {sentTo} 宛にメールをお送りしました。メール内のリンクを開くと{sentForReset ? "、新しいパスワードを設定できます。" : "ご利用いただけます。"}
-              </div>
+              <>
+                <div style={{ fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>
+                  {sentTo} 宛にメールをお送りしました。メール内のリンクを開くと{sentForReset ? "、新しいパスワードを設定できます。" : "ご利用いただけます。"}
+                </div>
+                {/* アドレスの打ち間違いや、メールが届かないときに入力画面へ戻れるように。 */}
+                <button
+                  onClick={() => {
+                    setSentTo("");
+                    setSentForReset(false);
+                  }}
+                  style={{ alignSelf: "center", padding: 4, cursor: "pointer", fontSize: 12, color: "var(--color-accent)", background: "transparent", border: "none", textDecoration: "underline" }}
+                >
+                  アドレスを直す・もう一度送る
+                </button>
+              </>
             ) : (
               <>
                 <div style={{ fontSize: 12.5, lineHeight: 1.7, textAlign: "center", opacity: 0.75 }}>

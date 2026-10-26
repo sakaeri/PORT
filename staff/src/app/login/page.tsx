@@ -121,7 +121,7 @@ export default function LoginPage() {
           boxShadow: "var(--shadow-lg)",
         }}
       >
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>PORT 受付</div>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>中央秘書事務所 本部</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <label style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>メールアドレス</label>
           <input

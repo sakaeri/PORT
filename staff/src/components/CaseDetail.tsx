@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Archive, ArrowCounterClockwise, Star, Plus, X, Paperclip, CircleNotch, FilePdf, Image as ImageIcon } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
+import InfoTooltip from "@/components/InfoTooltip";
 import { errorMessage, unwrap } from "@/lib/errors";
 import { CADENCE_LABEL, PAYMENT_TIMING_LABEL, PHASE_LABEL } from "@/lib/stage";
 import {
@@ -226,8 +227,9 @@ export default function CaseDetail({
         {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
 
         {request.phase === "quoted" && (
-          <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
-            依頼主がチャージ残高から直接お支払いいただくと、着手待ち（準備中）になります。着手はこの後、担当者が「着手する」を押して開始してください。
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-500)" }}>
+            依頼主のお支払い待ち
+            <InfoTooltip text="依頼主がチャージ残高から直接お支払いいただくと、着手待ち（準備中）になります。着手はこの後、担当者が「着手する」を押して開始してください。" />
           </div>
         )}
 
@@ -518,8 +520,9 @@ function CompletionReportForm({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {!canSendDirectly && (
-        <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-          提出すると秘書・本部メンバーの確認待ちになります。承認されるまで依頼主には送られません。
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
+          秘書・本部の確認後に依頼主へ送られます
+          <InfoTooltip text="提出すると秘書・本部メンバーの確認待ちになります。承認されるまで依頼主には送られません。" />
         </div>
       )}
       <textarea
