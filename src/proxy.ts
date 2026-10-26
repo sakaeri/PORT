@@ -9,19 +9,17 @@ import { NextResponse, type NextRequest } from "next/server";
 // customer's data to the org they're actually visiting, even if the same
 // login is also a customer of other orgs.
 //
-// Org resolution: a new org normally needs no Vercel/DNS work at all — it's
-// reached at /<slug> on the existing domain (e.g. port.example.com/a-company),
-// resolved from the first path segment and internally rewritten to "/" so
-// page.tsx doesn't need to know about it. A custom domain (org_id_by_domain)
-// is only for a future case where a company wants their own domain instead.
-// アプリ自身のページ。事業所・窓口の合言葉としては使えない。
+// 事業所は中央秘書事務所の1つだけ（org_id_by_domain が既定の事業所を返す）。
+// 先頭のパス（/teera など）が問い合わせ窓口の合言葉なら、"/" に内部で
+// 書き換えて窓口として表示する。
+// アプリ自身のページ。窓口の合言葉としては使えない。
 const RESERVED_SEGMENTS = new Set(["auth", "terms", "api", "manifest.webmanifest"]);
 
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
 
   // Rewriting to "/" keeps the visible URL as /<slug> while page.tsx renders
-  // unchanged; the org comes from the x-vid-org header either way.
+  // unchanged.
   let targetUrl: URL | null = null;
   // Cookie writes from the Supabase client are collected here and applied to
   // the response once, at the very end — the response itself is only built
@@ -47,25 +45,20 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  // 問い合わせ窓口（inquiry_desks）は外から偽れないよう、毎回ここで決め直す。
+  // 事業所・問い合わせ窓口は外から偽れないよう、毎回ここで決め直す。
+  requestHeaders.delete("x-vid-org");
   requestHeaders.delete("x-vid-desk");
   requestHeaders.delete("x-vid-desk-slug");
 
   const firstSegment = request.nextUrl.pathname.split("/")[1] || "";
   let orgId: string | null = null;
-  if (firstSegment) {
-    orgId = (await supabase.rpc("org_id_by_slug", { p_slug: firstSegment })).data;
-    // 事業所でなければ、中央秘書が引き受けている問い合わせ窓口（/teera など）かを見る。
-    if (!orgId && !RESERVED_SEGMENTS.has(firstSegment)) {
-      const { data: desks } = await supabase.rpc("desk_by_slug", { p_slug: firstSegment });
-      const desk = desks?.[0];
-      if (desk) {
-        orgId = desk.org_id;
-        requestHeaders.set("x-vid-desk", desk.id);
-        requestHeaders.set("x-vid-desk-slug", firstSegment);
-      }
-    }
-    if (orgId) {
+  if (firstSegment && !RESERVED_SEGMENTS.has(firstSegment)) {
+    const { data: desks } = await supabase.rpc("desk_by_slug", { p_slug: firstSegment });
+    const desk = desks?.[0];
+    if (desk) {
+      orgId = desk.org_id;
+      requestHeaders.set("x-vid-desk", desk.id);
+      requestHeaders.set("x-vid-desk-slug", firstSegment);
       targetUrl = request.nextUrl.clone();
       targetUrl.pathname = "/" + request.nextUrl.pathname.split("/").slice(2).join("/");
     }

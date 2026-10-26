@@ -38,14 +38,11 @@ export async function completeAnonymousEntry(turnstileToken: string) {
   if (error) throw error;
 }
 
-// 新規の問い合わせ・返信など、事業所にとって新しいやり取りを生む操作専用。
-// トライアル終了・支払い滞納などでロック中の窓口では使えない
-// （過去のやり取りの閲覧や、キャンセル・評価などの既存のやり取りの後始末は
-// requireContext() のままブロックしない）。
+// 新規の問い合わせ・返信など、新しいやり取りを生む操作専用。
+// 受付を止めた問い合わせ窓口では使えない。
 async function requireActiveContext() {
   const ctx = await requireContext();
   if (ctx.closedDeskName) throw new Error("ただいまこの窓口は受付をお休みしています。");
-  if (ctx.orgLocked) throw new Error("現在この窓口は新しいお問い合わせを受け付けておりません。しばらくしてから再度お試しください。");
   return ctx;
 }
 

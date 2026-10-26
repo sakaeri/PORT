@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, ChatsCircle, ChartBar, UsersThree, GearSix, Buildings, Sun, MoonStars, SignOut, List, X, PencilSimple, ListChecks } from "@phosphor-icons/react";
+import { Users, ChatsCircle, ChartBar, UsersThree, GearSix, Sun, MoonStars, SignOut, List, X, PencilSimple, ListChecks } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { headingWeight } from "@/lib/style";
-import OrgSwitcher from "@/components/OrgSwitcher";
-import BillingModal from "@/components/BillingModal";
 import Modal from "@/components/Modal";
 import AccountSettingsPanel from "@/components/AccountSettingsPanel";
 import Avatar, { avatarInitial } from "@/components/Avatar";
@@ -26,7 +24,6 @@ const NAV = [
   // 売上・実績とメニュー管理は本部（オーナー）だけ。秘書・スタッフには出さない。
   { href: "/stats", label: "売上・実績", icon: ChartBar, ownerOnly: true },
   { href: "/menu", label: "メニュー管理", icon: GearSix, ownerOnly: true },
-  { href: "/orgs", label: "事業者管理", icon: Buildings, hqOnly: true },
 ];
 
 export default function Shell({ ctx, children }: { ctx: StaffContext; children: React.ReactNode }) {
@@ -37,31 +34,13 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   const [myName, setMyName] = useState(ctx.displayName);
   const [myAvatarUrl, setMyAvatarUrl] = useState(ctx.avatarUrl);
   const [showMyName, setShowMyName] = useState(false);
-  // 事業者ごとの未読件数。今開いている事業者だけでなく、リンクしている
-  // 他の事業者の分もまとめて持っておき、事業者切替の▼に出す（is_staff_of()の
-  // RLSにより、ヘッダーを切り替えなくても他の自分の事業者は読める）。
-  const [orgUnreadCounts, setOrgUnreadCounts] = useState<Record<string, number>>({});
-  const unreadCount = orgUnreadCounts[ctx.orgId] ?? 0;
-
-  const prevOrgIdRef = useRef(ctx.orgId);
+  const [unreadCount, setUnreadCount] = useState(0);
   useEffect(() => {
-    // 事業者を切り替えた直後、前の事業者の件数が新しい件数を取得するまで
-    // 一瞬残って見えてしまうのを防ぐ（切替時だけ一旦クリアする。同じ事業者内の
-    // ページ遷移では毎回リセットしない — ちらつきの原因になるため）。
-    if (prevOrgIdRef.current !== ctx.orgId) {
-      prevOrgIdRef.current = ctx.orgId;
-      setOrgUnreadCounts({});
-    }
     const supabase = createClient(ctx.orgId);
     let cancelled = false;
     async function refreshUnread() {
-      const results = await Promise.all(
-        ctx.orgs.map(async (o) => {
-          const { data } = await supabase.rpc("unread_customer_count", { p_org_id: o.orgId });
-          return [o.orgId, typeof data === "number" ? data : 0] as const;
-        }),
-      );
-      if (!cancelled) setOrgUnreadCounts(Object.fromEntries(results));
+      const { data } = await supabase.rpc("unread_customer_count", { p_org_id: ctx.orgId });
+      if (!cancelled) setUnreadCount(typeof data === "number" ? data : 0);
     }
     void refreshUnread();
     const channel = supabase
@@ -76,7 +55,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       clearInterval(interval);
     };
     // pathname included so navigating away from a thread (which marks it read) re-checks the count
-  }, [ctx.orgId, ctx.orgs, pathname]);
+  }, [ctx.orgId, pathname]);
 
   // 「案件トーク」ナビの赤丸：未着手（支払い済み・未着手）／着手後で報告の
   // 目安時間まで残り15分以内（経過済みも含む）、のいずれかに当たる案件の件数。
@@ -144,32 +123,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   }
 
   const isOwner = ctx.role === "owner" || ctx.role === "reception";
-  const navItems = NAV.filter((n) => !("hqOnly" in n && n.hqOnly && !ctx.isHq) && !("hideWhenStaff" in n && n.hideWhenStaff && ctx.role === "dept_leader") && !("ownerOnly" in n && n.ownerOnly && !isOwner));
-
-  // Date.now() はレンダー中に直接呼べない（純粋関数のルール）ため、
-  // マウント後にeffectで計算する。初回描画では null のままバナーを出さない。
-  const [daysUntilTrialEnd, setDaysUntilTrialEnd] = useState<number | null>(null);
-  useEffect(() => {
-    if (!ctx.trialEndsOn) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a prop-derived, clock-dependent value that can't be computed during render
-      setDaysUntilTrialEnd(null);
-      return;
-    }
-    setDaysUntilTrialEnd(Math.ceil((new Date(ctx.trialEndsOn).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
-  }, [ctx.trialEndsOn]);
-  const trialEndingSoon = !ctx.isHq && ctx.planStatus === "trial" && daysUntilTrialEnd != null && daysUntilTrialEnd >= 0 && daysUntilTrialEnd <= 5;
-
-  const [showBillingModal, setShowBillingModal] = useState(false);
-  const bannerBtnStyle: React.CSSProperties = { display: "block", width: "100%", padding: "9px var(--space-4)", cursor: "pointer", fontSize: 12.5, textAlign: "center", border: "none" };
-  const billingBanner = ctx.isLocked ? (
-    <button onClick={() => setShowBillingModal(true)} style={{ ...bannerBtnStyle, color: "var(--color-bg)", background: "var(--stb-seal-ink)" }}>
-      お支払い状況の確認が必要です。新しいお問い合わせ・返信ができません。お支払い方法を登録してください →
-    </button>
-  ) : trialEndingSoon ? (
-    <button onClick={() => setShowBillingModal(true)} style={{ ...bannerBtnStyle, color: "var(--color-accent-100)", background: "var(--color-accent-800)" }}>
-      {daysUntilTrialEnd === 0 ? "本日" : `あと${daysUntilTrialEnd}日で`}トライアルが終了します。お支払い方法を登録してください →
-    </button>
-  ) : null;
+  const navItems = NAV.filter((n) => !("hideWhenStaff" in n && n.hideWhenStaff && ctx.role === "dept_leader") && !("ownerOnly" in n && n.ownerOnly && !isOwner));
 
   const sidebarBody = (
     <>
@@ -179,7 +133,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
           <img src="/logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <OrgSwitcher orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} orgs={ctx.orgs} unreadCounts={orgUnreadCounts} />
+          <div style={{ padding: "8px 0 6px", fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, color: "var(--color-nav-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ctx.orgDisplayName}</div>
         </div>
       </div>
 
@@ -326,10 +280,8 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
         )}
 
         <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div className="app-shell-chrome">{billingBanner}</div>
           <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
         </main>
-        {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
         {showMyName && (
           <Modal onClose={() => setShowMyName(false)} maxWidth={440}>
             <AccountSettingsPanel
@@ -369,10 +321,8 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div className="app-shell-chrome">{billingBanner}</div>
         <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
       </main>
-      {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
       {showMyName && (
         <Modal onClose={() => setShowMyName(false)} maxWidth={440}>
           <AccountSettingsPanel

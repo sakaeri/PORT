@@ -6,15 +6,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // client app) — this just refreshes the session cookie and sends anyone
 // without a session to /login. Role checking (owner/reception only) happens
 // in the authenticated layout, since it needs a DB read.
-//
-// Also forwards the staff_org_id cookie (set by the sidebar org switcher,
-// see switchStaffOrg()) as an x-vid-org header, the same mechanism the
-// client app uses, so one login can act as staff of more than one org
-// (see 20260914000002_staff_multi_org.sql).
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
-  const currentOrgId = request.cookies.get("staff_org_id")?.value;
-  if (currentOrgId) requestHeaders.set("x-vid-org", currentOrgId);
 
   // Cookie writes from the Supabase client are collected here and applied
   // once, at the end, after the response is built from the finalized
@@ -45,13 +38,11 @@ export async function proxy(request: NextRequest) {
   // /join: スタッフの招待リンク（招待された本人はまだログインしていない）。
   // /auth/confirm: パスワード再設定リンクの着地点（まだセッションが無い状態で来る）。
   // /reset-password: 再設定リンクを踏んだ直後の、新しいパスワードを設定する画面。
-  // /api/stripe-webhook: Stripeサーバーからの通知（ログインセッションを持たない）。
   const isPublicRoute =
     isLoginRoute ||
     request.nextUrl.pathname.startsWith("/join") ||
     request.nextUrl.pathname.startsWith("/auth/confirm") ||
     request.nextUrl.pathname.startsWith("/reset-password") ||
-    request.nextUrl.pathname.startsWith("/api/stripe-webhook") ||
     // ホーム画面に追加するときの設定ファイル。ブラウザはログイン情報なしで取りに来る。
     request.nextUrl.pathname === "/manifest.webmanifest";
 

@@ -1,28 +1,16 @@
 "use server";
 
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
-import { getOrCreateReferralCoupon, getStripe, markReferralCreditConsumed, pickAvailableReferralCredit } from "@/lib/stripe";
 import { isCustomerCaughtUp, notifyCustomerCompletionReport, notifyCustomerNewMessage, notifyCustomerQuoteCreated } from "@/lib/notify";
 import type { StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
 import { advanceFee, ADVANCE_FEE_RATE, ADVANCE_VALID_MINUTES } from "@/lib/advance";
 import { TASK_EXAMPLES } from "@/lib/task-examples";
 
-// allowLocked: トライアル終了・支払い滞納などでソフトロック中でも許可したい操作
-// （キャンセル処理や、支払い設定そのものなど）用。既定はロック中なら弾く。
-async function requireContext(opts?: { allowLocked?: boolean }) {
+async function requireContext() {
   const ctx = await getStaffContext();
   if (!ctx) throw new Error("権限がありません");
-  if (ctx.isLocked && !opts?.allowLocked) {
-    throw new Error("お支払い状況の確認が必要です。ご利用の継続には「お支払い設定」からお手続きください。");
-  }
-  return ctx;
-}
-
-async function requireHq() {
-  const ctx = await requireContext();
-  if (!ctx.isHq) throw new Error("権限がありません");
   return ctx;
 }
 
@@ -35,102 +23,10 @@ function requireDeletePermission(ctx: { role: string }) {
   }
 }
 
-async function requireContextWithDelete(opts?: { allowLocked?: boolean }) {
-  const ctx = await requireContext(opts);
+async function requireContextWithDelete() {
+  const ctx = await requireContext();
   requireDeletePermission(ctx);
   return ctx;
-}
-
-// ============================================================
-// PORT利用料の決済（Stripe）。オーナーのみ。支払い設定そのものなので
-// ロック中（トライアル終了・支払い滞納）でも呼べる必要がある（allowLocked）。
-// 席数（seats）は制作者機能が未実装のため常に0 — 今は基本料(base_fee)だけを
-// 請求する。制作者機能ができたら席数分の従量課金の行を追加する。
-// ============================================================
-export async function startSubscriptionSetup() {
-  const ctx = await requireContext({ allowLocked: true });
-  if (ctx.role !== "owner" && !(ctx.isHq && ctx.role === "dept_manager")) {
-    throw new Error("お支払い設定の変更は本部のみ行えます");
-  }
-
-  const stripe = getStripe();
-  const supabase = await createClient();
-  const { data: org, error } = await supabase
-    .from("organizations")
-    .select("base_fee, email, display_name, stripe_customer_id, stripe_subscription_id")
-    .eq("id", ctx.orgId)
-    .single();
-  if (error || !org) throw error ?? new Error("事業者情報を取得できませんでした");
-
-  const baseFee = org.base_fee;
-  const productId = process.env.STRIPE_PRODUCT_ID;
-  if (!productId) throw new Error("決済機能の準備ができていません。しばらくしてから再度お試しください。");
-
-  let customerId = org.stripe_customer_id;
-  if (!customerId) {
-    const customer = await stripe.customers.create({ name: org.display_name, email: org.email ?? undefined, metadata: { org_id: ctx.orgId } });
-    customerId = customer.id;
-    await supabase.from("organizations").update({ stripe_customer_id: customerId }).eq("id", ctx.orgId);
-  }
-
-  const admin = createServiceRoleClient();
-  // 確定済みの紹介チケットが残っていれば、新規作成するサブスクリプションに
-  // 最初から1ヶ月無料クーポンを組み込む（作成後にupdateすると初回請求には
-  // 間に合わないため、作成時に渡す必要がある）。
-  const availableCreditId = await pickAvailableReferralCredit(admin, ctx.orgId);
-  const couponId = availableCreditId ? await getOrCreateReferralCoupon(stripe) : null;
-
-  // confirmation_secret は latest_invoice を展開しただけでは含まれず、
-  // "latest_invoice.confirmation_secret" まで明示的にexpandしないと
-  // 返ってこない（invoiceが確定済み・請求額ありでもnullのままだった実例あり）。
-  const createFreshSubscription = async () => {
-    const sub = await stripe.subscriptions.create({
-      customer: customerId!,
-      items: [{ price_data: { currency: "jpy", product: productId, unit_amount: baseFee, recurring: { interval: "month" } } }],
-      payment_behavior: "default_incomplete",
-      payment_settings: { save_default_payment_method: "on_subscription" },
-      ...(couponId ? { coupon: couponId } : {}),
-      expand: ["latest_invoice.confirmation_secret"],
-    });
-    await supabase.from("organizations").update({ stripe_subscription_id: sub.id }).eq("id", ctx.orgId);
-    return sub;
-  };
-
-  let subscription = org.stripe_subscription_id
-    ? await stripe.subscriptions.retrieve(org.stripe_subscription_id, { expand: ["latest_invoice.confirmation_secret"] })
-    : null;
-
-  // すでに支払い済みで有効なら、カード入力フォームを出す必要はない
-  // （Payment Elementのconfirmを"redirect: if_required"で行っても、
-  // Webhookでplan_statusが反映されるまでの一瞬だけこの画面が再読み込みされる
-  // ことがあるため、その場合は「既に完了しています」を返す）。
-  if (subscription && (subscription.status === "active" || subscription.status === "trialing")) {
-    return { status: "active" as const };
-  }
-
-  // 存在しない、または解約済み・期限切れなら新しく作り直す。
-  // incomplete・past_due・unpaid などは既存のものをそのまま使い回す
-  // （新しく作ると二重にサブスクリプションができてしまうため）。
-  const needsFresh = !subscription || subscription.status === "canceled" || subscription.status === "incomplete_expired";
-  if (needsFresh) {
-    subscription = await createFreshSubscription();
-    if (availableCreditId) await markReferralCreditConsumed(admin, availableCreditId);
-  }
-  if (!subscription) throw new Error("決済の準備に失敗しました");
-
-  const invoice = subscription.latest_invoice;
-  const clientSecret = invoice && typeof invoice === "object" ? invoice.confirmation_secret?.client_secret : null;
-  if (!clientSecret) {
-    // expand指定を変えても直らない場合の切り分け用に、invoiceの中身を全部出す。
-    console.error("startSubscriptionSetup: confirmation_secret missing", {
-      subscriptionId: subscription.id,
-      subscriptionStatus: subscription.status,
-      invoiceRaw: JSON.stringify(invoice),
-    });
-    throw new Error("決済の準備に失敗しました");
-  }
-
-  return { status: "needs_payment" as const, clientSecret };
 }
 
 // org_write ポリシーは owner のみ更新可（reception は不可）。RLS は該当行が
@@ -391,25 +287,7 @@ export async function deleteReportFieldPreset(id: string) {
   if (error) throw error;
 }
 
-// ============================================================
-// 新規事業者アカウント作成（PORT本部のみ）
-// ============================================================
-interface OrgFields {
-  name: string;
-  display_name: string;
-  rep_name: string;
-  tel: string;
-  email: string;
-  slug: string;
-}
-
-interface OrgAccountFields extends OrgFields {
-  owner_email: string;
-  owner_password: string;
-  owner_display_name: string;
-}
-
-// 依頼主アプリのページ名。事業所・問い合わせ窓口の合言葉には使えない（src/proxy.ts と合わせる）。
+// 依頼主アプリのページ名。問い合わせ窓口の合言葉には使えない（src/proxy.ts と合わせる）。
 const RESERVED_SLUGS = new Set(["auth", "terms", "api"]);
 
 function validateSlug(rawSlug: string) {
@@ -418,195 +296,6 @@ function validateSlug(rawSlug: string) {
     throw new Error("URLの合言葉は半角英数字とハイフンのみ・2〜40文字で入力してください");
   }
   return slug;
-}
-
-// 事業者の行＋既定のキャンセル/返金ポリシーを作るだけの部分。オーナーの
-// ログインをどう用意するか（新規作成 or 今のログインに追加）は呼び出し側で分ける。
-// 人間秘書の契約が決まってから本部が作るアカウントなので、無料トライアルは
-// 挟まず最初から契約中（active）として作る。支払いが滞ったら本部が
-// setOrgLockState で手動でロックする。
-async function createOrgRow(fields: OrgFields, admin: ReturnType<typeof createServiceRoleClient>) {
-  const slug = validateSlug(fields.slug);
-  if (!fields.display_name.trim()) {
-    throw new Error("表示名は必須です");
-  }
-  // 正式名称は「窓口を追加」系の簡易フォームでは入力欄自体を出していないため、
-  // 空欄なら表示名をそのまま使う。あとから会社情報タブで正式なものに直せる。
-  const name = fields.name.trim() || fields.display_name.trim();
-
-  const { data: existing } = await admin.from("organizations").select("id").eq("slug", slug).maybeSingle();
-  const { data: deskWithSlug } = await admin.from("inquiry_desks").select("id").eq("slug", slug).maybeSingle();
-  if (existing || deskWithSlug) throw new Error("このURLの合言葉はすでに使われています");
-
-  const { data: org, error: orgErr } = await admin
-    .from("organizations")
-    .insert({
-      name,
-      display_name: fields.display_name.trim(),
-      rep_name: fields.rep_name.trim() || null,
-      tel: fields.tel.trim() || null,
-      email: fields.email.trim() || null,
-      slug,
-      solo: true,
-      plan_status: "active",
-    })
-    .select("id")
-    .single();
-  if (orgErr || !org) throw orgErr ?? new Error("事業者を作成できませんでした");
-
-  return { orgId: org.id as string, slug };
-}
-
-async function createOrgCore(fields: OrgAccountFields) {
-  if (fields.owner_password.length < 8) {
-    throw new Error("パスワードは8文字以上にしてください");
-  }
-  if (!fields.owner_email.trim()) {
-    throw new Error("オーナーのメールアドレスは必須です");
-  }
-
-  const admin = createServiceRoleClient();
-
-  const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
-    email: fields.owner_email.trim(),
-    password: fields.owner_password,
-    email_confirm: true,
-  });
-  if (userErr || !userRes.user) {
-    throw new Error(userErr?.message.includes("already been registered") ? "このメールアドレスはすでに使われています" : (userErr?.message ?? "アカウントを作成できませんでした"));
-  }
-  const userId = userRes.user.id;
-
-  // 連絡用メールアドレスが空欄なら、ログインメールアドレスをそのまま代わりに
-  // 使う（Stripeの領収書送付先にもなる）。あとから会社情報タブで正式な
-  // ものに直せる。正式名称の表示名からのフォールバックは createOrgRow 側で行う。
-  const orgFields = {
-    ...fields,
-    email: fields.email.trim() || fields.owner_email.trim(),
-  };
-
-  let result: { orgId: string; slug: string };
-  try {
-    result = await createOrgRow(orgFields, admin);
-  } catch (e) {
-    await admin.auth.admin.deleteUser(userId);
-    throw e;
-  }
-
-  const { error: profileErr } = await admin.from("profiles").insert({
-    id: userId,
-    org_id: result.orgId,
-    role: "owner",
-    display_name: fields.owner_display_name.trim() || fields.rep_name.trim() || fields.display_name.trim(),
-  });
-  if (profileErr) {
-    await admin.from("organizations").delete().eq("id", result.orgId);
-    await admin.auth.admin.deleteUser(userId);
-    throw profileErr;
-  }
-
-  return result;
-}
-
-export async function createOrgAccount(fields: OrgAccountFields) {
-  await requireHq();
-  return createOrgCore(fields);
-}
-
-// 依頼主一覧の問い合わせ行から、そのままその依頼主を新しい事業者として
-// 登録する。作成ロジックは createOrgAccount と共通（createOrgCore）で、
-// 追加で customers.converted_org_id を紐付けて「どの問い合わせがどの事業者
-// になったか」を追跡できるようにする。
-export async function convertCustomerToOrg(customerId: string, fields: OrgAccountFields) {
-  const ctx = await requireHq();
-  const result = await createOrgCore(fields);
-
-  const admin = createServiceRoleClient();
-  const { error } = await admin
-    .from("customers")
-    .update({ converted_org_id: result.orgId })
-    .eq("id", customerId)
-    .eq("org_id", ctx.orgId);
-  if (error) throw error;
-
-  return result;
-}
-
-// ============================================================
-// 複数窓口（1つのログインで複数事業者のスタッフを兼任する）
-// ============================================================
-
-// 新しいログインを作らず、今ログイン中の自分をそのまま新しい事業者の
-// オーナーとして追加する。事業者を複数運営したい人向け。owner だけに許可
-// する（reception が勝手に窓口を増やせると困るため）。
-// サイドバーの窓口切替。my_staff_orgs() に含まれる事業者かどうかはRLS側
-// （auth_role()/is_office() が該当なしなら null/false になる）で担保される
-// ため、ここでは単に選んだ事業者IDをCookieに保存するだけでよい。
-export async function switchStaffOrg(orgId: string) {
-  await requireContext();
-  const jar = await cookies();
-  jar.set("staff_org_id", orgId, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
-}
-
-// staff_org_id が今消した事業者を指していたら、次回そのまま見に行って
-// 「権限がありません」にならないよう、既定（自分のプロフィール本体の
-// 事業者）に戻す。
-async function clearStaffOrgCookieIfCurrent(orgId: string) {
-  const jar = await cookies();
-  if (jar.get("staff_org_id")?.value === orgId) jar.delete("staff_org_id");
-}
-
-// ログアウト時に呼ぶ。staff_org_id はhttpOnlyなのでクライアント側から消せず、
-// signOut() だけでは残ってしまう。残ったまま別アカウントで再ログインすると、
-// auth_org() がそのCookieの事業者IDを優先してしまい（新しいアカウントには
-// その事業者への権限がないため）「受付画面の権限がありません」になる。
-export async function clearStaffOrgCookie() {
-  const jar = await cookies();
-  jar.delete("staff_org_id");
-}
-
-// 事業者の完全削除（PORT本部のみ）。他社の事業者を丸ごと畳むためのもの。
-// organizations 以下は on delete cascade で依頼主・案件・トークなど全て
-// 連鎖削除される。専用のオーナーログイン（事業者管理・依頼主変換で作った
-// もの）があれば、その auth ユーザーごと削除して迷子のログインを残さない。
-export async function deleteOrgForHq(orgId: string) {
-  await requireHq();
-  const admin = createServiceRoleClient();
-
-  const { data: primaryProfile } = await admin.from("profiles").select("id").eq("org_id", orgId).maybeSingle();
-
-  const { error } = await admin.from("organizations").delete().eq("id", orgId);
-  if (error) throw error;
-
-  if (primaryProfile) await admin.auth.admin.deleteUser(primaryProfile.id);
-  await clearStaffOrgCookieIfCurrent(orgId);
-}
-
-// マネージャー（FC）からのロイヤリティ等の未払いを、本部が手動でロック/解除する。
-// 自動トライアル失効の代わりに、この手動フラグだけで isLocked を制御する
-// （getStaffContext の isLocked 判定は元々 plan_status を見ているので、
-// ここでは active⇄paused を切り替えるだけでよい）。
-export async function setOrgLockState(orgId: string, locked: boolean) {
-  await requireHq();
-  const admin = createServiceRoleClient();
-  const { error } = await admin
-    .from("organizations")
-    .update({ plan_status: locked ? "paused" : "active" })
-    .eq("id", orgId);
-  if (error) throw error;
-}
-
-// 依頼主から本部への「ご意見・ご要望」を既読にする。
-export async function markHqFeedbackRead(feedbackId: string) {
-  await requireHq();
-  const admin = createServiceRoleClient();
-  const { error } = await admin.from("hq_feedback").update({ read_at: new Date().toISOString() }).eq("id", feedbackId);
-  if (error) throw error;
 }
 
 // staff_alias（スタッフ）と同じ発想：依頼主本人が自由に変えられる name とは
@@ -1078,7 +767,7 @@ export async function approveCaseReport(requestId: string) {
 
 // 見積もり段階（まだ入金前）の見送り。費用が発生していないので即確定でよい。
 export async function declineQuote(requestId: string) {
-  const ctx = await requireContext({ allowLocked: true });
+  const ctx = await requireContext();
   const supabase = await createClient();
 
   const { data: r, error: fetchError } = await supabase.from("requests").select("phase").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();

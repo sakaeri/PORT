@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowSquareOut, Buildings } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { archiveThread, unarchiveThread, deleteCustomer } from "@/app/actions";
 import type { Department } from "@/components/StaffAdmin";
@@ -17,7 +16,6 @@ interface CustomerRow {
   memberNo: string | null;
   avatarUrl: string | null;
   active: boolean;
-  convertedOrg: { displayName: string; slug: string | null } | null;
   thread: { id: string; archived: boolean } | null;
   departmentId: string | null;
   deskName: string | null;
@@ -32,13 +30,11 @@ const yen = new Intl.NumberFormat("ja-JP");
 
 export default function CustomersList({
   rows: initialRows,
-  isHq,
   orgId,
   departments: initialDepartments,
   orgDisplayName,
 }: {
   rows: CustomerRow[];
-  isHq: boolean;
   orgId: string;
   departments: Department[];
   // 窓口（秘書）未設定の分は、事業所全体の担当としてこの名前でくくる。
@@ -177,17 +173,6 @@ export default function CustomersList({
                 </div>
               )}
             </Link>
-            {isHq && c.convertedOrg && (
-              <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, color: "var(--color-accent-200)" }}>
-                <Buildings size={14} />
-                {c.convertedOrg.displayName} として登録済み
-                {c.convertedOrg.slug && (
-                  <a href={`https://port.s-stylegolf.com/${c.convertedOrg.slug}`} target="_blank" rel="noreferrer" style={{ display: "flex", color: "var(--color-neutral-400)" }} aria-label="サイトを開く">
-                    <ArrowSquareOut size={13} />
-                  </a>
-                )}
-              </div>
-            )}
             <RowKebabMenu
               archived={c.thread?.archived}
               onToggleArchive={c.thread ? () => toggleArchive(c) : undefined}

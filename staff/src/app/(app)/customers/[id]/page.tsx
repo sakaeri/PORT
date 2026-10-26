@@ -54,7 +54,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, name, staff_label, member_no, balance, converted_org_id, converted_org:organizations!customers_converted_org_id_fkey(display_name, slug)")
+      .select("id, name, staff_label, member_no, balance")
       .eq("id", id)
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
@@ -85,8 +85,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ]);
 
   if (!customer) notFound();
-  const convertedOrgRaw = Array.isArray(customer.converted_org) ? customer.converted_org[0] : customer.converted_org;
-  const convertedOrg = convertedOrgRaw ? { displayName: convertedOrgRaw.display_name, slug: convertedOrgRaw.slug } : null;
 
   const templates = (templateRows ?? []).map((t) => ({
     id: t.id,
@@ -134,8 +132,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       currentUserId={ctx.userId}
       orgId={ctx.orgId}
       orgDisplayName={ctx.orgDisplayName}
-      isHq={ctx.isHq}
-      convertedOrg={convertedOrg}
       templates={templates}
       menus={menus}
       memos={memos}
