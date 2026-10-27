@@ -38,14 +38,6 @@ export async function completeAnonymousEntry(turnstileToken: string) {
   if (error) throw error;
 }
 
-// 新規の問い合わせ・返信など、新しいやり取りを生む操作専用。
-// 受付を止めた問い合わせ窓口では使えない。
-async function requireActiveContext() {
-  const ctx = await requireContext();
-  if (ctx.closedDeskName) throw new Error("ただいまこの窓口は受付をお休みしています。");
-  return ctx;
-}
-
 // 問い合わせ窓口（/teera など）でメールのリンクを送ったときは、リンクを開いた
 // あとも同じ窓口に戻す（auth/confirm がこの cookie を見て振り分ける）。
 async function rememberReturnPath() {
@@ -236,7 +228,7 @@ export async function sendMessage(text: string, attachments: { path: string; nam
 }
 
 async function sendMessageInner(text: string, attachments: { path: string; name: string; mime: string; bytes: number }[]) {
-  const ctx = await requireActiveContext();
+  const ctx = await requireContext();
   const supabase = await createClient();
   const trimmed = text.trim();
   if (!trimmed && attachments.length === 0) return;
@@ -277,7 +269,7 @@ export async function submitInfoRequestAnswer(formLabel: string, fields: { label
 }
 
 async function submitInfoRequestAnswerInner(formLabel: string, fields: { label: string; value: string }[], requestMessageId: string) {
-  const ctx = await requireActiveContext();
+  const ctx = await requireContext();
   const filled = fields.filter((f) => f.value.trim());
   if (!filled.length) throw new Error("1つ以上ご入力ください");
   const supabase = await createClient();
@@ -467,7 +459,7 @@ export async function payFromBalance(requestId: string) {
 }
 
 async function payFromBalanceInner(requestId: string) {
-  const ctx = await requireActiveContext();
+  const ctx = await requireContext();
   const supabase = await createClient();
   const { error } = await supabase.rpc("pay_request_from_balance", { p_request_id: requestId });
   if (error) throw error;
@@ -675,7 +667,7 @@ export async function sendHqMessage(body: string) {
 }
 
 async function sendHqMessageInner(body: string) {
-  const ctx = await requireActiveContext();
+  const ctx = await requireContext();
   const trimmed = body.trim();
   if (!trimmed) throw new Error("内容を入力してください");
   const admin = createServiceRoleClient();

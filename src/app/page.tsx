@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { deskTitle, getCustomerContext, getRequestBundles, getThreadMessages, hasAuthSession } from "@/lib/data";
+import { deskTitle, getClosedDeskName, getCustomerContext, getRequestBundles, getThreadMessages, hasAuthSession } from "@/lib/data";
 import ChatScreen from "@/components/chat/ChatScreen";
 import VerifyGate from "@/components/chat/VerifyGate";
 import AccountGate from "@/components/chat/AccountGate";
@@ -17,6 +17,19 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
   // なのにctxが取れない、本当の異常時だけに出す。
   if (!(await hasAuthSession())) {
     return <VerifyGate />;
+  }
+
+  // 受付を止めた問い合わせ窓口。新しい問い合わせは受けない。
+  const closedDeskName = await getClosedDeskName();
+  if (closedDeskName) {
+    return (
+      <main style={{ height: "100vh", display: "grid", placeItems: "center", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)", padding: 24, textAlign: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <div style={{ fontFamily: "var(--font-heading)", fontSize: 19 }}>{deskTitle(closedDeskName)}</div>
+          <div style={{ fontSize: 13.5, opacity: 0.85 }}>ただいま受付をお休みしています。</div>
+        </div>
+      </main>
+    );
   }
 
   const ctx = await getCustomerContext();
@@ -48,18 +61,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
             supabase/migrations が適用されているか確認してください）
           </div>
           <SignOutButton label="ログアウトしてやり直す" />
-        </div>
-      </main>
-    );
-  }
-
-  // 受付を止めた問い合わせ窓口。新しい問い合わせは受けない。
-  if (ctx.closedDeskName) {
-    return (
-      <main style={{ height: "100vh", display: "grid", placeItems: "center", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)", padding: 24, textAlign: "center" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <div style={{ fontFamily: "var(--font-heading)", fontSize: 19 }}>{deskTitle(ctx.closedDeskName)}</div>
-          <div style={{ fontSize: 13.5, opacity: 0.85 }}>ただいま受付をお休みしています。</div>
         </div>
       </main>
     );
