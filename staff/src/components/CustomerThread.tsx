@@ -480,7 +480,7 @@ const PHASE_BADGE_COLOR: Partial<Record<RequestPhase, { color: string; border: s
 };
 
 function QuoteBubble({ msg }: { msg: Message }) {
-  const p = msg.payload as { title?: string; note?: string; due?: string };
+  const p = msg.payload as { title?: string; note?: string; due?: string; dueDate?: string };
   const phase = msg.requestPhase;
   const badge = phase ? (PHASE_BADGE_COLOR[phase] ?? PHASE_BADGE_COLOR.quoted) : null;
 
@@ -497,7 +497,7 @@ function QuoteBubble({ msg }: { msg: Message }) {
       <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: headingWeight, lineHeight: 1.3 }}>{p.title}</div>
       {p.note && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{p.note}</div>}
       {msg.requestAmount != null && <div style={{ fontSize: 17, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{msg.requestAmount.toLocaleString("ja-JP")}</div>}
-      {p.due && <div style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>対応の目安：{p.due}</div>}
+      {p.due && <div style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>{p.dueDate ? `完了予定：${p.due}` : `対応の目安：${p.due}`}</div>}
 
       {phase === "completed" && msg.report && (
         <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
