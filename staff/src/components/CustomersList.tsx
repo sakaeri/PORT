@@ -47,13 +47,18 @@ export default function CustomersList({
   const [rows, setRows] = useState(initialRows);
   const [showArchived, setShowArchived] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
+  const [deskFilter, setDeskFilter] = useState<string>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const visible = rows
     .filter((c) => c.active || showArchived)
-    .filter((c) => departmentFilter === "all" || (departmentFilter === "none" ? c.departmentId === null : c.departmentId === departmentFilter));
+    .filter((c) => departmentFilter === "all" || (departmentFilter === "none" ? c.departmentId === null : c.departmentId === departmentFilter))
+    .filter((c) => deskFilter === "all" || (deskFilter === "none" ? c.deskName === null : c.deskName === deskFilter));
   const archivedCount = rows.filter((c) => !c.active).length;
   // 窓口未設定の依頼主は本部にしか見えないので、該当する行がある時だけ選択肢に出す。
   const filterOptions = [{ id: "all", name: "すべて" }, ...departments, ...(rows.some((r) => r.departmentId === null) ? [{ id: "none", name: orgDisplayName }] : [])];
+  // 問い合わせ窓口から来た依頼主がいるときだけ、窓口で絞り込めるようにする。
+  const deskNames = [...new Set(rows.flatMap((r) => (r.deskName ? [r.deskName] : [])))].sort();
+  const deskOptions = [{ id: "all", name: "すべての窓口" }, { id: "none", name: "いつものトーク" }, ...deskNames.map((n) => ({ id: n, name: n }))];
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from a server-refetched prop (router.refresh()), not state derived from other client state
@@ -115,7 +120,10 @@ export default function CustomersList({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <DepartmentFilterDropdown options={filterOptions} value={departmentFilter} onChange={setDepartmentFilter} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <DepartmentFilterDropdown options={filterOptions} value={departmentFilter} onChange={setDepartmentFilter} />
+        {deskNames.length > 0 && <DepartmentFilterDropdown options={deskOptions} value={deskFilter} onChange={setDeskFilter} />}
+      </div>
       {archivedCount > 0 && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
