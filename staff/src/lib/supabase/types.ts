@@ -189,6 +189,7 @@ export interface Database {
           auto_recharge_fail_count: number;
           converted_org_id: string | null;
           terms_accepted_at: string | null;
+          desk_id: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
@@ -625,8 +626,7 @@ export interface Database {
       org_id_by_slug: { Args: { p_slug: string }; Returns: string | null };
       desk_by_slug: { Args: { p_slug: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
       desk_by_id: { Args: { p_id: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
-      claim_desk_thread: { Args: { p_desk_id: string }; Returns: void };
-      ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
+      ensure_customer_for_org: { Args: { p_org_id: string; p_desk_id?: string }; Returns: string | null };
       finalize_hourly_billing: { Args: { p_request_id: string }; Returns: void };
       charge_subscription_occurrence: { Args: { p_subscription_id: string }; Returns: string | null };
       credit_auto_recharge: { Args: { p_customer_id: string; p_org_id: string; p_amount: number; p_stripe_payment_intent_id: string }; Returns: boolean };

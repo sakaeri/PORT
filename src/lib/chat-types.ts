@@ -81,6 +81,4 @@ export interface CustomerContext {
   autoRecharge: { enabled: boolean; threshold: number | null; amount: number | null; hasCard: boolean };
   // 問い合わせ窓口（TeeRA など）のトークのとき。チャットだけの画面になる。
   desk: { id: string; name: string; active: boolean } | null;
-  // 受付を止めた窓口のURLから、その窓口のトークを持たない人が来たとき（窓口名）。
-  closedDeskName: string | null;
 }

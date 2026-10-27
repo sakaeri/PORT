@@ -393,13 +393,16 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
   }
 
   async function commit(m: Menu) {
-    await saveOrAlert(() => updateMenu(m.id, { label: m.label, note: m.note ?? "", price: m.price, lead_hours: m.lead_hours, active: m.active, icon: m.icon }));
+    const leadHours = m.lead_hours > 0 ? m.lead_hours : 24;
+    if (leadHours !== m.lead_hours) patchLocal(m.id, { lead_hours: leadHours });
+    await saveOrAlert(() => updateMenu(m.id, { label: m.label, note: m.note ?? "", price: m.price, lead_hours: leadHours, active: m.active, icon: m.icon }));
   }
 
   return (
     <div style={card}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>受付メニュー</div>
+      {/* スマホでは見出しが縦に潰れないよう、ボタンは次の行に回す。 */}
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>受付メニュー</div>
         <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの秘書が対応するかは、依頼主の画面の「担当秘書」で割り当てます。編集は本部だけができます" />
         <div style={{ flex: 1 }} />
         {canEdit && (
@@ -446,7 +449,10 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                       <input value={m.label} onChange={(e) => patchLocal(m.id, { label: e.target.value })} onBlur={() => commit(m)} disabled={!canEdit} className="vid-input" style={input} />
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>請求金額（円・空欄なら相談項目として扱う）</span>
+                      <span style={{ ...label, display: "flex", alignItems: "center", gap: 6 }}>
+                        請求金額（円）
+                        <InfoTooltip text="空欄にすると「相談のみ」の項目になり、見積もりの選択肢には出てきません。" />
+                      </span>
                       <input
                         type="number"
                         value={m.price ?? ""}
@@ -462,7 +468,9 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                       <span style={label}>作業時間の目安（時間）</span>
                       <input
                         type="number"
-                        value={m.lead_hours}
+                        // 0 のときは空欄にして、消してから打ち直せるようにする（空のまま離れたら24時間）。
+                        value={m.lead_hours > 0 ? m.lead_hours : ""}
+                        placeholder="24"
                         onChange={(e) => patchLocal(m.id, { lead_hours: Number(e.target.value) })}
                         onBlur={() => commit(m)}
                         disabled={!canEdit}
@@ -494,6 +502,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                             placeItems: "center",
                             cursor: "pointer",
                             fontSize: 10,
+                            whiteSpace: "nowrap",
                             color: selectedIconName === null ? "var(--color-accent)" : "var(--color-neutral-500)",
                             background: selectedIconName === null ? "var(--color-accent-900)" : "transparent",
                             border: `1px solid ${selectedIconName === null ? "var(--color-accent)" : "var(--color-divider)"}`,
@@ -619,7 +628,7 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>返信テンプレ</div>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>返信テンプレ</div>
         <InfoTooltip text="受付がトークからワンタップで送る定型の返信です。項目を付けると依頼主が入力するフォームになります。" />
         <div style={{ flex: 1 }} />
         <button onClick={handleAdd} style={smallBtn}>
@@ -705,7 +714,7 @@ function TermsCard({ orgId, initialContent, canEdit }: { orgId: string; initialC
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>利用規約</div>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>利用規約</div>
         <InfoTooltip text="依頼主が新規登録のときに同意する利用規約の本文です（/terms に表示されます）。ここで直すとすぐに反映されます。法的な内容は専門家に確認することをおすすめします。" />
       </div>
       {!canEdit && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>利用規約の編集は本部のみ行えます。</div>}

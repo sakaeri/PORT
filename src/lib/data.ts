@@ -43,17 +43,18 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     return null;
   }
 
-  let customer = (
-    await supabase
-      .from("customers")
-      .select("id, org_id, name, member_no, balance, stripe_payment_method_id, auto_recharge_enabled, auto_recharge_threshold, auto_recharge_amount")
-      .eq("profile_id", auth.user.id)
-      .eq("org_id", orgId)
-      .maybeSingle()
-  ).data;
+  // 問い合わせ窓口のURL（/teera など）から来たら、いつものトークとは別の
+  // 「窓口の依頼主」の行とトークを使う（なければ ensure_customer_for_org が作る）。
+  const deskId = h.get("x-vid-desk");
+  const customerQuery = supabase
+    .from("customers")
+    .select("id, org_id, name, member_no, balance, stripe_payment_method_id, auto_recharge_enabled, auto_recharge_threshold, auto_recharge_amount, desk_id")
+    .eq("profile_id", auth.user.id)
+    .eq("org_id", orgId);
+  let customer = (await (deskId ? customerQuery.eq("desk_id", deskId) : customerQuery.is("desk_id", null)).maybeSingle()).data;
 
   if (!customer) {
-    const { data: newCustomerId, error } = await supabase.rpc("ensure_customer_for_org", { p_org_id: orgId });
+    const { data: newCustomerId, error } = await supabase.rpc("ensure_customer_for_org", { p_org_id: orgId, p_desk_id: deskId ?? undefined });
     if (error || !newCustomerId) {
       console.error("getCustomerContext: ensure_customer_for_org failed", { orgId, error });
       return null;
@@ -61,7 +62,7 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     customer = (
       await supabase
         .from("customers")
-        .select("id, org_id, name, member_no, balance, stripe_payment_method_id, auto_recharge_enabled, auto_recharge_threshold, auto_recharge_amount")
+        .select("id, org_id, name, member_no, balance, stripe_payment_method_id, auto_recharge_enabled, auto_recharge_threshold, auto_recharge_amount, desk_id")
         .eq("id", newCustomerId)
         .maybeSingle()
     ).data;
@@ -69,22 +70,6 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
   if (!customer) {
     console.error("getCustomerContext: customer row still missing after ensure_customer_for_org", { orgId, userId: auth.user.id });
     return null;
-  }
-
-  // 問い合わせ窓口のURL（/teera など）から入ったとき。まだ何も書いていないトークなら
-  // 窓口の印を付けて、その窓口の担当秘書に割り当てる（claim_desk_thread）。
-  let closedDeskName: string | null = null;
-  const deskSlug = h.get("x-vid-desk-slug");
-  if (deskSlug) {
-    const row = (await supabase.rpc("desk_by_slug", { p_slug: deskSlug })).data?.[0];
-    if (row && row.org_id === customer.org_id) {
-      if (row.active) {
-        const { error } = await supabase.rpc("claim_desk_thread", { p_desk_id: row.id });
-        if (error) console.error("getCustomerContext: claim_desk_thread failed", error);
-      } else {
-        closedDeskName = row.name;
-      }
-    }
   }
 
   const { data: thread } = await supabase
@@ -98,14 +83,12 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     return null;
   }
 
-  // 依頼主の画面（チャットだけになるか）は、URLではなくトークが窓口のものかで決まる。
+  // 窓口の依頼主なら、チャットだけの画面にする。
   let desk: CustomerContext["desk"] = null;
-  if (thread.desk_id) {
-    const row = (await supabase.rpc("desk_by_id", { p_id: thread.desk_id })).data?.[0];
+  if (customer.desk_id) {
+    const row = (await supabase.rpc("desk_by_id", { p_id: customer.desk_id })).data?.[0];
     if (row) desk = { id: row.id, name: row.name, active: row.active };
   }
-  // 受付を止めた窓口のURLから、まだその窓口のトークを持っていない人が来たとき。
-  if (desk) closedDeskName = null;
 
   const { data: org } = await supabase
     .from("organizations")
@@ -142,11 +125,28 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
       hasCard: !!customer.stripe_payment_method_id,
     },
     desk,
-    closedDeskName,
   };
 });
 
 // 画面に必要な最新分だけ取得する（会話が長くなっても初回表示は遅くならない）。
+// 受付を止めた窓口のURLから、まだその窓口でやり取りしたことがない人が来たとき。
+// 新しい問い合わせは受けないので、窓口の依頼主の行も作らずにお休みの画面を出す。
+export async function getClosedDeskName(): Promise<string | null> {
+  const h = await headers();
+  const deskId = h.get("x-vid-desk");
+  const orgId = h.get("x-vid-org");
+  if (!deskId || !orgId) return null;
+  const supabase = await createClient();
+  const row = (await supabase.rpc("desk_by_id", { p_id: deskId })).data?.[0];
+  if (!row || row.active) return null;
+  const { data: auth } = await supabase.auth.getUser();
+  if (auth.user) {
+    const { data: existing } = await supabase.from("customers").select("id").eq("profile_id", auth.user.id).eq("org_id", orgId).eq("desk_id", deskId).maybeSingle();
+    if (existing) return null;
+  }
+  return row.name;
+}
+
 export async function getThreadMessages(threadId: string): Promise<{ messages: MessageWithExtras[]; hasMoreOlder: boolean }> {
   const supabase = await createClient();
   const { data, error } = await supabase

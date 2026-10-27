@@ -11,14 +11,15 @@ const browserClients = new Map<string, ReturnType<typeof createBrowserClient<Dat
 // Cached per orgId (not a single shared instance): a caller that doesn't need
 // org scoping (sign-out, avatar upload) must not hand back a client missing
 // the header to a caller that does, or RLS silently filters everything out.
-export function createClient(orgId?: string) {
-  const key = orgId ?? "";
+// deskId: 問い合わせ窓口のトークを見ているときは、その窓口の依頼主として読む（x-vid-desk）。
+export function createClient(orgId?: string, deskId?: string | null) {
+  const key = `${orgId ?? ""}:${deskId ?? ""}`;
   const cached = browserClients.get(key);
   if (cached) return cached;
   const client = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    orgId ? { global: { headers: { "x-vid-org": orgId } } } : undefined,
+    orgId ? { global: { headers: { "x-vid-org": orgId, ...(deskId ? { "x-vid-desk": deskId } : {}) } } } : undefined,
   );
   browserClients.set(key, client);
   return client;

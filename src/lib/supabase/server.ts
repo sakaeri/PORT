@@ -12,12 +12,14 @@ export async function createClient() {
   // whichever org's site they're currently on. See 20260910000003_multi_org_customers.sql.
   const h = await headers();
   const orgId = h.get("x-vid-org");
+  // 問い合わせ窓口（/teera など）から来たときは、窓口の依頼主の行を使う（my_customer_id()）。
+  const deskId = h.get("x-vid-desk");
 
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      global: orgId ? { headers: { "x-vid-org": orgId } } : undefined,
+      global: orgId ? { headers: { "x-vid-org": orgId, ...(deskId ? { "x-vid-desk": deskId } : {}) } } : undefined,
       cookies: {
         getAll() {
           return cookieStore.getAll();

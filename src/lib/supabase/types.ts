@@ -148,6 +148,7 @@ export interface Database {
           auto_recharge_amount: number | null;
           auto_recharge_fail_count: number;
           terms_accepted_at: string | null;
+          desk_id: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
@@ -408,8 +409,7 @@ export interface Database {
       org_id_by_slug: { Args: { p_slug: string }; Returns: string | null };
       desk_by_slug: { Args: { p_slug: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
       desk_by_id: { Args: { p_id: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
-      claim_desk_thread: { Args: { p_desk_id: string }; Returns: void };
-      ensure_customer_for_org: { Args: { p_org_id: string }; Returns: string };
+      ensure_customer_for_org: { Args: { p_org_id: string; p_desk_id?: string }; Returns: string | null };
       pay_request_from_balance: { Args: { p_request_id: string }; Returns: void };
       disable_auto_recharge: { Args: Record<string, never>; Returns: void };
       increment_customer_balance: { Args: { p_customer_id: string; p_amount: number }; Returns: void };

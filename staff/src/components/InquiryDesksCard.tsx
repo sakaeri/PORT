@@ -151,7 +151,7 @@ export default function InquiryDesksCard({
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15 }}>問い合わせ窓口</div>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>問い合わせ窓口</div>
         <InfoTooltip text="他社サービスのお問い合わせを引き受けるときの入口です。名前を入れるだけでURLができます。「担当」で決めた秘書が、その窓口から届いたトークを受け持ちます（トークごとに別の秘書へ振ることもできます）。依頼主側はチャットだけの画面になります。受付をオフにすると新しい問い合わせは止まり、過去のトークは残ります。" />
         <div style={{ flex: 1 }} />
         {canEdit && !adding && (

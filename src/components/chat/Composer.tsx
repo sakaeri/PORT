@@ -25,6 +25,7 @@ function safeFileExt(name: string): string {
 interface Props {
   threadId: string;
   orgId: string;
+  deskId: string | null;
   onSend: (text: string, attachments: PendingAttachment[]) => Promise<void>;
 }
 
@@ -47,7 +48,7 @@ function isTouchDevice() {
   return typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 }
 
-export default function Composer({ threadId, orgId, onSend }: Props) {
+export default function Composer({ threadId, orgId, deskId, onSend }: Props) {
   const [draft, setDraft] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
@@ -90,7 +91,7 @@ export default function Composer({ threadId, orgId, onSend }: Props) {
 
   // 成功なら null、失敗ならエラーメッセージを返す
   async function uploadFile(file: File): Promise<string | null> {
-    const supabase = createClient(orgId);
+    const supabase = createClient(orgId, deskId);
     const path = `${threadId}/${crypto.randomUUID()}${safeFileExt(file.name)}`;
     const { error } = await supabase.storage.from("attachments").upload(path, file, { contentType: file.type });
     if (error) {

@@ -77,7 +77,7 @@ function isImageAttachment(f: AttachmentRow): boolean {
   return (f.mime ?? "").startsWith("image/") || /\.(jpe?g|png|gif|webp)$/i.test(f.file_name);
 }
 
-export function FilesBubble({ msg, highlight, orgId, orgDisplayName }: { msg: MessageWithExtras; highlight: boolean; orgId: string; orgDisplayName: string }) {
+export function FilesBubble({ msg, highlight, orgId, deskId, orgDisplayName }: { msg: MessageWithExtras; highlight: boolean; orgId: string; deskId: string | null; orgDisplayName: string }) {
   const isSelf = msg.sender_role === "client";
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
@@ -91,7 +91,7 @@ export function FilesBubble({ msg, highlight, orgId, orgDisplayName }: { msg: Me
   useEffect(() => {
     if (!imageKey) return;
     let cancelled = false;
-    createClient(orgId)
+    createClient(orgId, deskId)
       .storage.from("attachments")
       .createSignedUrls(imageKey.split("|"), 60 * 60)
       .then(({ data }) => {
@@ -103,14 +103,14 @@ export function FilesBubble({ msg, highlight, orgId, orgDisplayName }: { msg: Me
     return () => {
       cancelled = true;
     };
-  }, [imageKey, orgId]);
+  }, [imageKey, orgId, deskId]);
 
   async function openAttachment(f: AttachmentRow) {
     if (!f.file_path || openingId) return;
     setOpeningId(f.id);
     setErrorId(null);
     try {
-      const supabase = createClient(orgId);
+      const supabase = createClient(orgId, deskId);
       const { data, error } = await supabase.storage.from("attachments").createSignedUrl(f.file_path, 60);
       if (error || !data?.signedUrl) throw error ?? new Error("URLを発行できませんでした");
       window.open(data.signedUrl, "_blank", "noopener,noreferrer");
@@ -255,6 +255,7 @@ export function RequestCard({
   bundle,
   balance,
   orgId,
+  deskId,
   orgDisplayName,
   onPay,
   onOpenCharge,
@@ -265,6 +266,7 @@ export function RequestCard({
   bundle: RequestBundle;
   balance: number;
   orgId: string;
+  deskId: string | null;
   orgDisplayName: string;
   onPay: (id: string) => Promise<void>;
   onOpenCharge: () => void;
@@ -318,7 +320,7 @@ export function RequestCard({
     setOpeningAttachmentId(id);
     setAttachmentErrorId(null);
     try {
-      const supabase = createClient(orgId);
+      const supabase = createClient(orgId, deskId);
       const { data, error } = await supabase.storage.from("attachments").createSignedUrl(path, 60);
       if (error || !data?.signedUrl) throw error ?? new Error("URLを発行できませんでした");
       window.open(data.signedUrl, "_blank", "noopener,noreferrer");

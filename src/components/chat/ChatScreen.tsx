@@ -114,7 +114,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
   // 開いている間に届いた新着分だけを取りに行く（既に読み込んだ最古の時点以降のみ）。
   // 会話全体を毎回取り直すと、やり取りが長い依頼主ほどポーリングのたびに重くなるため。
   const refresh = useCallback(async () => {
-    const supabase = createClient(ctx.orgId);
+    const supabase = createClient(ctx.orgId, ctx.desk?.id);
     const { data, error } = oldestLoadedAt
       ? await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", ctx.threadId).is("deleted_at", null).gte("sent_at", oldestLoadedAt).order("sent_at", { ascending: true })
       : await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", ctx.threadId).is("deleted_at", null).order("sent_at", { ascending: false }).limit(MESSAGE_PAGE_SIZE);
@@ -127,13 +127,13 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
       setMessages(rows.map(mapMessageRow));
       if (!oldestLoadedAt && rows.length > 0) setOldestLoadedAt(rows[0].sent_at);
     }
-  }, [ctx.threadId, ctx.orgId, oldestLoadedAt]);
+  }, [ctx.threadId, ctx.orgId, ctx.desk?.id, oldestLoadedAt]);
 
   async function loadOlderMessages() {
     if (loadingOlder || !hasMoreOlder || !oldestLoadedAt) return;
     setLoadingOlder(true);
     try {
-      const supabase = createClient(ctx.orgId);
+      const supabase = createClient(ctx.orgId, ctx.desk?.id);
       const { data, error } = await supabase
         .from("messages")
         .select(MESSAGE_SELECT)
@@ -162,7 +162,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
   }
 
   useEffect(() => {
-    const supabase = createClient(ctx.orgId);
+    const supabase = createClient(ctx.orgId, ctx.desk?.id);
     const channel = supabase
       .channel(`thread-${ctx.threadId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `thread_id=eq.${ctx.threadId}` }, refresh)
@@ -177,7 +177,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [ctx.threadId, ctx.customerId, ctx.orgId, refresh]);
+  }, [ctx.threadId, ctx.customerId, ctx.orgId, ctx.desk?.id, refresh]);
 
   // 画面が見えている間に最新メッセージが変わったら既読にする（本部からの
   // メール通知を「未読の先頭の1通」だけに絞るため）。裏タブのまま届いた分は、
@@ -280,7 +280,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
       case "text":
         return <TextBubble key={m.id} msg={m} highlight={highlight} orgDisplayName={ctx.orgDisplayName} />;
       case "files":
-        return <FilesBubble key={m.id} msg={m} highlight={highlight} orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} />;
+        return <FilesBubble key={m.id} msg={m} highlight={highlight} orgId={ctx.orgId} deskId={ctx.desk?.id ?? null} orgDisplayName={ctx.orgDisplayName} />;
       case "notice":
       case "system":
         return <NoticeBubble key={m.id} msg={m} />;
@@ -298,6 +298,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
             bundle={m.requestBundle}
             balance={ctx.balance}
             orgId={ctx.orgId}
+            deskId={ctx.desk?.id ?? null}
             orgDisplayName={ctx.orgDisplayName}
             onOpenCharge={() => {
               setOpenMyPageWithCharge(true);
@@ -364,7 +365,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
         })}
       </div>
 
-      <Composer threadId={ctx.threadId} orgId={ctx.orgId} onSend={handleSend} />
+      <Composer threadId={ctx.threadId} orgId={ctx.orgId} deskId={ctx.desk?.id ?? null} onSend={handleSend} />
 
       {showProgress && (
         <ProgressPanel
