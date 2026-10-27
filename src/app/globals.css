@@ -44,9 +44,13 @@
   --color-bubble-other-bg: var(--color-surface);
   --color-bubble-other-text: var(--color-text);
 
-  --font-heading: var(--font-inter), var(--font-noto-jp), system-ui, sans-serif;
+  /* 書体はスマホ・パソコンに入っているものを使う（Androidは Noto Sans CJK、
+     iPhone・Macはヒラギノ）。書体ファイルを配ると、楽天モバイルの5Gなど
+     大きいファイルが途中で止まりやすい回線で画面が出なくなるため。 */
+  --font-system: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+  --font-heading: var(--font-system);
   --font-heading-weight: 500;
-  --font-body: var(--font-inter), var(--font-noto-jp), system-ui, sans-serif;
+  --font-body: var(--font-system);
 
   --space-1: 2.8px;
   --space-2: 5.6px;
