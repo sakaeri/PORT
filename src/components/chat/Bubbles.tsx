@@ -393,7 +393,7 @@ export function RequestCard({
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6, fontSize: 12.5 }}>
               {/* dueDate があるのは完了予定日を決めた見積もり。古い見積もりは目安のまま出す。 */}
               <span style={{ color: "var(--color-neutral-500)" }}>{payload.dueDate ? "完了予定" : "対応の目安"}</span>
-              <span style={{ color: "var(--color-accent-300)" }}>{payload.due}{payload.dueDate ? "まで" : " ごろ"}</span>
+              <span style={{ color: "var(--color-accent-300)" }}>{payload.due}{payload.dueDate ? "" : " ごろ"}</span>
             </div>
           )}
           {!["declined", "cancelled"].includes(r.phase) && (

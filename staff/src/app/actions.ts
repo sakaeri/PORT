@@ -9,6 +9,8 @@ import { advanceFee, ADVANCE_FEE_RATE, ADVANCE_VALID_MINUTES } from "@/lib/advan
 import { TASK_EXAMPLES } from "@/lib/task-examples";
 import { dueDateEndISO, dueDateLabel, isDueDate, jstTodayDate } from "@/lib/due-date";
 
+const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+
 // 本番の Next.js は Server Action で throw されたエラー文を画面に渡さない
 // （汎用の文言に置き換わる）。「何が悪かったか」を伝えたい操作はこれで包み、
 // 日本語の文言だけを戻り値で返す。想定外のエラーはログに残して空文字にする
@@ -552,7 +554,9 @@ async function createCaseRequestInner(
     // （pay_request_from_balance 側で有効化する）。
     cadence?: SubscriptionCadence;
     // 曜日・日付の指定（任意）。無指定なら初回決済日からの単純な+7日／+1ヶ月。
-    anchorWeekday?: number;
+    // 毎週の作業曜日（任意・複数可）。選んだ数だけ1回分の項目を週に数え、
+    // 引き落としは日曜はじまりで数えた最初の作業日の前日に週1回まとめて行う。
+    workWeekdays?: number[];
     anchorDayOfMonth?: number;
     // 毎月「月末」指定（任意・anchorDayOfMonthとは排他）。28日以降は月によって
     // 無い日になるため、実際の最終日を都度計算するフラグとして別で持つ。
@@ -566,7 +570,7 @@ async function createCaseRequestInner(
   if (advance && (!advance.label.trim() || !(advance.amount > 0))) throw new Error("代金の内容と実費を入力してください");
   if (advance && !(ADVANCE_VALID_MINUTES as readonly number[]).includes(advance.minutes)) throw new Error("有効時間を選んでください");
   const advanceFeeAmount = advance ? advanceFee(Math.round(advance.amount)) : 0;
-  const items = isHourly
+  let items = isHourly
     ? []
     : advance
       ? [
@@ -583,20 +587,24 @@ async function createCaseRequestInner(
   if (input.anchorDayOfMonth != null && (!Number.isInteger(input.anchorDayOfMonth) || input.anchorDayOfMonth < 1 || input.anchorDayOfMonth > 28)) {
     throw new Error("毎月の日付は1〜28日で選んでください（29日以降は「月末」を選んでください）");
   }
-  if (input.anchorWeekday != null && (!Number.isInteger(input.anchorWeekday) || input.anchorWeekday < 0 || input.anchorWeekday > 6)) throw new Error("曜日を選び直してください");
+  const workWeekdays = input.cadence === "weekly" && !advance ? [...new Set(input.workWeekdays ?? [])].sort((a, b) => a - b) : [];
+  if (workWeekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) throw new Error("曜日を選び直してください");
+  if (workWeekdays.length > 1) items = items.map((it) => ({ ...it, qty: it.qty * workWeekdays.length }));
+  const anchorWeekday = workWeekdays.length > 0 ? (workWeekdays[0] + 6) % 7 : null;
   const needsDueDate = !advance && !input.cadence;
   const dueDate = needsDueDate ? (input.dueDate ?? "").trim() : "";
   if (needsDueDate && !isDueDate(dueDate)) throw new Error("完了予定日を選んでください");
   if (needsDueDate && dueDate < jstTodayDate()) throw new Error("完了予定日は今日以降の日付を選んでください");
 
   const amount = isHourly ? input.hourly!.cap : items.reduce((sum, it) => sum + it.price * it.qty, 0);
-  const title = isHourly
+  const baseTitle = isHourly
     ? input.hourly!.label.trim() || "時間精算の依頼"
     : advance
       ? `立替：${advance.label.trim()}`
       : items.length > 2
       ? `${items[0].label}ほか${items.length - 1}件`
       : items.map((it) => it.label).join("・");
+  const title = workWeekdays.length > 0 ? `${baseTitle}（毎週${workWeekdays.map((d) => WEEKDAY_LABELS[d]).join("・")}）` : baseTitle;
 
   if (!isHourly && !advance && input.saveAsMenu) {
     const customItems = items.filter((it) => !it.menuId);
@@ -655,7 +663,7 @@ async function createCaseRequestInner(
           amount,
           items: items.map((it) => ({ label: it.label, price: it.price, payout: it.payout, qty: it.qty })),
           cadence: input.cadence,
-          anchor_weekday: input.cadence === "weekly" ? (input.anchorWeekday ?? null) : null,
+          anchor_weekday: input.cadence === "weekly" ? anchorWeekday : null,
           anchor_day_of_month: input.cadence === "monthly" && !input.anchorLastDayOfMonth ? (input.anchorDayOfMonth ?? null) : null,
           anchor_last_day_of_month: input.cadence === "monthly" && !!input.anchorLastDayOfMonth,
           created_by: ctx.userId,

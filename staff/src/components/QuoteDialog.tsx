@@ -24,6 +24,8 @@ export interface CustomItem {
   qty: number;
 }
 
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
 function pillStyle(active: boolean): React.CSSProperties {
   return {
     height: 30,
@@ -133,7 +135,7 @@ export default function QuoteDialog({
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [advanceMinutes, setAdvanceMinutes] = useState<number>(15);
   const [cadence, setCadence] = useState<SubscriptionCadence | "">(initialCadence ?? "");
-  const [anchorWeekday, setAnchorWeekday] = useState<number | null>(null);
+  const [workWeekdays, setWorkWeekdays] = useState<number[]>([]);
   const [anchorDayOfMonth, setAnchorDayOfMonth] = useState("");
   const [anchorLastDayOfMonth, setAnchorLastDayOfMonth] = useState(false);
   const [estimatedHours, setEstimatedHours] = useState("");
@@ -171,7 +173,10 @@ export default function QuoteDialog({
   const hourlyCap = capFromEstimatedHours(Number(estimatedHours));
   const advanceBase = Math.max(0, Math.round(Number(advanceAmount) || 0));
   const advanceFeeAmount = advanceFee(advanceBase);
-  const total = isHourly ? hourlyCap : isAdvance ? advanceBase + advanceFeeAmount : itemsTotal;
+  // 毎週で作業曜日を複数選んだら、その数だけ1回分を週にまとめて引き落とす。
+  const weeklyDays = mode === "menu" && cadence === "weekly" ? [...workWeekdays].sort((a, b) => a - b) : [];
+  const timesPerWeek = Math.max(1, weeklyDays.length);
+  const total = isHourly ? hourlyCap : isAdvance ? advanceBase + advanceFeeAmount : itemsTotal * timesPerWeek;
   // 完了予定日はチャットで依頼主と決めた日。定期（周期で決まる）と立替（その場で支払う）では聞かない。
   const needsDueDate = !isAdvance && !(mode === "menu" && cadence);
   const today = jstTodayDate();
@@ -191,7 +196,7 @@ export default function QuoteDialog({
         hourly: isHourly ? { rate: HOURLY_RATE_PER_HOUR, cap: hourlyCap, label: hourlyLabel } : undefined,
         advance: isAdvance ? { label: advanceLabel, amount: advanceBase, minutes: advanceMinutes } : undefined,
         cadence: mode === "menu" && cadence ? cadence : undefined,
-        anchorWeekday: mode === "menu" && cadence === "weekly" && anchorWeekday != null ? anchorWeekday : undefined,
+        workWeekdays: weeklyDays.length > 0 ? weeklyDays : undefined,
         anchorDayOfMonth: mode === "menu" && cadence === "monthly" && !anchorLastDayOfMonth && anchorDayOfMonth.trim() ? Number(anchorDayOfMonth) : undefined,
         anchorLastDayOfMonth: mode === "menu" && cadence === "monthly" && anchorLastDayOfMonth ? true : undefined,
       }));
@@ -390,14 +395,26 @@ export default function QuoteDialog({
             </div>
             {cadence === "weekly" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)" }}>曜日を指定（任意・無指定なら初回決済日から7日ごと）</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, color: "var(--color-neutral-600)" }}>作業する曜日（任意・複数可）</span>
+                  <InfoTooltip text="選んだ曜日の数だけ1回分を数えます（月・木なら週2回分）。引き落としは週1回で、日曜はじまりで数えた最初の作業日の前日にまとめて行います（例：月・木→日曜、土・日・月→土曜）。選ばない場合は、初回の支払い日から7日ごとです。" />
+                </div>
                 <div style={{ display: "flex", gap: 4 }}>
-                  {["日", "月", "火", "水", "木", "金", "土"].map((label, i) => (
-                    <button key={i} onClick={() => setAnchorWeekday((v) => (v === i ? null : i))} style={{ ...pillStyle(anchorWeekday === i), minWidth: 30, padding: "0 6px" }}>
+                  {WEEKDAYS.map((label, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setWorkWeekdays((v) => (v.includes(i) ? v.filter((d) => d !== i) : [...v, i]))}
+                      style={{ ...pillStyle(workWeekdays.includes(i)), minWidth: 30, padding: "0 6px" }}
+                    >
                       {label}
                     </button>
                   ))}
                 </div>
+                {weeklyDays.length > 0 && (
+                  <span style={{ fontSize: 11, color: "var(--color-neutral-400)" }}>
+                    週{weeklyDays.length}回・毎週{WEEKDAYS[(weeklyDays[0] + 6) % 7]}曜に引き落とし
+                  </span>
+                )}
               </div>
             )}
             {cadence === "monthly" && (
@@ -448,7 +465,7 @@ export default function QuoteDialog({
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input value={dueDate} onChange={(e) => setDueDate(e.target.value)} type="date" min={today} className="vid-input" style={{ ...inputStyle, maxWidth: 180 }} />
-                {dueDate && dueDate >= today && <span style={{ fontSize: 12, color: "var(--color-neutral-400)" }}>{dueDateLabel(dueDate)}まで</span>}
+                {dueDate && dueDate >= today && <span style={{ fontSize: 12, color: "var(--color-neutral-400)" }}>{dueDateLabel(dueDate)}</span>}
               </div>
             </div>
           )}
