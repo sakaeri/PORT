@@ -274,7 +274,7 @@ export function RequestCard({
   onSkipRating: (id: string) => Promise<void>;
 }) {
   const { request: r, items, report, rating } = bundle;
-  const payload = msg.payload as { title?: string; note?: string; due?: string };
+  const payload = msg.payload as { title?: string; note?: string; due?: string; dueDate?: string };
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState("");
   const [paying, setPaying] = useState(false);
@@ -391,8 +391,9 @@ export function RequestCard({
           )}
           {payload.due && (
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6, fontSize: 12.5 }}>
-              <span style={{ color: "var(--color-neutral-500)" }}>対応の目安</span>
-              <span style={{ color: "var(--color-accent-300)" }}>{payload.due} ごろ</span>
+              {/* dueDate があるのは完了予定日を決めた見積もり。古い見積もりは目安のまま出す。 */}
+              <span style={{ color: "var(--color-neutral-500)" }}>{payload.dueDate ? "完了予定" : "対応の目安"}</span>
+              <span style={{ color: "var(--color-accent-300)" }}>{payload.due}{payload.dueDate ? "まで" : " ごろ"}</span>
             </div>
           )}
           {!["declined", "cancelled"].includes(r.phase) && (

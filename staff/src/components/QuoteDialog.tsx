@@ -8,6 +8,7 @@ import { createCaseRequest } from "@/app/actions";
 import InfoTooltip from "@/components/InfoTooltip";
 import { advanceFee, ADVANCE_FEE_MIN, ADVANCE_FEE_RATE, ADVANCE_VALID_MINUTES } from "@/lib/advance";
 import type { SubscriptionCadence } from "@/lib/supabase/types";
+import { dueDateLabel, jstTodayDate } from "@/lib/due-date";
 
 export interface MenuOption {
   id: string;
@@ -15,19 +16,12 @@ export interface MenuOption {
   note: string | null;
   price: number | null;
   payout: number;
-  leadHours: number;
 }
 
 export interface CustomItem {
   label: string;
   price: number;
   qty: number;
-  leadHours: number | null;
-}
-
-function hoursToDueLabel(hours: number): string {
-  if (hours <= 24) return "24時間以内";
-  return `${Math.ceil(hours / 24)}日後`;
 }
 
 function pillStyle(active: boolean): React.CSSProperties {
@@ -128,7 +122,7 @@ export default function QuoteDialog({
   const [customLabel, setCustomLabel] = useState("");
   const [customPrice, setCustomPrice] = useState("");
   const [customQty, setCustomQty] = useState("1");
-  const [customLeadHours, setCustomLeadHours] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [note, setNote] = useState("");
   const [saveAsMenu, setSaveAsMenu] = useState(false);
   // menu：メニューから選ぶ／hourly：時間精算／advance：立替（実費の支払い代行）
@@ -155,13 +149,11 @@ export default function QuoteDialog({
   function addCustomItem() {
     const price = Number(customPrice);
     const qty = Math.max(1, Math.round(Number(customQty) || 1));
-    const leadHours = customLeadHours.trim() ? Math.max(1, Math.round(Number(customLeadHours))) : null;
     if (!customLabel.trim() || !Number.isFinite(price) || price < 0) return;
-    setCustomItems((rows) => [...rows, { label: customLabel.trim(), price, qty, leadHours }]);
+    setCustomItems((rows) => [...rows, { label: customLabel.trim(), price, qty }]);
     setCustomLabel("");
     setCustomPrice("");
     setCustomQty("1");
-    setCustomLeadHours("");
   }
 
   function bumpCustomQty(index: number, delta: number) {
@@ -170,21 +162,21 @@ export default function QuoteDialog({
 
   // 金額が未設定（相談項目としてだけ使う）受付メニューは見積もりの候補には出さない。
   const priceableMenus = menus.filter((m): m is MenuOption & { price: number } => m.price != null);
-  const menuItems = priceableMenus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id], leadHours: m.leadHours as number | null }));
+  const menuItems = priceableMenus.filter((m) => (qty[m.id] ?? 0) > 0).map((m) => ({ menuId: m.id as string | null, label: m.label, price: m.price, payout: m.payout, qty: qty[m.id] }));
   const allItems = [
     ...menuItems,
-    ...customItems.map((c) => ({ menuId: null as string | null, label: c.label, price: c.price, payout: 0, qty: c.qty, leadHours: c.leadHours })),
+    ...customItems.map((c) => ({ menuId: null as string | null, label: c.label, price: c.price, payout: 0, qty: c.qty })),
   ];
   const itemsTotal = allItems.reduce((sum, it) => sum + it.price * it.qty, 0);
   const hourlyCap = capFromEstimatedHours(Number(estimatedHours));
   const advanceBase = Math.max(0, Math.round(Number(advanceAmount) || 0));
   const advanceFeeAmount = advanceFee(advanceBase);
   const total = isHourly ? hourlyCap : isAdvance ? advanceBase + advanceFeeAmount : itemsTotal;
-  // 同じ項目を複数個頼むと、その分準備に時間がかかる想定で数量に比例させる
-  // （項目ごとの目安時間 × 数量）。違う項目同士は並行して進む前提でmaxを取る。
-  const knownLeadHours = allItems.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
-  const due = !isAdvance && knownLeadHours.length > 0 ? hoursToDueLabel(Math.max(...knownLeadHours)) : "";
-  const canSubmit = isHourly ? hourlyCap > 0 : isAdvance ? advanceBase > 0 && !!advanceLabel.trim() : allItems.length > 0;
+  // 完了予定日はチャットで依頼主と決めた日。定期（周期で決まる）と立替（その場で支払う）では聞かない。
+  const needsDueDate = !isAdvance && !(mode === "menu" && cadence);
+  const today = jstTodayDate();
+  const dueDateOk = !needsDueDate || (!!dueDate && dueDate >= today);
+  const canSubmit = dueDateOk && (isHourly ? hourlyCap > 0 : isAdvance ? advanceBase > 0 && !!advanceLabel.trim() : allItems.length > 0);
 
   async function submit() {
     if (saving || !canSubmit) return;
@@ -194,7 +186,7 @@ export default function QuoteDialog({
       const { data: requestId } = unwrap(await createCaseRequest(threadId, customerId, {
         items: allItems,
         note,
-        due,
+        dueDate: needsDueDate ? dueDate : undefined,
         saveAsMenu,
         hourly: isHourly ? { rate: HOURLY_RATE_PER_HOUR, cap: hourlyCap, label: hourlyLabel } : undefined,
         advance: isAdvance ? { label: advanceLabel, amount: advanceBase, minutes: advanceMinutes } : undefined,
@@ -317,7 +309,7 @@ export default function QuoteDialog({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</div>
                     <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>
-                      ¥{m.price.toLocaleString("ja-JP")}・納期{m.leadHours}時間
+                      ¥{m.price.toLocaleString("ja-JP")}
                     </div>
                   </div>
                   <button onClick={() => bump(m.id, -1)} disabled={!qty[m.id]} style={stepperBtn}>
@@ -346,10 +338,6 @@ export default function QuoteDialog({
                     <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>数量</span>
                     <input value={customQty} onChange={(e) => setCustomQty(e.target.value)} type="number" min={1} className="vid-input" style={inputStyle} />
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3, width: 90 }}>
-                    <span style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>目安時間(h)・任意</span>
-                    <input value={customLeadHours} onChange={(e) => setCustomLeadHours(e.target.value)} type="number" min={1} placeholder="なし" className="vid-input" style={inputStyle} />
-                  </div>
                   <button onClick={addCustomItem} style={{ ...smallBtn, height: 36 }}>
                     追加
                   </button>
@@ -360,7 +348,6 @@ export default function QuoteDialog({
                   <span style={{ flex: 1, minWidth: 0 }}>{c.label}</span>
                   <span style={{ color: "var(--color-neutral-500)" }}>
                     ¥{c.price.toLocaleString("ja-JP")}
-                    {c.leadHours != null && `・納期${c.leadHours}時間`}
                   </span>
                   <button onClick={() => bumpCustomQty(i, -1)} disabled={c.qty <= 1} style={stepperBtn}>
                     −
@@ -453,10 +440,16 @@ export default function QuoteDialog({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
-          {due && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
-              対応の目安：{due}
-              <InfoTooltip text="選んだ項目の目安時間から自動で計算しています。" />
+          {needsDueDate && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>完了予定日</span>
+                <InfoTooltip text="チャットで依頼主に「いつごろまでに必要か」を聞いて、その日を選びます。「いつでもいい」と言われたら、こちらで目安の日を決めて伝えてください。依頼主の見積もりカードに表示され、案件の期限になります。" />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input value={dueDate} onChange={(e) => setDueDate(e.target.value)} type="date" min={today} className="vid-input" style={{ ...inputStyle, maxWidth: 180 }} />
+                {dueDate && dueDate >= today && <span style={{ fontSize: 12, color: "var(--color-neutral-400)" }}>{dueDateLabel(dueDate)}まで</span>}
+              </div>
             </div>
           )}
           <textarea

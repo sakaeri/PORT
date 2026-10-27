@@ -7,6 +7,7 @@ import { isCustomerCaughtUp, notifyCustomerCompletionReport, notifyCustomerNewMe
 import type { StaffRole, SubscriptionCadence } from "@/lib/supabase/types";
 import { advanceFee, ADVANCE_FEE_RATE, ADVANCE_VALID_MINUTES } from "@/lib/advance";
 import { TASK_EXAMPLES } from "@/lib/task-examples";
+import { dueDateEndISO, dueDateLabel, isDueDate, jstTodayDate } from "@/lib/due-date";
 
 // 本番の Next.js は Server Action で throw されたエラー文を画面に渡さない
 // （汎用の文言に置き換わる）。「何が悪かったか」を伝えたい操作はこれで包み、
@@ -97,7 +98,7 @@ export async function importTaskExampleMenus(orgId: string) {
 
 export async function updateMenu(
   id: string,
-  fields: { label: string; note: string; price: number | null; lead_hours: number; active: boolean; icon: string | null },
+  fields: { label: string; note: string; price: number | null; active: boolean; icon: string | null },
 ) {
   await requireHqPrivileged();
   const supabase = await createClient();
@@ -107,7 +108,6 @@ export async function updateMenu(
       label: fields.label.trim(),
       note: fields.note.trim() || null,
       price: fields.price,
-      lead_hours: fields.lead_hours,
       active: fields.active,
       icon: fields.icon,
     })
@@ -536,9 +536,11 @@ async function createCaseRequestInner(
   customerThreadId: string,
   customerId: string,
   input: {
-    items: { menuId: string | null; label: string; price: number; payout: number; qty: number; leadHours?: number | null }[];
+    items: { menuId: string | null; label: string; price: number; payout: number; qty: number }[];
     note: string;
-    due: string;
+    // 完了予定日（日本時間 YYYY-MM-DD）。チャットで依頼主と決めた日を入れる。
+    // 定期対応（周期で期限が決まる）と立替（その場で支払う）では使わない。
+    dueDate?: string;
     saveAsMenu?: boolean;
     // メニューに無い依頼を時間精算にする場合。設定すると items は無視する。
     hourly?: { rate: number; cap: number; label: string };
@@ -568,8 +570,8 @@ async function createCaseRequestInner(
     ? []
     : advance
       ? [
-          { menuId: null, label: `実費（${advance.label.trim()}）`, price: Math.round(advance.amount), payout: 0, qty: 1, leadHours: null },
-          { menuId: null, label: `立替手数料（${Math.round(ADVANCE_FEE_RATE * 100)}%）`, price: advanceFeeAmount, payout: 0, qty: 1, leadHours: null },
+          { menuId: null, label: `実費（${advance.label.trim()}）`, price: Math.round(advance.amount), payout: 0, qty: 1 },
+          { menuId: null, label: `立替手数料（${Math.round(ADVANCE_FEE_RATE * 100)}%）`, price: advanceFeeAmount, payout: 0, qty: 1 },
         ]
       : input.items.filter((it) => it.qty > 0 && it.label.trim());
   if (!isHourly && items.length === 0) throw new Error("見積もりの項目を1つ以上追加してください");
@@ -582,6 +584,10 @@ async function createCaseRequestInner(
     throw new Error("毎月の日付は1〜28日で選んでください（29日以降は「月末」を選んでください）");
   }
   if (input.anchorWeekday != null && (!Number.isInteger(input.anchorWeekday) || input.anchorWeekday < 0 || input.anchorWeekday > 6)) throw new Error("曜日を選び直してください");
+  const needsDueDate = !advance && !input.cadence;
+  const dueDate = needsDueDate ? (input.dueDate ?? "").trim() : "";
+  if (needsDueDate && !isDueDate(dueDate)) throw new Error("完了予定日を選んでください");
+  if (needsDueDate && dueDate < jstTodayDate()) throw new Error("完了予定日は今日以降の日付を選んでください");
 
   const amount = isHourly ? input.hourly!.cap : items.reduce((sum, it) => sum + it.price * it.qty, 0);
   const title = isHourly
@@ -591,18 +597,13 @@ async function createCaseRequestInner(
       : items.length > 2
       ? `${items[0].label}ほか${items.length - 1}件`
       : items.map((it) => it.label).join("・");
-  // 着手時に納期（due_at）を計算するための作業時間の目安を保存しておく
-  // （項目ごとの目安時間 × 数量。複数項目は並行して進む前提でmaxを取る）。
-  // 時間精算案件は着手〜完了の実測で金額を決めるので目安自体は使わない。
-  const knownLeadHours = items.map((it) => (it.leadHours != null ? it.leadHours * it.qty : null)).filter((h): h is number => h != null);
-  const leadHoursTotal = isHourly || advance || input.cadence ? null : knownLeadHours.length > 0 ? Math.max(...knownLeadHours) : null;
 
   if (!isHourly && !advance && input.saveAsMenu) {
     const customItems = items.filter((it) => !it.menuId);
     if (customItems.length > 0) {
       const { error: menuError } = await supabase
         .from("menus")
-        .insert(customItems.map((it) => ({ org_id: ctx.orgId, label: it.label, price: it.price, payout: it.payout, lead_hours: it.leadHours ?? 24 })));
+        .insert(customItems.map((it) => ({ org_id: ctx.orgId, label: it.label, price: it.price, payout: it.payout, lead_hours: 24 })));
       if (menuError) throw menuError;
     }
   }
@@ -617,7 +618,7 @@ async function createCaseRequestInner(
       amount,
       phase: "quoted",
       quoted_at: new Date().toISOString(),
-      lead_hours: leadHoursTotal,
+      due_at: dueDate ? dueDateEndISO(dueDate) : null,
       payment_timing: "balance",
       hourly_rate: isHourly ? input.hourly!.rate : null,
       hourly_cap: isHourly ? input.hourly!.cap : null,
@@ -665,7 +666,7 @@ async function createCaseRequestInner(
       await supabase.from("requests").update({ subscription_id: subscription.id }).eq("id", request.id);
     }
 
-    const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: input.due.trim() || undefined };
+    const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: dueDate ? dueDateLabel(dueDate) : undefined, dueDate: dueDate || undefined };
     const { error: msgError } = await supabase.from("messages").insert({
       thread_id: customerThreadId,
       sender_id: ctx.userId,
@@ -753,12 +754,13 @@ async function startCaseRequestInner(requestId: string) {
   if (!current) throw new Error("着手できる状態ではありません");
 
   const now = new Date().toISOString();
-  // 着手した瞬間を起点に、社内タスク管理用の納期目安（due_at）を計算する。
-  // 依頼主の入金待ちなどの時間は含めない（本人の対応が遅れないよう）。
-  const dueAt = current.lead_hours != null ? new Date(Date.now() + current.lead_hours * 3600 * 1000).toISOString() : null;
+  // 期限は見積もりで決めた完了予定日（due_at）のまま。完了予定日を決める前に
+  // 作った古い見積もりだけ、着手した瞬間から作業時間の目安で期限を出す。
+  const update: { phase: "started"; started_at: string; due_at?: string } = { phase: "started", started_at: now };
+  if (current.lead_hours != null) update.due_at = new Date(Date.now() + current.lead_hours * 3600 * 1000).toISOString();
   const { data, error } = await supabase
     .from("requests")
-    .update({ phase: "started", started_at: now, due_at: dueAt })
+    .update(update)
     .eq("id", requestId)
     .eq("org_id", ctx.orgId)
     .eq("phase", "preparing")

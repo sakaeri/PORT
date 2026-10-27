@@ -393,9 +393,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
   }
 
   async function commit(m: Menu) {
-    const leadHours = m.lead_hours > 0 ? m.lead_hours : 24;
-    if (leadHours !== m.lead_hours) patchLocal(m.id, { lead_hours: leadHours });
-    await saveOrAlert(() => updateMenu(m.id, { label: m.label, note: m.note ?? "", price: m.price, lead_hours: leadHours, active: m.active, icon: m.icon }));
+    await saveOrAlert(() => updateMenu(m.id, { label: m.label, note: m.note ?? "", price: m.price, active: m.active, icon: m.icon }));
   }
 
   return (
@@ -403,7 +401,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
       {/* スマホでは見出しが縦に潰れないよう、ボタンは次の行に回す。 */}
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>受付メニュー</div>
-        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・作業時間の目安・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの秘書が対応するかは、依頼主の画面の「担当秘書」で割り当てます。編集は本部だけができます" />
+        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの秘書が対応するかは、依頼主の画面の「担当秘書」で割り当てます。編集は本部だけができます" />
         <div style={{ flex: 1 }} />
         {canEdit && (
           <button onClick={handleImport} disabled={importing} style={{ ...smallBtn, opacity: importing ? 0.6 : 1 }}>
@@ -458,20 +456,6 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                         value={m.price ?? ""}
                         placeholder="未設定"
                         onChange={(e) => patchLocal(m.id, { price: e.target.value === "" ? null : Number(e.target.value) })}
-                        onBlur={() => commit(m)}
-                        disabled={!canEdit}
-                        className="vid-input"
-                        style={input}
-                      />
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <span style={label}>作業時間の目安（時間）</span>
-                      <input
-                        type="number"
-                        // 0 のときは空欄にして、消してから打ち直せるようにする（空のまま離れたら24時間）。
-                        value={m.lead_hours > 0 ? m.lead_hours : ""}
-                        placeholder="24"
-                        onChange={(e) => patchLocal(m.id, { lead_hours: Number(e.target.value) })}
                         onBlur={() => commit(m)}
                         disabled={!canEdit}
                         className="vid-input"

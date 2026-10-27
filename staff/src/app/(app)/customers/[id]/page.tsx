@@ -62,7 +62,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     supabase.from("intake_forms").select("id, label, note, intake_fields(id, label, kind, required, sort)").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
     supabase
       .from("menus")
-      .select("id, label, note, price, payout, lead_hours")
+      .select("id, label, note, price, payout")
       .eq("org_id", ctx.orgId)
       .eq("active", true)
       .order("sort", { ascending: true }),
@@ -95,7 +95,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .sort((a, b) => a.sort - b.sort)
       .map((f) => ({ id: f.id, label: f.label, kind: f.kind, required: f.required })),
   }));
-  const menus = (menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, payout: m.payout, leadHours: m.lead_hours }));
+  const menus = (menuRows ?? []).map((m) => ({ id: m.id, label: m.label, note: m.note, price: m.price, payout: m.payout }));
   const memos = (memoRows ?? []).map((m) => {
     const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
     return { id: m.id, authorId: m.author_id, authorName: profile?.staff_alias ?? profile?.display_name ?? "スタッフ", body: m.body, createdAt: m.created_at };
