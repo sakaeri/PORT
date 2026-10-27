@@ -164,12 +164,15 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
           {/* eslint-disable-next-line @next/next/no-img-element -- 固定サイズの静的アセットのため plain img */}
           <img src="/logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 21, textAlign: "center" }}>{orgDisplayName}</div>
-        <div style={{ fontSize: 13, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-400)", marginBottom: 10 }}>
-          ちょっとした頼みごとも、まずはこちらから。
-          <br />
-          単発から定期まで柔軟に対応いたします。
-        </div>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 21, textAlign: "center", marginBottom: isDesk ? 10 : 0 }}>{orgDisplayName}</div>
+        {/* 秘書サービスの案内文なので、問い合わせ窓口では出さない。 */}
+        {!isDesk && (
+          <div style={{ fontSize: 13, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-400)", marginBottom: 10 }}>
+            ちょっとした頼みごとも、まずはこちらから。
+            <br />
+            単発から定期まで柔軟に対応いたします。
+          </div>
+        )}
 
         <div
           style={{
