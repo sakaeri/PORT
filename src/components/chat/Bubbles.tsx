@@ -423,7 +423,17 @@ export function RequestCard({
                         </button>
                       </div>
                     )}
-                    <QuoteExpiryLine expired={expiry.expired} remaining={expiry.remaining} />
+                    {/* 定期の見積もりの期限は日付で決めるので、残り時間ではなく日付で出す。 */}
+                    {r.cadence && r.quote_expires_at && !expiry.expired ? (
+                      <div>
+                        お支払い期限：
+                        <span style={{ color: "var(--color-accent-300)" }}>
+                          {new Date(r.quote_expires_at).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: "short" })}
+                        </span>
+                      </div>
+                    ) : (
+                      <QuoteExpiryLine expired={expiry.expired} remaining={expiry.remaining} />
+                    )}
                     {payError && <div style={{ color: "var(--color-accent-200)" }}>{payError}</div>}
                     <button
                       onClick={handlePay}

@@ -540,8 +540,8 @@ async function createCaseRequestInner(
   input: {
     items: { menuId: string | null; label: string; price: number; payout: number; qty: number }[];
     note: string;
-    // 完了予定日（日本時間 YYYY-MM-DD）。チャットで依頼主と決めた日を入れる。
-    // 定期対応（周期で期限が決まる）と立替（その場で支払う）では使わない。
+    // 日本時間 YYYY-MM-DD。単発では完了予定日（チャットで依頼主と決めた日）、
+    // 定期では支払い期限（この日までに確定してもらう）。立替では使わない。
     dueDate?: string;
     saveAsMenu?: boolean;
     // メニューに無い依頼を時間精算にする場合。設定すると items は無視する。
@@ -553,14 +553,10 @@ async function createCaseRequestInner(
     // 確定するまでは定期対応としては動き出さない
     // （pay_request_from_balance 側で有効化する）。
     cadence?: SubscriptionCadence;
-    // 曜日・日付の指定（任意）。無指定なら初回決済日からの単純な+7日／+1ヶ月。
     // 毎週の作業曜日（任意・複数可）。選んだ数だけ1回分の項目を週に数え、
     // 引き落としは日曜はじまりで数えた最初の作業日の前日に週1回まとめて行う。
+    // 毎月は日付を指定せず、引き落とした日の1か月後に次を引き落とす。
     workWeekdays?: number[];
-    anchorDayOfMonth?: number;
-    // 毎月「月末」指定（任意・anchorDayOfMonthとは排他）。28日以降は月によって
-    // 無い日になるため、実際の最終日を都度計算するフラグとして別で持つ。
-    anchorLastDayOfMonth?: boolean;
   },
 ) {
   const ctx = await requireContext();
@@ -584,17 +580,15 @@ async function createCaseRequestInner(
   const isWholeYen = (n: number) => Number.isInteger(n) && n >= 0;
   if (items.some((it) => !isWholeYen(it.price) || !isWholeYen(it.payout) || !Number.isInteger(it.qty) || it.qty < 1)) throw new Error("金額と数量は整数で入力してください");
   if (isHourly && (!isWholeYen(input.hourly!.rate) || !isWholeYen(input.hourly!.cap))) throw new Error("金額は整数で入力してください");
-  if (input.anchorDayOfMonth != null && (!Number.isInteger(input.anchorDayOfMonth) || input.anchorDayOfMonth < 1 || input.anchorDayOfMonth > 28)) {
-    throw new Error("毎月の日付は1〜28日で選んでください（29日以降は「月末」を選んでください）");
-  }
   const workWeekdays = input.cadence === "weekly" && !advance ? [...new Set(input.workWeekdays ?? [])].sort((a, b) => a - b) : [];
   if (workWeekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) throw new Error("曜日を選び直してください");
   if (workWeekdays.length > 1) items = items.map((it) => ({ ...it, qty: it.qty * workWeekdays.length }));
   const anchorWeekday = workWeekdays.length > 0 ? (workWeekdays[0] + 6) % 7 : null;
-  const needsDueDate = !advance && !input.cadence;
-  const dueDate = needsDueDate ? (input.dueDate ?? "").trim() : "";
-  if (needsDueDate && !isDueDate(dueDate)) throw new Error("完了予定日を選んでください");
-  if (needsDueDate && dueDate < jstTodayDate()) throw new Error("完了予定日は今日以降の日付を選んでください");
+  const isRecurring = !advance && !!input.cadence;
+  const dateLabel = isRecurring ? "支払い期限" : "完了予定日";
+  const dueDate = advance ? "" : (input.dueDate ?? "").trim();
+  if (!advance && !isDueDate(dueDate)) throw new Error(`${dateLabel}を選んでください`);
+  if (!advance && dueDate < jstTodayDate()) throw new Error(`${dateLabel}は今日以降の日付を選んでください`);
 
   const amount = isHourly ? input.hourly!.cap : items.reduce((sum, it) => sum + it.price * it.qty, 0);
   const baseTitle = isHourly
@@ -626,13 +620,13 @@ async function createCaseRequestInner(
       amount,
       phase: "quoted",
       quoted_at: new Date().toISOString(),
-      due_at: dueDate ? dueDateEndISO(dueDate) : null,
+      due_at: dueDate && !isRecurring ? dueDateEndISO(dueDate) : null,
       payment_timing: "balance",
       hourly_rate: isHourly ? input.hourly!.rate : null,
       hourly_cap: isHourly ? input.hourly!.cap : null,
       cadence: advance ? null : (input.cadence ?? null),
       advance_amount: advance ? Math.round(advance.amount) : null,
-      quote_expires_at: advance ? new Date(Date.now() + advance.minutes * 60 * 1000).toISOString() : null,
+      quote_expires_at: advance ? new Date(Date.now() + advance.minutes * 60 * 1000).toISOString() : isRecurring ? dueDateEndISO(dueDate) : null,
     })
     .select("id")
     .single();
@@ -664,8 +658,8 @@ async function createCaseRequestInner(
           items: items.map((it) => ({ label: it.label, price: it.price, payout: it.payout, qty: it.qty })),
           cadence: input.cadence,
           anchor_weekday: input.cadence === "weekly" ? anchorWeekday : null,
-          anchor_day_of_month: input.cadence === "monthly" && !input.anchorLastDayOfMonth ? (input.anchorDayOfMonth ?? null) : null,
-          anchor_last_day_of_month: input.cadence === "monthly" && !!input.anchorLastDayOfMonth,
+          anchor_day_of_month: null,
+          anchor_last_day_of_month: false,
           created_by: ctx.userId,
         })
         .select("id")
@@ -674,7 +668,7 @@ async function createCaseRequestInner(
       await supabase.from("requests").update({ subscription_id: subscription.id }).eq("id", request.id);
     }
 
-    const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: dueDate ? dueDateLabel(dueDate) : undefined, dueDate: dueDate || undefined };
+    const payload: Record<string, unknown> = { title, note: input.note.trim() || undefined, due: dueDate && !isRecurring ? dueDateLabel(dueDate) : undefined, dueDate: dueDate && !isRecurring ? dueDate : undefined, payDeadline: isRecurring ? dueDateLabel(dueDate) : undefined };
     const { error: msgError } = await supabase.from("messages").insert({
       thread_id: customerThreadId,
       sender_id: ctx.userId,
