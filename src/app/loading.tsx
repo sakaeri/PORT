@@ -22,12 +22,13 @@ export default function Loading() {
           <img src="/logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         <CircleNotch size={22} style={{ color: "var(--color-accent)", animation: "vid-spin 0.7s linear infinite" }} />
+        {slow && <div style={{ fontSize: 12.5, opacity: 0.85 }}>電波が弱いため読み込めませんでした。</div>}
         {slow && (
           <button
             onClick={() => window.location.reload()}
             style={{ height: 36, padding: "0 16px", cursor: "pointer", fontSize: 12.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
           >
-            再読み込み
+            もう一度読み込む
           </button>
         )}
       </div>

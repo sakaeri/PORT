@@ -10,12 +10,16 @@ import { errorMessage } from "@/lib/errors";
 declare global {
   interface Window {
     turnstile?: {
-      render: (container: HTMLElement, options: { sitekey: string; callback: (token: string) => void }) => string;
+      render: (
+        container: HTMLElement,
+        options: { sitekey: string; callback: (token: string) => void; "error-callback"?: () => void; "timeout-callback"?: () => void },
+      ) => string;
     };
   }
 }
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+const SLOW_MESSAGE = "電波が弱いため読み込めませんでした。";
 
 // proxy.ts はもう匿名ログインを自動でしない。かわりに初回訪問だけこの画面を
 // 一瞬はさみ、見えない（invisible）Cloudflare Turnstileチェックを裏で通して
@@ -49,9 +53,21 @@ export default function VerifyGate() {
     if (!TURNSTILE_SITE_KEY) void proceed("");
   }, [proceed]);
 
+  // 回線によっては確認や通信の途中で止まり、スピナーが回り続けることがある
+  // （楽天モバイルの5Gなど）。しばらく進まなければ、やり直せるようにする。
+  useEffect(() => {
+    const t = setTimeout(() => setError((e) => e || SLOW_MESSAGE), 10000);
+    return () => clearTimeout(t);
+  }, []);
+
   function handleTurnstileLoaded() {
     if (!TURNSTILE_SITE_KEY || !containerRef.current || !window.turnstile) return;
-    window.turnstile.render(containerRef.current, { sitekey: TURNSTILE_SITE_KEY, callback: proceed });
+    window.turnstile.render(containerRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: proceed,
+      "error-callback": () => setError(SLOW_MESSAGE),
+      "timeout-callback": () => setError(SLOW_MESSAGE),
+    });
   }
 
   return (
@@ -70,7 +86,7 @@ export default function VerifyGate() {
             onClick={() => window.location.reload()}
             style={{ height: 38, padding: "0 18px", cursor: "pointer", fontSize: 13, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
           >
-            もう一度試す
+            もう一度読み込む
           </button>
         </div>
       ) : (

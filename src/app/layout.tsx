@@ -1,18 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-
-const notoSansJp = Noto_Sans_JP({
-  variable: "--font-noto-jp",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
 
 export const metadata: Metadata = {
   title: "PORT",
@@ -41,7 +28,7 @@ const themeInitScript = `
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // テーマの属性（data-vid-theme）は描画前のスクリプトで付けるので、そこだけの食い違いは警告しない。
-    <html lang="ja" className={`${inter.variable} ${notoSansJp.variable}`} suppressHydrationWarning>
+    <html lang="ja" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
