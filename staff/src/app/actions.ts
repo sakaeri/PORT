@@ -1419,3 +1419,69 @@ export async function setInquiryDeskSecretary(deskId: string, departmentId: stri
   const { error: moveErr } = await move;
   if (moveErr) throw moveErr;
 }
+
+// ---------- 紹介元（紹介カード）----------
+// 紹介カードを受け取った社長がトークで「〇〇の紹介です」と伝えたら、依頼主の
+// 画面で紹介元を選んで 5,000円分の紹介特典を残高に付ける（DB関数 grant_referral_credit）。
+
+export type ReferralSource = { id: string; name: string; active: boolean };
+
+export async function createReferralSource(...args: Parameters<typeof createReferralSourceInner>) {
+  return toResult("createReferralSource", () => createReferralSourceInner(...args));
+}
+
+async function createReferralSourceInner(name: string): Promise<ReferralSource> {
+  const ctx = await requireHqPrivileged();
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("紹介元の名前を入力してください");
+  if (trimmed.length > 40) throw new Error("紹介元の名前は40文字以内で入力してください");
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("referral_sources").insert({ org_id: ctx.orgId, name: trimmed }).select("id, name, active").single();
+  if (error || !data) throw error ?? new Error("紹介元を追加できませんでした");
+  return data;
+}
+
+export async function updateReferralSource(...args: Parameters<typeof updateReferralSourceInner>) {
+  return toResult("updateReferralSource", () => updateReferralSourceInner(...args));
+}
+
+// 一度使った紹介元も記録を残すため、削除ではなく非表示（active=false）にする。
+async function updateReferralSourceInner(id: string, fields: { name?: string; active?: boolean }) {
+  const ctx = await requireHqPrivileged();
+  const patch: { name?: string; active?: boolean } = {};
+  if (fields.name !== undefined) {
+    const trimmed = fields.name.trim();
+    if (!trimmed) throw new Error("紹介元の名前を入力してください");
+    if (trimmed.length > 40) throw new Error("紹介元の名前は40文字以内で入力してください");
+    patch.name = trimmed;
+  }
+  if (fields.active !== undefined) patch.active = fields.active;
+  const supabase = await createClient();
+  const { error } = await supabase.from("referral_sources").update(patch).eq("id", id).eq("org_id", ctx.orgId);
+  if (error) throw error;
+}
+
+export async function grantReferralCredit(...args: Parameters<typeof grantReferralCreditInner>) {
+  return toResult("grantReferralCredit", () => grantReferralCreditInner(...args));
+}
+
+async function grantReferralCreditInner(customerId: string, sourceId: string): Promise<number> {
+  await requireContext();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("grant_referral_credit", { p_customer_id: customerId, p_source_id: sourceId });
+  // DB関数の日本語のメッセージ（二重付与・窓口のトークなど）はそのまま見せる。
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function revokeReferralCredit(...args: Parameters<typeof revokeReferralCreditInner>) {
+  return toResult("revokeReferralCredit", () => revokeReferralCreditInner(...args));
+}
+
+async function revokeReferralCreditInner(customerId: string): Promise<number> {
+  await requireHqPrivileged();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("revoke_referral_credit", { p_customer_id: customerId });
+  if (error) throw new Error(error.message);
+  return data;
+}

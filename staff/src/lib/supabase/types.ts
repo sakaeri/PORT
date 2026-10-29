@@ -73,6 +73,19 @@ export interface ReportDetail {
 export interface Database {
   public: {
     Tables: {
+      referral_sources: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          active: boolean;
+          sort: number;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["referral_sources"]["Row"]> & { org_id: string; name: string };
+        Update: Partial<Database["public"]["Tables"]["referral_sources"]["Row"]>;
+        Relationships: [];
+      };
       inquiry_desks: {
         Row: {
           id: string;
@@ -190,6 +203,8 @@ export interface Database {
           converted_org_id: string | null;
           terms_accepted_at: string | null;
           desk_id: string | null;
+          referral_source_id: string | null;
+          referral_granted_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
@@ -565,7 +580,7 @@ export interface Database {
           customer_id: string;
           org_id: string;
           amount: number;
-          kind: "charge" | "deduction" | "refund_credit";
+          kind: "charge" | "deduction" | "refund_credit" | "referral_credit";
           request_id: string | null;
           stripe_checkout_session_id: string | null;
           created_at: string;
@@ -574,7 +589,7 @@ export interface Database {
           customer_id: string;
           org_id: string;
           amount: number;
-          kind: "charge" | "deduction" | "refund_credit";
+          kind: "charge" | "deduction" | "refund_credit" | "referral_credit";
         };
         Update: Partial<Database["public"]["Tables"]["customer_balance_transactions"]["Row"]>;
         Relationships: [];
@@ -628,6 +643,8 @@ export interface Database {
       desk_by_id: { Args: { p_id: string }; Returns: { id: string; org_id: string; name: string; active: boolean }[] };
       ensure_customer_for_org: { Args: { p_org_id: string; p_desk_id?: string }; Returns: string | null };
       finalize_hourly_billing: { Args: { p_request_id: string }; Returns: void };
+      grant_referral_credit: { Args: { p_customer_id: string; p_source_id: string }; Returns: number };
+      revoke_referral_credit: { Args: { p_customer_id: string }; Returns: number };
       charge_subscription_occurrence: { Args: { p_subscription_id: string }; Returns: string | null };
       credit_auto_recharge: { Args: { p_customer_id: string; p_org_id: string; p_amount: number; p_stripe_payment_intent_id: string }; Returns: boolean };
       my_companies: {
