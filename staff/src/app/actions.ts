@@ -325,7 +325,7 @@ export async function deleteReportFieldPreset(id: string) {
 }
 
 // 依頼主アプリのページ名。問い合わせ窓口の合言葉には使えない（src/proxy.ts と合わせる）。
-const RESERVED_SLUGS = new Set(["auth", "terms", "api"]);
+const RESERVED_SLUGS = new Set(["auth", "terms", "legal", "api"]);
 
 function validateSlug(rawSlug: string) {
   const slug = rawSlug.trim().toLowerCase();
