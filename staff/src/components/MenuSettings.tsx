@@ -5,7 +5,6 @@ import {
   Trash,
   Plus,
   X,
-  CaretDown,
   CaretRight,
   Gift,
   Wrench,
@@ -48,6 +47,7 @@ import { headingWeight } from "@/lib/style";
 import { useIsMobile } from "@/lib/useIsMobile";
 import InfoTooltip from "@/components/InfoTooltip";
 import InquiryDesksCard from "@/components/InquiryDesksCard";
+import ReferralSourcesCard, { type ReferralSourceWithCustomers } from "@/components/ReferralSourcesCard";
 import type { InquiryDesk } from "@/app/actions";
 import Modal from "@/components/Modal";
 import {
@@ -254,6 +254,7 @@ export default function MenuSettings({
   initialTemplates,
   initialTermsContent,
   initialDesks,
+  initialReferralSources,
   departments,
   canEdit,
 }: {
@@ -262,6 +263,7 @@ export default function MenuSettings({
   initialTemplates: IntakeForm[];
   initialTermsContent: string;
   initialDesks: InquiryDesk[];
+  initialReferralSources: ReferralSourceWithCustomers[];
   departments: { id: string; name: string }[];
   // 受付メニューはFC展開でのブランド・料金統一のため本部専用で、
   // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレは常に編集可。
@@ -337,17 +339,19 @@ export default function MenuSettings({
       {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} canDelete={canEdit} />}
       {tab === "terms" && <TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} />}
       {tab === "desks" && <InquiryDesksCard initialDesks={initialDesks} departments={departments} canEdit={canEdit} />}
+      {tab === "referrals" && <ReferralSourcesCard initialSources={initialReferralSources} canEdit={canEdit} />}
     </div>
   );
 }
 
-type TabKey = "menu" | "templates" | "terms" | "desks";
+type TabKey = "menu" | "templates" | "terms" | "desks" | "referrals";
 
 const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
   { key: "menu", label: "受付メニュー", mobileLabel: "メニュー" },
   { key: "templates", label: "返信テンプレ", mobileLabel: "テンプレ" },
   { key: "terms", label: "利用規約", mobileLabel: "規約" },
   { key: "desks", label: "問い合わせ窓口", mobileLabel: "窓口" },
+  { key: "referrals", label: "紹介元", mobileLabel: "紹介" },
 ];
 
 function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
@@ -431,16 +435,18 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
           return (
             <div key={m.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
               <button
-                onClick={() => setOpenId(open ? null : m.id)}
+                onClick={() => setOpenId(m.id)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
               >
-                {open ? <CaretDown size={13} /> : <CaretRight size={13} />}
                 {SelectedIcon && <SelectedIcon size={15} color="var(--color-accent)" style={{ flex: "none" }} />}
                 <span style={{ flex: 1, fontSize: 13.5, opacity: m.active ? 1 : 0.5 }}>{m.label || "（無題）"}</span>
                 <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{m.price != null ? `¥${m.price.toLocaleString("ja-JP")}` : "相談のみ"}</span>
+                <CaretRight size={13} color="var(--color-neutral-500)" />
               </button>
               {open && (
-                <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                <Modal onClose={() => setOpenId(null)} maxWidth={520}>
+                <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <PopupHeader title={m.label || "（無題）"} onClose={() => setOpenId(null)} />
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       <span style={label}>メニュー名</span>
@@ -545,6 +551,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                     )}
                   </div>
                 </div>
+                </Modal>
               )}
               {presetsMenuId === m.id && (
                 <Modal onClose={() => setPresetsMenuId(null)} maxWidth={480}>
@@ -570,6 +577,18 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
 }
 
 // canDelete: 返信テンプレの削除は本部（オーナー）のみ。追加・編集は秘書もできる。
+// 一覧の行をタップして開くポップアップの見出し（名前と閉じるボタン）。
+function PopupHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+      <button onClick={onClose} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+        <X size={18} />
+      </button>
+    </div>
+  );
+}
+
 function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; initialTemplates: IntakeForm[]; canDelete: boolean }) {
   const [templates, setTemplates] = useState(initialTemplates);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -629,15 +648,17 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
           return (
             <div key={t.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
               <button
-                onClick={() => openOnly(open ? null : t.id)}
+                onClick={() => openOnly(t.id)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
               >
-                {open ? <CaretDown size={13} /> : <CaretRight size={13} />}
                 <span style={{ flex: 1, fontSize: 13.5 }}>{t.label || "（無題）"}</span>
                 <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{t.intake_fields.length > 0 ? `項目${t.intake_fields.length}件` : "定型文のみ"}</span>
+                <CaretRight size={13} color="var(--color-neutral-500)" />
               </button>
               {open && (
-                <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                <Modal onClose={() => openOnly(null)} maxWidth={520}>
+                <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <PopupHeader title={t.label || "（無題）"} onClose={() => openOnly(null)} />
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={label}>テンプレ名</span>
                     <input value={t.label} onChange={(e) => patchLocal(t.id, { label: e.target.value })} onBlur={() => commit(t)} placeholder="例：ご予約の確認" className="vid-input" style={input} />
@@ -665,6 +686,7 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
                     )}
                   </div>
                 </div>
+                </Modal>
               )}
             </div>
           );

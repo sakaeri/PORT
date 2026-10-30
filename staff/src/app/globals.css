@@ -194,3 +194,10 @@ button:disabled {
 .vid-template-pick:hover:not(:disabled) {
   background: var(--color-bg) !important;
 }
+
+/* 売上・実績の数字のうち、長くなりやすいもの（評価）はスマホでは小さく出す。 */
+@media (max-width: 720px) {
+  .vid-stat-small {
+    font-size: 13px !important;
+  }
+}

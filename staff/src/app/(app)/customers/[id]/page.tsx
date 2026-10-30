@@ -51,10 +51,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     { data: latestRequestRow },
     { data: departmentRows },
     { data: hqSummaries },
+    { data: referralSourceRows },
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, name, staff_label, member_no, balance")
+      .select("id, name, staff_label, member_no, balance, desk_id, referral_source_id, referral_granted_at")
       .eq("id", id)
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
@@ -82,6 +83,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .maybeSingle(),
     supabase.from("departments").select("id, name").eq("org_id", ctx.orgId).order("created_at", { ascending: true }),
     supabase.rpc("hq_thread_summaries", { p_org_id: ctx.orgId }),
+    supabase.from("referral_sources").select("id, name, active").eq("org_id", ctx.orgId).order("sort", { ascending: true }).order("created_at", { ascending: true }),
   ]);
 
   if (!customer) notFound();
@@ -141,6 +143,16 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       viewerIsOwner={ctx.role === "owner" || ctx.role === "reception"}
       hqFeedbackThreadId={hqFeedbackRow?.thread_id ?? null}
       hqFeedbackUnread={hqFeedbackRow?.unread ?? false}
+      referral={
+        // 問い合わせ窓口のトークには残高が無いので、紹介特典の欄も出さない。
+        customer.desk_id
+          ? null
+          : {
+              sourceName: customer.referral_source_id ? ((referralSourceRows ?? []).find((s) => s.id === customer.referral_source_id)?.name ?? "") : null,
+              sources: (referralSourceRows ?? []).filter((s) => s.active).map((s) => ({ id: s.id, name: s.name })),
+              canGrant: ctx.role === "owner" || ctx.role === "reception" || ctx.role === "dept_manager",
+            }
+      }
     />
   );
 }

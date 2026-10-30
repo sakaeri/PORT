@@ -23,6 +23,7 @@ import {
   addIntakeField,
   updateIntakeField,
   deleteIntakeField,
+  grantReferralCredit,
 } from "@/app/actions";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import HqFeedbackChat from "@/components/HqFeedbackChat";
@@ -31,6 +32,7 @@ import QuoteDialog, { type MenuOption } from "@/components/QuoteDialog";
 import TextComposer from "@/components/TextComposer";
 import AttachmentList from "@/components/AttachmentList";
 import Modal from "@/components/Modal";
+import InfoTooltip from "@/components/InfoTooltip";
 import { PHASE_LABEL } from "@/lib/stage";
 import type { AppRole, RequestPhase } from "@/lib/supabase/types";
 
@@ -572,6 +574,7 @@ export default function CustomerThread({
   viewerIsOwner,
   hqFeedbackThreadId,
   hqFeedbackUnread,
+  referral,
 }: {
   customer: { id: string; name: string; staffLabel: string | null; memberNo: string | null; balance: number };
   thread: { id: string; archived: boolean; departmentId: string | null } | null;
@@ -591,6 +594,8 @@ export default function CustomerThread({
   viewerIsOwner: boolean;
   hqFeedbackThreadId: string | null;
   hqFeedbackUnread: boolean;
+  // 紹介特典（null は問い合わせ窓口のトークで、欄ごと出さない）。
+  referral: ReferralInfo | null;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
@@ -612,7 +617,7 @@ export default function CustomerThread({
   const scrollRef = useRef<HTMLDivElement>(null);
   const skipAutoScrollRef = useRef(false);
   const isNearBottomRef = useRef(true);
-  const [balance] = useState(customer.balance);
+  const [balance, setBalance] = useState(customer.balance);
 
   const [staffLabel, setStaffLabel] = useState(customer.staffLabel);
   const [labelOpen, setLabelOpen] = useState(false);
@@ -1072,6 +1077,7 @@ export default function CustomerThread({
           )}
           <RatingsSummary ratings={ratings} />
           <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
+          {referral && <ReferralSection customerId={customer.id} referral={referral} onBalanceChange={setBalance} />}
           {canSeeHqFeedback && (
             <HqFeedbackSection threadId={hqFeedbackThreadId} unread={hqFeedbackUnread} orgId={orgId} currentUserId={currentUserId} />
           )}
@@ -1093,6 +1099,69 @@ export default function CustomerThread({
         }}
       />
     )}
+    </div>
+  );
+}
+
+type ReferralInfo = {
+  sourceName: string | null;
+  sources: { id: string; name: string }[];
+  canGrant: boolean;
+};
+
+// 「〇〇の紹介です」と言われたら、紹介元を選んで 5,000円分の紹介特典を付ける（1人1回）。
+function ReferralSection({ customerId, referral, onBalanceChange }: { customerId: string; referral: ReferralInfo; onBalanceChange: (balance: number) => void }) {
+  const [sourceName, setSourceName] = useState(referral.sourceName);
+  const [selected, setSelected] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function grant() {
+    if (busy || !selected) return;
+    const name = referral.sources.find((s) => s.id === selected)?.name ?? "";
+    if (!window.confirm(`「${name}」の紹介として、5,000円分を残高に入れます。よろしいですか？`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { data } = unwrap(await grantReferralCredit(customerId, selected));
+      onBalanceChange(data!);
+      setSourceName(name);
+      setSelected("");
+    } catch (e) {
+      setError(errorMessage(e, "付けられませんでした"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (sourceName === null && (!referral.canGrant || referral.sources.length === 0)) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>紹介元</span>
+        <InfoTooltip text="トークで「〇〇の紹介です」と言われたら選びます。選ぶと5,000円分が残高に入ります（1人1回・有効期限なし）。紹介元はメニュー管理の「紹介元」で登録します。" />
+      </div>
+      {sourceName !== null ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+          <span style={{ flex: 1, minWidth: 0 }}>{sourceName || "（削除された紹介元）"}・特典済み</span>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 6 }}>
+          <select value={selected} onChange={(e) => setSelected(e.target.value)} className="vid-input" style={{ flex: 1, minWidth: 0, height: 30, padding: "0 8px", fontSize: 12, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
+            <option value="">選ぶ</option>
+            {referral.sources.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <button onClick={grant} disabled={busy || !selected} style={{ flex: "none", height: 30, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: busy || !selected ? 0.6 : 1 }}>
+            特典を付ける
+          </button>
+        </div>
+      )}
+      {error && <div style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</div>}
     </div>
   );
 }
