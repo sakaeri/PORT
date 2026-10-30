@@ -21,7 +21,7 @@ export default async function CustomersPage() {
   const supabase = await createClient();
   // 依存のないクエリは並列で投げる。依頼主一覧に必要な「各依頼主の最新メッセージ・未読」は、
   // 案件トークまで巻き込む二重ネストの embed ではなく、確実に正しい専用RPCでまとめて取る。
-  const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }, { data: requests }, { data: deskThreads }] = await Promise.all([
+  const [{ data: customers, error }, { data: summaries, error: summariesError }, { data: departments }, { data: requests }, { data: deskThreads }, { data: threadTimes }] = await Promise.all([
     supabase
       .from("customers")
       .select("id, name, staff_label, member_no, active, profile:profiles!customers_profile_id_fkey(avatar_url)")
@@ -36,10 +36,13 @@ export default async function CustomersPage() {
       .order("created_at", { ascending: false }),
     // 問い合わせ窓口（TeeRA など）のトークは、一覧で窓口名を出す。
     supabase.from("threads").select("customer_id, inquiry_desks(name)").eq("org_id", ctx.orgId).eq("kind", "customer").not("desk_id", "is", null),
+    // 最後にメッセージが動いた依頼主を上にするため。
+    supabase.from("threads").select("customer_id, last_msg_at").eq("org_id", ctx.orgId).eq("kind", "customer"),
   ]);
   if (error) console.error("customers select failed:", error);
   if (summariesError) console.error("customer_thread_summaries failed:", summariesError);
 
+  const lastMessageAtByCustomerId = new Map((threadTimes ?? []).map((t) => [t.customer_id, t.last_msg_at ?? ""]));
   const summaryByCustomerId = new Map((summaries ?? []).map((s) => [s.customer_id, s]));
   const deskNameByCustomerId = new Map<string, string>();
   for (const t of deskThreads ?? []) {
@@ -102,7 +105,8 @@ export default async function CustomersPage() {
     })
     // やり取りが一度もない依頼主（ページを開いただけ）、または自動ウェルカム
     // メッセージしかない幽霊依頼主は一覧に一切出さない。
-    .filter((r) => r.lastMessagePreview !== null && !r.isGhost);
+    .filter((r) => r.lastMessagePreview !== null && !r.isGhost)
+    .sort((a, b) => (lastMessageAtByCustomerId.get(b.id) ?? "").localeCompare(lastMessageAtByCustomerId.get(a.id) ?? ""));
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>

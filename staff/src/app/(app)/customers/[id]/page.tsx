@@ -60,12 +60,13 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
     supabase.from("threads").select("id, archived_at, department_id").eq("customer_id", id).eq("kind", "customer").maybeSingle(),
-    supabase.from("intake_forms").select("id, label, note, intake_fields(id, label, kind, required, sort)").eq("org_id", ctx.orgId).order("sort", { ascending: true }),
+    supabase.from("intake_forms").select("id, label, note, intake_fields(id, label, kind, required, sort)").eq("org_id", ctx.orgId).order("last_used_at", { ascending: false }).order("sort", { ascending: true }),
     supabase
       .from("menus")
       .select("id, label, note, price, payout")
       .eq("org_id", ctx.orgId)
       .eq("active", true)
+      .order("last_used_at", { ascending: false })
       .order("sort", { ascending: true }),
     supabase
       .from("work_memos")
