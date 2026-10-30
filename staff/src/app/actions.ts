@@ -1374,11 +1374,20 @@ async function createInquiryDeskInner(name: string): Promise<InquiryDesk> {
   return data;
 }
 
-export async function setInquiryDeskActive(deskId: string, active: boolean) {
+export async function setInquiryDeskActive(...args: Parameters<typeof setInquiryDeskActiveInner>) {
+  return toResult("setInquiryDeskActive", () => setInquiryDeskActiveInner(...args));
+}
+
+async function setInquiryDeskActiveInner(deskId: string, active: boolean) {
   const ctx = await requireHqPrivileged();
   const admin = createServiceRoleClient();
-  const { error } = await admin.from("inquiry_desks").update({ active }).eq("id", deskId).eq("org_id", ctx.orgId);
+  // 対象が見つからず0件のまま終わっても、エラーにならず「切り替わったように見える」ので、件数で確かめる。
+  const { data, error } = await admin.from("inquiry_desks").update({ active }).eq("id", deskId).eq("org_id", ctx.orgId).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) {
+    console.error("setInquiryDeskActive: no row updated", { deskId, orgId: ctx.orgId });
+    throw new Error("切り替えできませんでした。画面を開き直してからもう一度お試しください。");
+  }
 }
 
 // 窓口のURL（/teera の部分）をあとから変える。前のURLは使えなくなる。
@@ -1395,7 +1404,11 @@ async function updateInquiryDeskSlugInner(deskId: string, rawSlug: string): Prom
     admin.from("inquiry_desks").select("id").eq("slug", slug).neq("id", deskId).maybeSingle(),
   ]);
   if (org || desk) throw new Error("このURLはすでに使われています");
-  const { error } = await admin.from("inquiry_desks").update({ slug }).eq("id", deskId).eq("org_id", ctx.orgId);
+  const { data: updated, error } = await admin.from("inquiry_desks").update({ slug }).eq("id", deskId).eq("org_id", ctx.orgId).select("id");
+  if (!error && (!updated || updated.length === 0)) {
+    console.error("updateInquiryDeskSlug: no row updated", { deskId, orgId: ctx.orgId });
+    throw new Error("変更できませんでした。画面を開き直してからもう一度お試しください。");
+  }
   if (error) throw error;
   return slug;
 }

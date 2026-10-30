@@ -63,6 +63,12 @@ export default function ReferralSourcesCard({ initialSources, canEdit }: { initi
   const [editName, setEditName] = useState("");
   const opened = sources.find((s) => s.id === openId) ?? null;
 
+  function closeAdd() {
+    setAdding(false);
+    setName("");
+    setError("");
+  }
+
   async function add() {
     if (busy || !name.trim()) return;
     setBusy(true);
@@ -100,7 +106,7 @@ export default function ReferralSourcesCard({ initialSources, canEdit }: { initi
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>紹介元</div>
         <InfoTooltip text="紹介カードを渡してくれる方を登録します。依頼主がトークで「〇〇の紹介です」と伝えたら、依頼主の画面の「紹介元」で選ぶと、5,000円分が残高に入ります（1人1回・有効期限なし）。" />
         <div style={{ flex: 1 }} />
-        {canEdit && !adding && (
+        {canEdit && (
           <button onClick={() => setAdding(true)} style={smallBtn}>
             <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
             紹介元を追加
@@ -109,23 +115,38 @@ export default function ReferralSourcesCard({ initialSources, canEdit }: { initi
       </div>
 
       {adding && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例：〇〇税理士事務所" className="vid-input" style={input} autoFocus />
-          <button onClick={add} disabled={busy || !name.trim()} style={smallBtn}>
-            追加
-          </button>
-          <button
-            onClick={() => {
-              setAdding(false);
-              setName("");
-            }}
-            style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}
-          >
-            やめる
-          </button>
-        </div>
+        <Modal onClose={() => !busy && closeAdd()} maxWidth={440}>
+          <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17 }}>紹介元を追加</div>
+              <button onClick={closeAdd} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+                <X size={18} />
+              </button>
+            </div>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) add();
+              }}
+              placeholder="例：〇〇税理士事務所"
+              className="vid-input"
+              style={{ ...input, flex: "none", height: 38 }}
+              autoFocus
+            />
+            {error && <div style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</div>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={closeAdd} disabled={busy} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+                キャンセル
+              </button>
+              <button onClick={add} disabled={busy || !name.trim()} style={{ ...smallBtn, color: "var(--color-accent-100)", background: "var(--color-accent-900)", opacity: busy || !name.trim() ? 0.6 : 1 }}>
+                {busy ? "追加中…" : "追加する"}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
-      {error && !opened && <div style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</div>}
+      {error && !opened && !adding && <div style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</div>}
       {sources.length === 0 && !adding && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ紹介元がありません。</div>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

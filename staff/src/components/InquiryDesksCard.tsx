@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Copy, Check, PencilSimple } from "@phosphor-icons/react";
+import { Plus, Copy, Check, PencilSimple, X } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage, unwrap } from "@/lib/errors";
 import { createInquiryDesk, setInquiryDeskActive, setInquiryDeskSecretary, updateInquiryDeskSlug, type InquiryDesk } from "@/app/actions";
 import InfoTooltip from "@/components/InfoTooltip";
+import Modal from "@/components/Modal";
 
 // 依頼主アプリの公開URL（OrgsAdmin.tsx の事業者URLと同じドメイン）。
 const CLIENT_APP_ORIGIN = "https://port.s-stylegolf.com";
@@ -103,12 +104,14 @@ export default function InquiryDesksCard({
     }
   }
 
+  function closeAdd() {
+    setAdding(false);
+    setName("");
+    setError("");
+  }
+
   async function create() {
-    if (saving) return;
-    if (!name.trim()) {
-      setAdding(false);
-      return;
-    }
+    if (saving || !name.trim()) return;
     setSaving(true);
     setError("");
     try {
@@ -129,7 +132,7 @@ export default function InquiryDesksCard({
     setTogglingId(desk.id);
     setError("");
     try {
-      await setInquiryDeskActive(desk.id, !desk.active);
+      unwrap(await setInquiryDeskActive(desk.id, !desk.active));
       setDesks((d) => d.map((x) => (x.id === desk.id ? { ...x, active: !desk.active } : x)));
     } catch (e) {
       setError(errorMessage(e, "切り替えできませんでした"));
@@ -154,7 +157,7 @@ export default function InquiryDesksCard({
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>問い合わせ窓口</div>
         <InfoTooltip text="他社サービスのお問い合わせを引き受けるときの入口です。名前を入れるだけでURLができます。「担当」で決めた秘書が、その窓口から届いたトークを受け持ちます（トークごとに別の秘書へ振ることもできます）。依頼主側はチャットだけの画面になります。受付をオフにすると新しい問い合わせは止まり、過去のトークは残ります。" />
         <div style={{ flex: 1 }} />
-        {canEdit && !adding && (
+        {canEdit && (
           <button onClick={() => setAdding(true)} style={smallBtn}>
             <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
             窓口を追加
@@ -163,29 +166,39 @@ export default function InquiryDesksCard({
       </div>
 
       {adding && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) create();
-              if (e.key === "Escape") setAdding(false);
-            }}
-            placeholder="窓口の名前（例：TeeRA）"
-            className="vid-input"
-            style={input}
-          />
-          <button onClick={() => { setAdding(false); setName(""); }} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-            やめる
-          </button>
-          <button onClick={create} disabled={saving} style={{ ...smallBtn, color: "var(--color-accent-100)", background: "var(--color-accent-900)", opacity: saving ? 0.6 : 1 }}>
-            {saving ? "作成中…" : "作成"}
-          </button>
-        </div>
+        <Modal onClose={() => !saving && closeAdd()} maxWidth={440}>
+          <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17 }}>窓口を追加</div>
+              <button onClick={closeAdd} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+                <X size={18} />
+              </button>
+            </div>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) create();
+              }}
+              placeholder="窓口の名前（例：TeeRA）"
+              className="vid-input"
+              style={{ ...input, flex: "none", height: 38 }}
+            />
+            {error && <div style={{ fontSize: 12, color: "var(--color-accent-200)" }}>{error}</div>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={closeAdd} disabled={saving} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+                キャンセル
+              </button>
+              <button onClick={create} disabled={saving || !name.trim()} style={{ ...smallBtn, color: "var(--color-accent-100)", background: "var(--color-accent-900)", opacity: saving || !name.trim() ? 0.6 : 1 }}>
+                {saving ? "作成中…" : "作成する"}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
-      {error && <div style={{ fontSize: 12, color: "var(--color-accent-200)" }}>{error}</div>}
+      {error && !adding && <div style={{ fontSize: 12, color: "var(--color-accent-200)" }}>{error}</div>}
 
       {desks.length === 0 && !adding && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ窓口がありません。</div>}
 
@@ -217,14 +230,15 @@ export default function InquiryDesksCard({
                   </button>
                 </div>
               ) : (
+                // 受付を止めている窓口は、URLの変更・コピーをできないようにする（使われないURLを配らないため）。
                 <button
-                  onClick={() => canEdit && startEdit(d)}
-                  disabled={!canEdit}
-                  title={canEdit ? "URLを変える" : undefined}
-                  style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4, maxWidth: "100%", padding: 0, cursor: canEdit ? "pointer" : "default", fontSize: 11, color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
+                  onClick={() => canEdit && d.active && startEdit(d)}
+                  disabled={!canEdit || !d.active}
+                  title={canEdit && d.active ? "URLを変える" : undefined}
+                  style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4, maxWidth: "100%", padding: 0, cursor: canEdit && d.active ? "pointer" : "default", fontSize: 11, color: "var(--color-neutral-500)", background: "transparent", border: "none" }}
                 >
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>/{d.slug}</span>
-                  {canEdit && <PencilSimple size={11} style={{ flex: "none" }} />}
+                  {canEdit && d.active && <PencilSimple size={11} style={{ flex: "none" }} />}
                 </button>
               )}
               <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
@@ -247,7 +261,13 @@ export default function InquiryDesksCard({
             </div>
             {editingId !== d.id && (
               <>
-                <button onClick={() => copy(d)} aria-label="URLをコピー" title="URLをコピー" style={{ ...smallBtn, width: 32, padding: 0, display: "grid", placeItems: "center" }}>
+                <button
+                  onClick={() => d.active && copy(d)}
+                  disabled={!d.active}
+                  aria-label="URLをコピー"
+                  title={d.active ? "URLをコピー" : undefined}
+                  style={{ ...smallBtn, width: 32, padding: 0, display: "grid", placeItems: "center", opacity: d.active ? 1 : 0.35, cursor: d.active ? "pointer" : "default" }}
+                >
                   {copiedId === d.id ? <Check size={14} /> : <Copy size={14} />}
                 </button>
                 <button
