@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { CaretDown, CaretRight } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
+import { CaretRight, X } from "@phosphor-icons/react";
+import { headingWeight } from "@/lib/style";
+import Modal from "@/components/Modal";
 import { setDepartmentRoyaltyPct } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
 import Avatar, { avatarInitial } from "@/components/Avatar";
@@ -49,7 +52,8 @@ export default function DepartmentStatsList({
   canEditRoyalty: boolean;
 }) {
   const [departments, setDepartments] = useState(initialDepartments);
-  const [expandedId, setExpandedId] = useState<string | null>(departments.length === 1 ? departments[0].id : null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const router = useRouter();
   const [royaltyDraft, setRoyaltyDraft] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -67,6 +71,8 @@ export default function DepartmentStatsList({
     try {
       await setDepartmentRoyaltyPct(d.id, pct);
       setDepartments((rows) => rows.map((r) => (r.id === d.id ? { ...r, royaltyPct: pct } : r)));
+      // 上の「秘書への支払い」もロイヤリティから計算しているので、出し直す。
+      router.refresh();
     } catch (e) {
       setError(errorMessage(e, "変更できませんでした"));
     } finally {
@@ -81,16 +87,15 @@ export default function DepartmentStatsList({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {departments.map((d) => {
-        const expanded = expandedId === d.id;
+        const open = openId === d.id;
         const isRealDepartment = d.id !== "unassigned";
         const royaltyAmount = d.royaltyPct != null ? Math.round((d.monthRevenue * d.royaltyPct) / 100) : null;
         return (
           <div key={d.id} style={{ borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
             <button
-              onClick={() => setExpandedId(expanded ? null : d.id)}
+              onClick={() => setOpenId(d.id)}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", cursor: "pointer", background: "transparent", border: "none", textAlign: "left", color: "var(--color-text)" }}
             >
-              {expanded ? <CaretDown size={14} color="var(--color-neutral-500)" /> : <CaretRight size={14} color="var(--color-neutral-500)" />}
               {/* 窓口未設定分は事業所全体のくくりなので、サイドバーと同じ事業所のロゴを出す */}
               <Avatar url={isRealDepartment ? d.avatarUrl : "/logo.png"} initial={avatarInitial(d.name)} size={28} />
               <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
@@ -98,12 +103,22 @@ export default function DepartmentStatsList({
                 <span style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>★{d.monthRatingAvg?.toFixed(1)}</span>
               )}
               <span style={{ flex: "none", fontSize: 12.5, fontFamily: "var(--font-heading)" }}>{yen(d.monthRevenue)}</span>
+              <CaretRight size={14} color="var(--color-neutral-500)" />
             </button>
-            {expanded && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 14px 14px", borderTop: "1px solid var(--color-divider)", paddingTop: 12 }}>
-                <div style={{ display: "flex", gap: 14, fontSize: 12, color: "var(--color-neutral-500)" }}>
-                  <span>今月の完了 {d.monthCompleted}件</span>
-                  <span>今月の評価 {d.monthRatingCount > 0 ? `★${d.monthRatingAvg?.toFixed(1)}（${d.monthRatingCount}件）` : "まだありません"}</span>
+            {open && (
+              <Modal onClose={() => setOpenId(null)} maxWidth={560}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "var(--space-6)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Avatar url={isRealDepartment ? d.avatarUrl : "/logo.png"} initial={avatarInitial(d.name)} size={28} />
+                  <div style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</div>
+                  <button onClick={() => setOpenId(null)} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+                    <X size={18} />
+                  </button>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, color: "var(--color-neutral-500)" }}>
+                  <span>売上 {yen(d.monthRevenue)}</span>
+                  <span>完了 {d.monthCompleted}件</span>
+                  <span>評価 {d.monthRatingCount > 0 ? `★${d.monthRatingAvg?.toFixed(1)}（${d.monthRatingCount}件）` : "まだありません"}</span>
                 </div>
 
                 {isRealDepartment && (
@@ -131,12 +146,13 @@ export default function DepartmentStatsList({
                 )}
 
                 <MonthlyMenuBreakdown months={d.months} />
+                {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
               </div>
+              </Modal>
             )}
           </div>
         );
       })}
-      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
     </div>
   );
 }

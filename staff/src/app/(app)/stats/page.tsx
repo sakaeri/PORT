@@ -250,7 +250,7 @@ async function OrgStats({
         <StatTile label="チャージ金額" value={yen(monthCharges)} />
         <StatTile label="紹介登録" value={monthReferrals > 0 ? `${monthReferrals}人・${yen(monthReferrals * REFERRAL_CREDIT)}` : "0人"} />
         <StatTile label="秘書への支払い" value={yen(grandPayout)} />
-        <StatTile label="評価" value={grandRatingCount > 0 ? `★${grandRatingAvg?.toFixed(1)}（${grandRatingCount}件）` : "まだありません"} />
+        <StatTile label="評価" small value={grandRatingCount > 0 ? `★${grandRatingAvg?.toFixed(1)}（${grandRatingCount}件）` : "まだありません"} />
       </div>
 
       <DepartmentStatsList departments={stats} canEditRoyalty={viewerRole === "owner"} />
@@ -258,11 +258,14 @@ async function OrgStats({
   );
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
+// small：スマホでは文字を小さくして、長い値（「まだありません」など）が切れないようにする。
+function StatTile({ label, value, small }: { label: string; value: string; small?: boolean }) {
   return (
     <div style={{ minWidth: 0, padding: "12px 10px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}>
       <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
+      <div className={small ? "vid-stat-small" : undefined} style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {value}
+      </div>
     </div>
   );
 }
