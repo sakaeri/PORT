@@ -59,6 +59,9 @@ export default async function TermsPage() {
       <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 700 }}>利用規約</div>
         <div style={{ fontSize: 13.5, lineHeight: 1.9, color: "var(--color-text)", whiteSpace: "pre-wrap" }}>{content}</div>
+        <a href="/legal" style={{ fontSize: 12, color: "var(--color-accent)" }}>
+          特定商取引法に基づく表記
+        </a>
       </div>
     </main>
   );

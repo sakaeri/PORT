@@ -13,7 +13,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // 先頭のパス（/teera など）が問い合わせ窓口の合言葉なら、"/" に内部で
 // 書き換えて窓口として表示する。
 // アプリ自身のページ。窓口の合言葉としては使えない。
-const RESERVED_SEGMENTS = new Set(["auth", "terms", "api", "manifest.webmanifest"]);
+const RESERVED_SEGMENTS = new Set(["auth", "terms", "legal", "api", "manifest.webmanifest"]);
 
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);

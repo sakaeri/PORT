@@ -286,6 +286,11 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
         </div>
 
         {!isDesk && <GateInfo />}
+        {!isDesk && (
+          <a href="/legal" target="_blank" rel="noreferrer" style={{ alignSelf: "center", fontSize: 11, color: "var(--color-neutral-500)" }}>
+            特定商取引法に基づく表記
+          </a>
+        )}
       </div>
     </main>
   );
