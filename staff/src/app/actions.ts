@@ -1473,15 +1473,3 @@ async function grantReferralCreditInner(customerId: string, sourceId: string): P
   if (error) throw new Error(error.message);
   return data;
 }
-
-export async function revokeReferralCredit(...args: Parameters<typeof revokeReferralCreditInner>) {
-  return toResult("revokeReferralCredit", () => revokeReferralCreditInner(...args));
-}
-
-async function revokeReferralCreditInner(customerId: string): Promise<number> {
-  await requireHqPrivileged();
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("revoke_referral_credit", { p_customer_id: customerId });
-  if (error) throw new Error(error.message);
-  return data;
-}

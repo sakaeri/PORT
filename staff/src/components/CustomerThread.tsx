@@ -24,7 +24,6 @@ import {
   updateIntakeField,
   deleteIntakeField,
   grantReferralCredit,
-  revokeReferralCredit,
 } from "@/app/actions";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
 import HqFeedbackChat from "@/components/HqFeedbackChat";
@@ -1108,7 +1107,6 @@ type ReferralInfo = {
   sourceName: string | null;
   sources: { id: string; name: string }[];
   canGrant: boolean;
-  canRevoke: boolean;
 };
 
 // 「〇〇の紹介です」と言われたら、紹介元を選んで 5,000円分の紹介特典を付ける（1人1回）。
@@ -1136,22 +1134,6 @@ function ReferralSection({ customerId, referral, onBalanceChange }: { customerId
     }
   }
 
-  async function revoke() {
-    if (busy) return;
-    if (!window.confirm("紹介特典を取り消します。残高から最大5,000円を引きます（すでに使った分は戻りません）。よろしいですか？")) return;
-    setBusy(true);
-    setError("");
-    try {
-      const { data } = unwrap(await revokeReferralCredit(customerId));
-      onBalanceChange(data!);
-      setSourceName(null);
-    } catch (e) {
-      setError(errorMessage(e, "取り消せませんでした"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (sourceName === null && (!referral.canGrant || referral.sources.length === 0)) return null;
 
   return (
@@ -1163,11 +1145,6 @@ function ReferralSection({ customerId, referral, onBalanceChange }: { customerId
       {sourceName !== null ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
           <span style={{ flex: 1, minWidth: 0 }}>{sourceName || "（削除された紹介元）"}・特典済み</span>
-          {referral.canRevoke && (
-            <button onClick={revoke} disabled={busy} style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-              取り消し
-            </button>
-          )}
         </div>
       ) : (
         <div style={{ display: "flex", gap: 6 }}>

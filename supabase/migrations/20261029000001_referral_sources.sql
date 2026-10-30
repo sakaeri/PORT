@@ -71,37 +71,7 @@ begin
 end $$;
 grant execute on function grant_referral_credit(uuid, uuid) to authenticated;
 
--- 間違えて付けたときの取り消し（本部だけ）。もう使われた分は戻せないので、
--- 残っている残高から最大 5,000円だけ引く。
-create or replace function revoke_referral_credit(p_customer_id uuid) returns integer
-language plpgsql security definer set search_path = public as $$
-declare
-  c customers%rowtype;
-  v_back integer;
-begin
-  if auth_role() not in ('owner', 'reception') then
-    raise exception '取り消しは本部だけができます';
-  end if;
-
-  select * into c from customers where id = p_customer_id for update;
-  if not found or c.org_id <> auth_org() then
-    raise exception '依頼主が見つかりません';
-  end if;
-  if c.referral_granted_at is null then
-    raise exception '紹介特典は付いていません';
-  end if;
-
-  v_back := least(5000, greatest(c.balance, 0));
-  update customers
-  set balance = balance - v_back, referral_source_id = null, referral_granted_at = null
-  where id = c.id;
-  if v_back > 0 then
-    insert into customer_balance_transactions (customer_id, org_id, amount, kind)
-    values (c.id, c.org_id, -v_back, 'referral_credit');
-  end if;
-
-  return c.balance - v_back;
-end $$;
-grant execute on function revoke_referral_credit(uuid) to authenticated;
+-- 取り消しの仕組みは使わない（付ける前に確認を出すので十分）。
+drop function if exists revoke_referral_credit(uuid);
 
 notify pgrst, 'reload schema';

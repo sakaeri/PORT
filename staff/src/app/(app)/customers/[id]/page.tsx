@@ -151,7 +151,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               sourceName: customer.referral_source_id ? ((referralSourceRows ?? []).find((s) => s.id === customer.referral_source_id)?.name ?? "") : null,
               sources: (referralSourceRows ?? []).filter((s) => s.active).map((s) => ({ id: s.id, name: s.name })),
               canGrant: ctx.role === "owner" || ctx.role === "reception" || ctx.role === "dept_manager",
-              canRevoke: ctx.role === "owner",
             }
       }
     />

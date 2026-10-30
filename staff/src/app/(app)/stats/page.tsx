@@ -246,10 +246,10 @@ async function OrgStats({
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         <StatTile label="総売上" value={yen(grandMonthRevenue)} />
-        <StatTile label="秘書への支払い" value={yen(grandPayout)} />
+        <StatTile label="完了件数" value={`${grandMonthCompleted}件`} />
         <StatTile label="チャージ金額" value={yen(monthCharges)} />
         <StatTile label="紹介登録" value={monthReferrals > 0 ? `${monthReferrals}人・${yen(monthReferrals * REFERRAL_CREDIT)}` : "0人"} />
-        <StatTile label="完了件数" value={`${grandMonthCompleted}件`} />
+        <StatTile label="秘書への支払い" value={yen(grandPayout)} />
         <StatTile label="評価" value={grandRatingCount > 0 ? `★${grandRatingAvg?.toFixed(1)}（${grandRatingCount}件）` : "まだありません"} />
       </div>
 

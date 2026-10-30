@@ -644,7 +644,6 @@ export interface Database {
       ensure_customer_for_org: { Args: { p_org_id: string; p_desk_id?: string }; Returns: string | null };
       finalize_hourly_billing: { Args: { p_request_id: string }; Returns: void };
       grant_referral_credit: { Args: { p_customer_id: string; p_source_id: string }; Returns: number };
-      revoke_referral_credit: { Args: { p_customer_id: string }; Returns: number };
       charge_subscription_occurrence: { Args: { p_subscription_id: string }; Returns: string | null };
       credit_auto_recharge: { Args: { p_customer_id: string; p_org_id: string; p_amount: number; p_stripe_payment_intent_id: string }; Returns: boolean };
       my_companies: {

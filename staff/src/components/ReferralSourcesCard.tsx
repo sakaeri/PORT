@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CaretDown, CaretRight, Plus } from "@phosphor-icons/react";
+import { CaretRight, Plus, X } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage, unwrap } from "@/lib/errors";
 import { createReferralSource, updateReferralSource } from "@/app/actions";
 import InfoTooltip from "@/components/InfoTooltip";
+import Modal from "@/components/Modal";
 
 export type ReferralSourceWithCustomers = {
   id: string;
@@ -50,7 +51,7 @@ const input: React.CSSProperties = {
 };
 
 // 紹介カードを渡してくれる先生など。ここに登録しておくと、依頼主の画面で
-// 「〇〇の紹介」を選べる。タップすると、その紹介元から来た依頼主が開く。
+// 「〇〇の紹介」を選べる。タップすると、その紹介元から来た依頼主がポップアップで出る。
 export default function ReferralSourcesCard({ initialSources, canEdit }: { initialSources: ReferralSourceWithCustomers[]; canEdit: boolean }) {
   const [sources, setSources] = useState(initialSources);
   const [adding, setAdding] = useState(false);
@@ -60,6 +61,7 @@ export default function ReferralSourcesCard({ initialSources, canEdit }: { initi
   const [openId, setOpenId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const opened = sources.find((s) => s.id === openId) ?? null;
 
   async function add() {
     if (busy || !name.trim()) return;
@@ -123,72 +125,85 @@ export default function ReferralSourcesCard({ initialSources, canEdit }: { initi
           </button>
         </div>
       )}
-      {error && <div style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</div>}
+      {error && !opened && <div style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</div>}
       {sources.length === 0 && !adding && <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ紹介元がありません。</div>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {sources.map((s) => {
-          const open = openId === s.id;
-          return (
-            <div key={s.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden", opacity: s.active ? 1 : 0.55 }}>
-              <button
-                onClick={() => setOpenId(open ? null : s.id)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
-              >
-                {open ? <CaretDown size={13} /> : <CaretRight size={13} />}
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {s.name}
-                  {!s.active && "（非表示）"}
-                </span>
-                <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{s.customers.length}人</span>
-              </button>
-              {open && (
-                <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-                  {s.customers.length === 0 ? (
-                    <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>まだ紹介された依頼主はいません。</div>
-                  ) : (
-                    s.customers.map((c) => (
-                      <Link key={c.id} href={`/customers/${c.id}`} style={{ fontSize: 13, color: "var(--color-accent)", textDecoration: "none" }}>
-                        {c.label}
-                      </Link>
-                    ))
-                  )}
-                  {canEdit && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingTop: 8, borderTop: "1px solid var(--color-divider)" }}>
-                      {editingId === s.id ? (
-                        <>
-                          <input value={editName} onChange={(e) => setEditName(e.target.value)} className="vid-input" style={input} autoFocus />
-                          <button onClick={() => save(s.id, { name: editName })} disabled={busy || !editName.trim()} style={smallBtn}>
-                            保存
-                          </button>
-                          <button onClick={() => setEditingId(null)} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-                            やめる
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => {
-                              setEditingId(s.id);
-                              setEditName(s.name);
-                            }}
-                            style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}
-                          >
-                            名前を変える
-                          </button>
-                          <button onClick={() => save(s.id, { active: !s.active })} disabled={busy} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
-                            {s.active ? "非表示にする" : "表示に戻す"}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {sources.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => {
+              setOpenId(s.id);
+              setEditingId(null);
+              setError("");
+            }}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", textAlign: "left", color: "var(--color-text)", opacity: s.active ? 1 : 0.55 }}
+          >
+            <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {s.name}
+              {!s.active && "（非表示）"}
+            </span>
+            <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{s.customers.length}人</span>
+            <CaretRight size={13} color="var(--color-neutral-500)" />
+          </button>
+        ))}
       </div>
+
+      {opened && (
+        <Modal onClose={() => setOpenId(null)} maxWidth={440}>
+          <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opened.name}</div>
+              <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{opened.customers.length}人</span>
+              <button onClick={() => setOpenId(null)} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
+                <X size={18} />
+              </button>
+            </div>
+            {opened.customers.length === 0 ? (
+              <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>まだ紹介された依頼主はいません。</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {opened.customers.map((c) => (
+                  <Link key={c.id} href={`/customers/${c.id}`} style={{ fontSize: 13.5, color: "var(--color-accent)", textDecoration: "none" }}>
+                    {c.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+            {canEdit && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingTop: 12, borderTop: "1px solid var(--color-divider)" }}>
+                {editingId === opened.id ? (
+                  <>
+                    <input value={editName} onChange={(e) => setEditName(e.target.value)} className="vid-input" style={input} autoFocus />
+                    <button onClick={() => save(opened.id, { name: editName })} disabled={busy || !editName.trim()} style={smallBtn}>
+                      保存
+                    </button>
+                    <button onClick={() => setEditingId(null)} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+                      やめる
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditingId(opened.id);
+                        setEditName(opened.name);
+                      }}
+                      style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}
+                    >
+                      名前を変える
+                    </button>
+                    <button onClick={() => save(opened.id, { active: !opened.active })} disabled={busy} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+                      {opened.active ? "非表示にする" : "表示に戻す"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {error && <div style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</div>}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
