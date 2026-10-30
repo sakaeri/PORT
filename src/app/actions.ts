@@ -323,8 +323,6 @@ async function setInitialProfileInner(name: string, email: string, phone: string
   // クライアント側のチェックボックスだけに頼らず、サーバー側でも必ず確認する。
   if (!agreedToTerms) throw new Error("利用規約への同意が必要です");
 
-  await supabase.from("customers").update({ name: trimmedName, terms_accepted_at: new Date().toISOString() }).eq("id", ctx.customerId);
-
   const h = await headers();
   const host = h.get("host");
   const protocol = host?.startsWith("localhost") ? "http" : "https";
@@ -343,6 +341,10 @@ async function setInitialProfileInner(name: string, email: string, phone: string
     }
     throw emailErr;
   }
+
+  // 名前と規約への同意は、メールアドレスが受け付けられてから保存する。先に保存すると、
+  // 登録済みのアドレスで弾かれたときに、名前だけ付いた仮の依頼主が本部の一覧に残ってしまう。
+  await supabase.from("customers").update({ name: trimmedName, terms_accepted_at: new Date().toISOString() }).eq("id", ctx.customerId);
 
   if (phone.trim()) {
     const { data: existing } = await supabase
