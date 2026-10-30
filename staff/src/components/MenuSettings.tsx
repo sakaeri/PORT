@@ -358,11 +358,12 @@ export default function MenuSettings({
         </div>
       )}
 
-      {tab === "menu" && <MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} />}
-      {tab === "templates" && <TemplatesCard orgId={orgId} initialTemplates={initialTemplates} canDelete={canEdit} />}
-      {tab === "terms" && <TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} />}
-      {tab === "desks" && <InquiryDesksCard initialDesks={initialDesks} departments={departments} canEdit={canEdit} />}
-      {tab === "referrals" && <ReferralSourcesCard initialSources={initialReferralSources} canEdit={canEdit} />}
+      {/* タブを切り替えても中身を作り直さない（作り直すと、最初に読み込んだ時点の内容に戻って見えてしまう） */}
+      <div hidden={tab !== "menu"}><MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} /></div>
+      <div hidden={tab !== "templates"}><TemplatesCard orgId={orgId} initialTemplates={initialTemplates} canDelete={canEdit} /></div>
+      <div hidden={tab !== "terms"}><TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} /></div>
+      <div hidden={tab !== "desks"}><InquiryDesksCard initialDesks={initialDesks} departments={departments} canEdit={canEdit} /></div>
+      <div hidden={tab !== "referrals"}><ReferralSourcesCard initialSources={initialReferralSources} canEdit={canEdit} /></div>
     </div>
   );
 }
