@@ -1134,15 +1134,23 @@ function ReferralSection({ customerId, referral, onBalanceChange }: { customerId
     }
   }
 
-  if (sourceName === null && (!referral.canGrant || referral.sources.length === 0)) return null;
+  if (sourceName === null && !referral.canGrant) return null;
+  // 紹介元をまだ1つも登録していないときも欄は出し、登録先をⓘで案内する（欄ごと消えると分かりにくいため）。
+  const noSources = sourceName === null && referral.sources.length === 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>紹介元</span>
-        <InfoTooltip text="トークで「〇〇の紹介です」と言われたら選びます。選ぶと5,000円分が残高に入ります（1人1回・有効期限なし）。紹介元はメニュー管理の「紹介元」で登録します。" />
+        <span style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>紹介元{noSources && "（未登録）"}</span>
+        <InfoTooltip
+          text={
+            noSources
+              ? "メニュー管理の「紹介元」で登録すると、ここで選べるようになります。トークで「〇〇の紹介です」と言われたら選ぶと、5,000円分が残高に入ります（1人1回・有効期限なし）。"
+              : "トークで「〇〇の紹介です」と言われたら選びます。選ぶと5,000円分が残高に入ります（1人1回・有効期限なし）。紹介元はメニュー管理の「紹介元」で登録します。"
+          }
+        />
       </div>
-      {sourceName !== null ? (
+      {noSources ? null : sourceName !== null ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
           <span style={{ flex: 1, minWidth: 0 }}>{sourceName || "（削除された紹介元）"}・特典済み</span>
         </div>
