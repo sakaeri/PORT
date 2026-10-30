@@ -1,20 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Noto_Sans_JP } from "next/font/google";
-import "@phosphor-icons/web/regular";
-import "@phosphor-icons/web/fill";
+// 書体ファイルとアイコンフォントは配らない（楽天モバイルの5Gなど、大きいファイルが
+// 途中で止まりやすい回線で画面が出なくなるため）。アイコンは @phosphor-icons/react で描く。
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-
-const notoSansJp = Noto_Sans_JP({
-  variable: "--font-noto-jp",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
 
 export const metadata: Metadata = {
   title: "中央秘書事務所 本部",
@@ -43,7 +30,7 @@ const themeInitScript = `
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // テーマの属性（data-vid-theme）は描画前のスクリプトで付けるので、そこだけの食い違いは警告しない。
-    <html lang="ja" className={`${inter.variable} ${notoSansJp.variable}`} suppressHydrationWarning>
+    <html lang="ja" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
