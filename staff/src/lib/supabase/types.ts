@@ -255,6 +255,7 @@ export interface Database {
           sort: number;
           active: boolean;
           department_id: string | null;
+          last_used_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["menus"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["menus"]["Row"]>;
@@ -269,6 +270,7 @@ export interface Database {
           icon: string | null;
           body: string | null;
           sort: number;
+          last_used_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["intake_forms"]["Row"]> & { org_id: string; label: string };
         Update: Partial<Database["public"]["Tables"]["intake_forms"]["Row"]>;

@@ -16,7 +16,7 @@ export default async function CasesPage() {
       .select("id, title, amount, phase, pay_status, due_at, created_at, customer_id, customers(name, staff_label, profile:profiles!customers_profile_id_fkey(avatar_url))")
       .eq("org_id", ctx.orgId)
       .order("created_at", { ascending: false }),
-    supabase.from("threads").select("id, request_id, archived_at").eq("org_id", ctx.orgId).eq("kind", "case"),
+    supabase.from("threads").select("id, request_id, archived_at, last_msg_at").eq("org_id", ctx.orgId).eq("kind", "case"),
     supabase.rpc("case_thread_summaries", { p_org_id: ctx.orgId }),
     // 着手中（started）の案件のうち、スタッフが完了報告を提出済みだが、まだ
     // マネージャー・本部メンバーが依頼主に送っていない（＝報告済み・承認待ち）
@@ -41,7 +41,10 @@ export default async function CasesPage() {
   // 案件詳細（マネージャーが金額を見て着手判断をしないように）と同じ方針で、
   // 一覧でも本部以外には金額そのものをクライアントへ送らない。
   const canSeeAmount = ctx.role === "owner";
-  const rows: CaseRow[] = (requests ?? []).map((r) => {
+  // 最後にメッセージが動いた案件を上に（トークがまだ無ければ作った日時で）。
+  const lastActivityAt = (r: { id: string; created_at: string }) => threadByRequestId.get(r.id)?.last_msg_at ?? r.created_at;
+  const sortedRequests = (requests ?? []).slice().sort((a, b) => lastActivityAt(b).localeCompare(lastActivityAt(a)));
+  const rows: CaseRow[] = sortedRequests.map((r) => {
     const customer = Array.isArray(r.customers) ? r.customers[0] : r.customers;
     const customerProfile = customer ? (Array.isArray(customer.profile) ? customer.profile[0] : customer.profile) : null;
     const thread = threadByRequestId.get(r.id) ?? null;
