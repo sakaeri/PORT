@@ -69,13 +69,36 @@ import {
 } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
 
-// 入力欄から離れたときの自動保存。失敗したら保存されたように見せず、知らせる。
-async function saveOrAlert(save: () => Promise<unknown>) {
-  try {
-    await save();
-  } catch (e) {
-    alert(errorMessage(e, "保存できませんでした。もう一度お試しください。"));
-  }
+// ポップアップの中の変更は「保存する」を押したときだけ反映する。新しく足した行は
+// まだDBに無いので、仮のid（new: で始まる）を付けておき、保存のときに作る。
+const NEW_ID_PREFIX = "new:";
+function tempId(): string {
+  return `${NEW_ID_PREFIX}${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+}
+function isTempId(id: string): boolean {
+  return id.startsWith(NEW_ID_PREFIX);
+}
+const UNSAVED_CONFIRM = "保存していない変更があります。保存せずに閉じますか？";
+
+// ポップアップの下の「保存する」「キャンセル」。
+function SaveBar({ saving, dirty, error, onSave, onCancel }: { saving: boolean; dirty: boolean; error: string; onSave: () => void; onCancel: () => void }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
+      {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <button onClick={onCancel} disabled={saving} style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}>
+          キャンセル
+        </button>
+        <button
+          onClick={onSave}
+          disabled={saving || !dirty}
+          style={{ ...smallBtn, color: "var(--color-accent-100)", background: "var(--color-accent-900)", opacity: saving || !dirty ? 0.6 : 1 }}
+        >
+          {saving ? "保存中…" : "保存する"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 interface Menu {
@@ -357,6 +380,12 @@ const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
 function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
   const [menus, setMenus] = useState(initialMenus);
   const [openId, setOpenId] = useState<string | null>(null);
+  // 開いているメニューの編集中の内容（保存するまで一覧には反映しない）。
+  const [draft, setDraft] = useState<Menu | null>(null);
+  // 「メニューを追加」で作ったばかりのメニュー。保存せずに閉じたら消す。
+  const [newMenuId, setNewMenuId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [presetsMenuId, setPresetsMenuId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [importing, setImporting] = useState(false);
@@ -380,24 +409,87 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
     }
   }
 
+  function openMenu(m: Menu) {
+    setOpenId(m.id);
+    setDraft({ ...m, report_field_presets: m.report_field_presets.map((p) => ({ ...p })) });
+    setSaveError("");
+  }
+
   async function handleAdd() {
     const id = await createMenu(orgId);
-    setMenus((m) => [...m, { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: null, lead_hours: 24, active: true, department_id: null, report_field_presets: [] }]);
-    setOpenId(id);
+    const created: Menu = { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: null, lead_hours: 24, active: true, department_id: null, report_field_presets: [] };
+    setMenus((m) => [...m, created]);
+    setNewMenuId(id);
+    openMenu(created);
   }
 
   async function handleDelete(id: string) {
     if (!confirm("このメニューを削除しますか？")) return;
     await deleteMenu(id);
     setMenus((m) => m.filter((x) => x.id !== id));
+    setOpenId(null);
+    setDraft(null);
+    setNewMenuId(null);
   }
 
-  function patchLocal(id: string, patch: Partial<Menu>) {
-    setMenus((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  function patchDraft(patch: Partial<Menu>) {
+    setDraft((d) => (d ? { ...d, ...patch } : d));
   }
 
-  async function commit(m: Menu) {
-    await saveOrAlert(() => updateMenu(m.id, { label: m.label, note: m.note ?? "", price: m.price, active: m.active, icon: m.icon }));
+  const savedMenu = menus.find((m) => m.id === openId) ?? null;
+  const dirty = !!draft && !!savedMenu && JSON.stringify(draft) !== JSON.stringify(savedMenu);
+
+  async function closeMenu() {
+    if (saving) return;
+    if (dirty && !confirm(UNSAVED_CONFIRM)) return;
+    // 追加したばかりで一度も保存していないメニューは、作らなかったことにする。
+    if (newMenuId && newMenuId === openId) {
+      const id = newMenuId;
+      setMenus((m) => m.filter((x) => x.id !== id));
+      deleteMenu(id).catch(() => {});
+    }
+    setNewMenuId(null);
+    setPresetsMenuId(null);
+    setOpenId(null);
+    setDraft(null);
+  }
+
+  async function saveMenu() {
+    if (!draft || !savedMenu || saving) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      await updateMenu(draft.id, { label: draft.label, note: draft.note ?? "", price: draft.price, active: draft.active, icon: draft.icon });
+      // 報告書の定型項目：消したもの・足したもの・変えたものを反映する（名前が空の新しい行は作らない）。
+      const keptIds = new Set(draft.report_field_presets.map((p) => p.id));
+      for (const p of savedMenu.report_field_presets) {
+        if (!keptIds.has(p.id)) await deleteReportFieldPreset(p.id);
+      }
+      const savedPresets: ReportFieldPreset[] = [];
+      for (const [i, p] of draft.report_field_presets.entries()) {
+        if (isTempId(p.id)) {
+          if (!p.label.trim()) continue;
+          const id = await createReportFieldPreset(draft.id, p.label.trim(), i);
+          if (p.kind !== "text" || p.required) await updateReportFieldPreset(id, { kind: p.kind, required: p.required });
+          savedPresets.push({ ...p, id, label: p.label.trim(), sort: i });
+        } else {
+          const before = savedMenu.report_field_presets.find((x) => x.id === p.id);
+          if (before && (before.label !== p.label || before.kind !== p.kind || before.required !== p.required)) {
+            await updateReportFieldPreset(p.id, { label: p.label, kind: p.kind, required: p.required });
+          }
+          savedPresets.push(p);
+        }
+      }
+      setMenus((rows) => rows.map((r) => (r.id === draft.id ? { ...draft, report_field_presets: savedPresets } : r)));
+      setNewMenuId(null);
+      setPresetsMenuId(null);
+      setOpenId(null);
+      setDraft(null);
+    } catch (e) {
+      setSaveError(errorMessage(e, "保存できませんでした。もう一度お試しください。"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -431,11 +523,12 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
         {visibleMenus.map((m) => {
           const open = openId === m.id;
           const selectedIconName = menuIconName(m.icon);
+          const draftIconName = open && draft ? menuIconName(draft.icon) : null;
           const SelectedIcon = selectedIconName ? MENU_ICON_COMPONENTS[selectedIconName] : null;
           return (
             <div key={m.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
               <button
-                onClick={() => setOpenId(m.id)}
+                onClick={() => openMenu(m)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
               >
                 {SelectedIcon && <SelectedIcon size={15} color="var(--color-accent)" style={{ flex: "none" }} />}
@@ -443,14 +536,14 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                 <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{m.price != null ? `¥${m.price.toLocaleString("ja-JP")}` : "相談のみ"}</span>
                 <CaretRight size={13} color="var(--color-neutral-500)" />
               </button>
-              {open && (
-                <Modal onClose={() => setOpenId(null)} maxWidth={520}>
+              {open && draft && (
+                <Modal onClose={closeMenu} maxWidth={520}>
                 <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 10 }}>
-                  <PopupHeader title={m.label || "（無題）"} onClose={() => setOpenId(null)} />
+                  <PopupHeader title={draft.label || "（無題）"} onClose={closeMenu} />
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       <span style={label}>メニュー名</span>
-                      <input value={m.label} onChange={(e) => patchLocal(m.id, { label: e.target.value })} onBlur={() => commit(m)} disabled={!canEdit} className="vid-input" style={input} />
+                      <input value={draft.label} onChange={(e) => patchDraft({ label: e.target.value })} disabled={!canEdit} className="vid-input" style={input} />
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       <span style={{ ...label, display: "flex", alignItems: "center", gap: 6 }}>
@@ -459,10 +552,9 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                       </span>
                       <input
                         type="number"
-                        value={m.price ?? ""}
+                        value={draft.price ?? ""}
                         placeholder="未設定"
-                        onChange={(e) => patchLocal(m.id, { price: e.target.value === "" ? null : Number(e.target.value) })}
-                        onBlur={() => commit(m)}
+                        onChange={(e) => patchDraft({ price: e.target.value === "" ? null : Number(e.target.value) })}
                         disabled={!canEdit}
                         className="vid-input"
                         style={input}
@@ -471,7 +563,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={label}>詳細内容</span>
-                    <input value={m.note ?? ""} onChange={(e) => patchLocal(m.id, { note: e.target.value })} onBlur={() => commit(m)} disabled={!canEdit} className="vid-input" style={input} />
+                    <input value={draft.note ?? ""} onChange={(e) => patchDraft({ note: e.target.value })} disabled={!canEdit} className="vid-input" style={input} />
                   </div>
 
                   {canEdit && (
@@ -481,8 +573,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                         <button
                           type="button"
                           onClick={() => {
-                            patchLocal(m.id, { icon: null });
-                            commit({ ...m, icon: null });
+                            patchDraft({ icon: null });
                           }}
                           title="アイコンなし"
                           style={{
@@ -493,9 +584,9 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                             cursor: "pointer",
                             fontSize: 10,
                             whiteSpace: "nowrap",
-                            color: selectedIconName === null ? "var(--color-accent)" : "var(--color-neutral-500)",
-                            background: selectedIconName === null ? "var(--color-accent-900)" : "transparent",
-                            border: `1px solid ${selectedIconName === null ? "var(--color-accent)" : "var(--color-divider)"}`,
+                            color: draftIconName === null ? "var(--color-accent)" : "var(--color-neutral-500)",
+                            background: draftIconName === null ? "var(--color-accent-900)" : "transparent",
+                            border: `1px solid ${draftIconName === null ? "var(--color-accent)" : "var(--color-divider)"}`,
                             borderRadius: "var(--radius-md)",
                           }}
                         >
@@ -503,15 +594,13 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                         </button>
                         {MENU_ICON_OPTIONS.map((opt) => {
                           const OptIcon = MENU_ICON_COMPONENTS[opt.name];
-                          const on = selectedIconName === opt.name;
+                          const on = draftIconName === opt.name;
                           return (
                             <button
                               key={opt.name}
                               type="button"
                               onClick={() => {
-                                const iconClass = menuIconClass(opt.name);
-                                patchLocal(m.id, { icon: iconClass });
-                                commit({ ...m, icon: iconClass });
+                                patchDraft({ icon: menuIconClass(opt.name) });
                               }}
                               title={opt.label}
                               style={{
@@ -536,11 +625,11 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
 
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingTop: 6, borderTop: "1px solid var(--color-divider)" }}>
                     <button onClick={() => setPresetsMenuId(m.id)} style={smallBtn}>
-                      報告書の定型項目　{m.report_field_presets.length}件
+                      報告書の定型項目　{draft.report_field_presets.length}件
                     </button>
                     <div style={{ flex: 1 }} />
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-neutral-400)" }}>
-                      <input type="checkbox" checked={m.active} onChange={(e) => { patchLocal(m.id, { active: e.target.checked }); commit({ ...m, active: e.target.checked }); }} disabled={!canEdit} />
+                      <input type="checkbox" checked={draft.active} onChange={(e) => patchDraft({ active: e.target.checked })} disabled={!canEdit} />
                       表示する
                     </label>
                     {canEdit && (
@@ -550,21 +639,25 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                       </button>
                     )}
                   </div>
+                  {canEdit && <SaveBar saving={saving} dirty={dirty} error={saveError} onSave={saveMenu} onCancel={closeMenu} />}
                 </div>
                 </Modal>
               )}
-              {presetsMenuId === m.id && (
+              {presetsMenuId === m.id && draft && (
                 <Modal onClose={() => setPresetsMenuId(null)} maxWidth={480}>
                   <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 18 }}>報告書の定型項目</div>
-                      <InfoTooltip text="このメニューの完了報告を書くとき、スタッフがワンタップで項目を追加できる定型の項目名です（自由な項目追加も別途できます）。" />
+                      <InfoTooltip text="このメニューの完了報告を書くとき、スタッフがワンタップで項目を追加できる定型の項目名です（自由な項目追加も別途できます）。ここでの変更は、メニューの「保存する」を押したときに反映されます。" />
                       <div style={{ flex: 1 }} />
                       <button onClick={() => setPresetsMenuId(null)} aria-label="閉じる" style={{ display: "flex", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}>
                         <X size={18} />
                       </button>
                     </div>
-                    <MenuReportFieldPresetsEditor menuId={m.id} presets={m.report_field_presets} onChange={(p) => patchLocal(m.id, { report_field_presets: p })} canEdit={canEdit} />
+                    <MenuReportFieldPresetsEditor menuId={m.id} presets={draft.report_field_presets} onChange={(p) => patchDraft({ report_field_presets: p })} canEdit={canEdit} />
+                    <button onClick={() => setPresetsMenuId(null)} style={{ ...smallBtn, alignSelf: "flex-end" }}>
+                      決定
+                    </button>
                   </div>
                 </Modal>
               )}
@@ -593,39 +686,88 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
   const [templates, setTemplates] = useState(initialTemplates);
   const [openId, setOpenId] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  // 開いているテンプレの編集中の内容（保存するまで一覧には反映しない）。
+  const [draft, setDraft] = useState<IntakeForm | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
-  // 新規作成したテンプレを何も入力しないまま閉じたら、作らなかったことにする。
-  function openOnly(id: string | null) {
-    const t = createdId && createdId !== id ? templates.find((x) => x.id === createdId) : null;
-    if (createdId !== id) setCreatedId(null);
-    const label = t?.label.trim() ?? "";
-    if (t && (label === "" || label === "新しいテンプレ") && !(t.note ?? "").trim() && t.intake_fields.every((f) => !f.label.trim())) {
-      setTemplates((rows) => rows.filter((x) => x.id !== t.id));
-      discardIntakeFormIfEmpty(t.id).catch(() => {});
+  function openTemplate(t: IntakeForm) {
+    setOpenId(t.id);
+    setDraft({ ...t, intake_fields: t.intake_fields.map((f) => ({ ...f })) });
+    setSaveError("");
+  }
+
+  const savedTemplate = templates.find((t) => t.id === openId) ?? null;
+  const dirty = !!draft && !!savedTemplate && JSON.stringify(draft) !== JSON.stringify(savedTemplate);
+
+  function closeTemplate() {
+    if (saving) return;
+    if (dirty && !confirm(UNSAVED_CONFIRM)) return;
+    // 追加したばかりで一度も保存していないテンプレは、作らなかったことにする。
+    if (createdId && createdId === openId) {
+      const id = createdId;
+      setTemplates((rows) => rows.filter((x) => x.id !== id));
+      discardIntakeFormIfEmpty(id).catch(() => {});
     }
-    setOpenId(id);
+    setCreatedId(null);
+    setOpenId(null);
+    setDraft(null);
+  }
+
+  async function saveTemplate() {
+    if (!draft || !savedTemplate || saving) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      await updateIntakeForm(draft.id, { label: draft.label, note: draft.note ?? "" });
+      // 入力してもらう項目：消したもの・足したもの・変えたものを反映する（名前が空の新しい行は作らない）。
+      const keptIds = new Set(draft.intake_fields.map((f) => f.id));
+      for (const f of savedTemplate.intake_fields) {
+        if (!keptIds.has(f.id)) await deleteIntakeField(f.id);
+      }
+      const savedFields: IntakeField[] = [];
+      for (const [i, f] of draft.intake_fields.entries()) {
+        if (isTempId(f.id)) {
+          if (!f.label.trim()) continue;
+          const created = await addIntakeField(draft.id, i);
+          await updateIntakeField(created.id, { label: f.label.trim(), kind: f.kind });
+          savedFields.push({ ...f, id: created.id, key: created.key, label: f.label.trim(), sort: i });
+        } else {
+          const before = savedTemplate.intake_fields.find((x) => x.id === f.id);
+          if (before && (before.label !== f.label || before.kind !== f.kind)) await updateIntakeField(f.id, { label: f.label, kind: f.kind });
+          savedFields.push(f);
+        }
+      }
+      setTemplates((rows) => rows.map((r) => (r.id === draft.id ? { ...draft, intake_fields: savedFields } : r)));
+      setCreatedId(null);
+      setOpenId(null);
+      setDraft(null);
+    } catch (e) {
+      setSaveError(errorMessage(e, "保存できませんでした。もう一度お試しください。"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleAdd() {
     const id = await createIntakeForm(orgId);
-    openOnly(null);
-    setTemplates((t) => [...t, { id, org_id: orgId, label: "", note: null, sort: 999, intake_fields: [] }]);
+    const created: IntakeForm = { id, org_id: orgId, label: "", note: null, sort: 999, intake_fields: [] };
+    setTemplates((t) => [...t, created]);
     setCreatedId(id);
-    setOpenId(id);
+    openTemplate(created);
   }
 
   async function handleDelete(id: string) {
     if (!confirm("このテンプレを削除しますか？")) return;
     await deleteIntakeForm(id);
     setTemplates((t) => t.filter((x) => x.id !== id));
+    setCreatedId(null);
+    setOpenId(null);
+    setDraft(null);
   }
 
-  function patchLocal(id: string, patch: Partial<IntakeForm>) {
-    setTemplates((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  }
-
-  async function commit(t: IntakeForm) {
-    await saveOrAlert(() => updateIntakeForm(t.id, { label: t.label, note: t.note ?? "" }));
+  function patchDraft(patch: Partial<IntakeForm>) {
+    setDraft((d) => (d ? { ...d, ...patch } : d));
   }
 
   return (
@@ -648,34 +790,33 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
           return (
             <div key={t.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
               <button
-                onClick={() => openOnly(t.id)}
+                onClick={() => openTemplate(t)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
               >
                 <span style={{ flex: 1, fontSize: 13.5 }}>{t.label || "（無題）"}</span>
                 <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{t.intake_fields.length > 0 ? `項目${t.intake_fields.length}件` : "定型文のみ"}</span>
                 <CaretRight size={13} color="var(--color-neutral-500)" />
               </button>
-              {open && (
-                <Modal onClose={() => openOnly(null)} maxWidth={520}>
+              {open && draft && (
+                <Modal onClose={closeTemplate} maxWidth={520}>
                 <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 10 }}>
-                  <PopupHeader title={t.label || "（無題）"} onClose={() => openOnly(null)} />
+                  <PopupHeader title={draft.label || "（無題）"} onClose={closeTemplate} />
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={label}>テンプレ名</span>
-                    <input value={t.label} onChange={(e) => patchLocal(t.id, { label: e.target.value })} onBlur={() => commit(t)} placeholder="例：ご予約の確認" className="vid-input" style={input} />
+                    <input value={draft.label} onChange={(e) => patchDraft({ label: e.target.value })} placeholder="例：ご予約の確認" className="vid-input" style={input} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={label}>定型文の本文（項目がなければそのまま送信されます）</span>
                     <textarea
-                      value={t.note ?? ""}
-                      onChange={(e) => patchLocal(t.id, { note: e.target.value })}
-                      onBlur={() => commit(t)}
+                      value={draft.note ?? ""}
+                      onChange={(e) => patchDraft({ note: e.target.value })}
                       rows={3}
                       className="vid-input"
                       style={{ ...input, height: "auto", padding: "8px 10px", resize: "vertical" }}
                     />
                   </div>
 
-                  <TemplateFieldsEditor formId={t.id} fields={t.intake_fields} onChange={(fields) => patchLocal(t.id, { intake_fields: fields })} />
+                  <TemplateFieldsEditor formId={draft.id} fields={draft.intake_fields} onChange={(fields) => patchDraft({ intake_fields: fields })} />
 
                   <div style={{ display: "flex", justifyContent: "flex-end" }}>
                     {canDelete && (
@@ -685,6 +826,7 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
                     </button>
                     )}
                   </div>
+                  <SaveBar saving={saving} dirty={dirty} error={saveError} onSave={saveTemplate} onCancel={closeTemplate} />
                 </div>
                 </Modal>
               )}
@@ -761,19 +903,13 @@ function MenuReportFieldPresetsEditor({
   onChange: (p: ReportFieldPreset[]) => void;
   canEdit: boolean;
 }) {
-  async function add() {
-    const id = await createReportFieldPreset(menuId, "", presets.length);
-    onChange([...presets, { id, menu_id: menuId, label: "", kind: "text", required: false, sort: presets.length }]);
+  function add() {
+    onChange([...presets, { id: tempId(), menu_id: menuId, label: "", kind: "text", required: false, sort: presets.length }]);
   }
   function patch(id: string, p: Partial<ReportFieldPreset>) {
     onChange(presets.map((x) => (x.id === id ? { ...x, ...p } : x)));
   }
-  async function commitLabel(id: string, val: string) {
-    if (!val.trim()) return;
-    await saveOrAlert(() => updateReportFieldPreset(id, { label: val }));
-  }
-  async function remove(id: string) {
-    await deleteReportFieldPreset(id);
+  function remove(id: string) {
     onChange(presets.filter((p) => p.id !== id));
   }
 
@@ -784,7 +920,6 @@ function MenuReportFieldPresetsEditor({
           <input
             value={p.label}
             onChange={(e) => patch(p.id, { label: e.target.value })}
-            onBlur={() => commitLabel(p.id, p.label)}
             placeholder="項目名"
             disabled={!canEdit}
             className="vid-input"
@@ -792,10 +927,7 @@ function MenuReportFieldPresetsEditor({
           />
           <select
             value={p.kind}
-            onChange={(e) => {
-              patch(p.id, { kind: e.target.value });
-              updateReportFieldPreset(p.id, { kind: e.target.value });
-            }}
+            onChange={(e) => patch(p.id, { kind: e.target.value })}
             disabled={!canEdit}
             className="vid-input"
             style={{ ...modalInput, flex: "none", width: 92, height: 32 }}
@@ -810,10 +942,7 @@ function MenuReportFieldPresetsEditor({
             <input
               type="checkbox"
               checked={p.required}
-              onChange={(e) => {
-                patch(p.id, { required: e.target.checked });
-                updateReportFieldPreset(p.id, { required: e.target.checked });
-              }}
+              onChange={(e) => patch(p.id, { required: e.target.checked })}
               disabled={!canEdit}
             />
             必須
@@ -843,18 +972,13 @@ const FIELD_KINDS = [
 ];
 
 function TemplateFieldsEditor({ formId, fields, onChange }: { formId: string; fields: IntakeField[]; onChange: (f: IntakeField[]) => void }) {
-  async function add() {
-    const created = await addIntakeField(formId, fields.length);
-    onChange([...fields, { id: created.id, form_id: formId, key: created.key, label: "", kind: "text", sort: fields.length }]);
+  function add() {
+    onChange([...fields, { id: tempId(), form_id: formId, key: "", label: "", kind: "text", sort: fields.length }]);
   }
   function patch(id: string, p: Partial<IntakeField>) {
     onChange(fields.map((f) => (f.id === id ? { ...f, ...p } : f)));
   }
-  async function commit(f: IntakeField) {
-    await saveOrAlert(() => updateIntakeField(f.id, { label: f.label, kind: f.kind }));
-  }
-  async function remove(id: string) {
-    await deleteIntakeField(id);
+  function remove(id: string) {
     onChange(fields.filter((f) => f.id !== id));
   }
 
@@ -866,14 +990,13 @@ function TemplateFieldsEditor({ formId, fields, onChange }: { formId: string; fi
           <input
             value={f.label}
             onChange={(e) => patch(f.id, { label: e.target.value })}
-            onBlur={() => commit(f)}
             placeholder="例：ご希望の日時"
             className="vid-input"
             style={{ ...input, height: 32 }}
           />
           <select
             value={f.kind}
-            onChange={(e) => { patch(f.id, { kind: e.target.value }); commit({ ...f, kind: e.target.value }); }}
+            onChange={(e) => patch(f.id, { kind: e.target.value })}
             className="vid-input"
             style={{ ...input, height: 32 }}
           >
