@@ -28,11 +28,6 @@ export async function GET(request: Request) {
     if (!error) {
       if (typeParam === "email_change") await afterEmailChange(supabase);
       if (base) cookieStore.delete("vid_next");
-      // 「パスワードをお忘れの方」から来たときは、パスワード設定を開いた状態で迎える。
-      if (cookieStore.get("vid_setpw")) {
-        cookieStore.delete("vid_setpw");
-        return NextResponse.redirect(`${origin}${base || "/"}?setpw=1`);
-      }
       return NextResponse.redirect(`${origin}${base || next}`);
     }
   }

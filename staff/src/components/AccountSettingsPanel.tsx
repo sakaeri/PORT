@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, CircleNotch } from "@phosphor-icons/react";
-import { updateMyDisplayName, updateOrgDisplayName, updateLoginEmail, updateLoginPassword, updateMyAvatar } from "@/app/actions";
+import { updateMyDisplayName, updateOrgDisplayName, updateLoginEmail, updateMyAvatar } from "@/app/actions";
 import { errorMessage, unwrap } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 import { createClient } from "@/lib/supabase/client";
@@ -59,7 +59,7 @@ const editBox: React.CSSProperties = {
   border: "1px solid var(--color-accent-800)",
 };
 
-// 自分の表示名・ログイン用メール/パスワード・（オーナーなら）事業者の
+// 自分の表示名・ログイン用メール・（オーナーなら）事業者の
 // 表示名をまとめて変更するパネル。以前は「表示名変更」「会社情報」
 // 「ログイン情報」に分かれていたものを一本化した。
 export default function AccountSettingsPanel({
@@ -91,10 +91,6 @@ export default function AccountSettingsPanel({
   const [email, setEmail] = useState(loginEmail);
   const [editingName, setEditingName] = useState(false);
   const [editingEmail, setEditingEmail] = useState(false);
-  const [editingPw, setEditingPw] = useState(false);
-  const [curPw, setCurPw] = useState("");
-  const [nextPw, setNextPw] = useState("");
-  const [confirmPw, setConfirmPw] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState<string | null>(null);
@@ -170,26 +166,6 @@ export default function AccountSettingsPanel({
     }
   }
 
-  async function savePassword() {
-    if (saving) return;
-    setError("");
-    if (nextPw.length < 8) return setError("新しいパスワードは8文字以上にしてください");
-    if (nextPw !== confirmPw) return setError("新しいパスワードが一致しません");
-    setSaving("password");
-    try {
-      unwrap(await updateLoginPassword(curPw, nextPw));
-      setEditingPw(false);
-      setCurPw("");
-      setNextPw("");
-      setConfirmPw("");
-      setDone("パスワードを変更しました。");
-    } catch (e) {
-      setError(errorMessage(e, "変更できませんでした"));
-    } finally {
-      setSaving(null);
-    }
-  }
-
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -220,7 +196,6 @@ export default function AccountSettingsPanel({
           onClick={() => {
             setEditingName((v) => !v);
             setEditingEmail(false);
-            setEditingPw(false);
             setError("");
             setDone("");
           }}
@@ -273,7 +248,6 @@ export default function AccountSettingsPanel({
           <button
             onClick={() => {
               setEditingEmail((v) => !v);
-              setEditingPw(false);
               setEditingName(false);
               setError("");
               setDone("");
@@ -297,49 +271,6 @@ export default function AccountSettingsPanel({
           </div>
         )}
 
-        <div style={row}>
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={fieldLabel}>パスワード</span>
-            <span style={{ fontSize: 13, letterSpacing: "0.12em" }}>••••••••</span>
-          </div>
-          <button
-            onClick={() => {
-              setEditingPw((v) => !v);
-              setEditingEmail(false);
-              setEditingName(false);
-              setError("");
-              setDone("");
-            }}
-            style={smallBtn}
-          >
-            変更
-          </button>
-        </div>
-        {editingPw && (
-          <div style={editBox}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <input type="password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder="現在のパスワード" className="vid-input" style={input} />
-              <input type="password" value={nextPw} onChange={(e) => setNextPw(e.target.value)} placeholder="新しいパスワード（8文字以上）" className="vid-input" style={input} />
-              <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="確認のため再入力" className="vid-input" style={input} />
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={savePassword} disabled={saving === "password"} style={{ ...smallBtn, height: 34 }}>
-                {saving === "password" ? "保存中…" : "変更を保存"}
-              </button>
-              <button
-                onClick={() => {
-                  setEditingPw(false);
-                  setCurPw("");
-                  setNextPw("");
-                  setConfirmPw("");
-                }}
-                style={{ ...smallBtn, color: "var(--color-neutral-400)", borderColor: "var(--color-divider)" }}
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}

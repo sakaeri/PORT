@@ -125,7 +125,7 @@ export async function deleteMenu(id: string) {
 }
 
 // ============================================================
-// ログイン情報（この管理画面に入るためのメール・パスワード。書類には使わない）
+// ログイン情報（この管理画面に入るためのメール。書類には使わない）
 // ============================================================
 export async function updateLoginEmail(...args: Parameters<typeof updateLoginEmailInner>) {
   return toResult("updateLoginEmail", () => updateLoginEmailInner(...args));
@@ -148,52 +148,47 @@ async function updateLoginEmailInner(newEmail: string) {
   }
 }
 
-// パスワードを忘れたログイン前の人向け（↔ updateLoginPassword はログイン済み・
-// 現在のパスワードを知っている人向け）。メールが存在するかどうかはSupabase側が
-// 意図的に教えてくれない仕様なので、成功・失敗に関わらず同じ案内文にする。
-export async function requestPasswordReset(...args: Parameters<typeof requestPasswordResetInner>) {
-  return toResult("requestPasswordReset", () => requestPasswordResetInner(...args));
+// ログインはメールで届くリンク（または同じメールの数字）だけ。パスワードは使わない。
+// 登録の無いアドレスでも送った時と同じ扱いにする（どのアドレスが登録済みか分からないように）。
+export async function requestLoginLink(...args: Parameters<typeof requestLoginLinkInner>) {
+  return toResult("requestLoginLink", () => requestLoginLinkInner(...args));
 }
 
-async function requestPasswordResetInner(email: string) {
+async function requestLoginLinkInner(email: string) {
   const trimmed = email.trim();
-  if (!trimmed) throw new Error("メールアドレスをご入力ください");
+  if (!trimmed) throw new Error("メールアドレスを入力してください");
   const supabase = await createClient();
   const h = await headers();
   const host = h.get("host");
   const protocol = host?.startsWith("localhost") ? "http" : "https";
-  await supabase.auth.resetPasswordForEmail(trimmed, { redirectTo: `${protocol}://${host}/auth/confirm` });
+  const { error } = await supabase.auth.signInWithOtp({
+    email: trimmed,
+    // 登録済みのスタッフ専用。初見のアドレスでアカウントを作らない（参加は招待リンクから）。
+    options: { emailRedirectTo: `${protocol}://${host}/auth/confirm`, shouldCreateUser: false },
+  });
+  if (error) {
+    if (error.status === 429 || /rate limit/i.test(error.message)) throw new Error("短時間に何度も送信されたため、少し時間をおいてからお試しください。");
+    if (error.code === "otp_disabled" || /signups? not allowed/i.test(error.message)) return;
+    console.error("requestLoginLink", error.code, error.message);
+    throw new Error("送信できませんでした。しばらくしてからもう一度お試しください。");
+  }
 }
 
-// /auth/confirm 経由でrecoveryトークンを確認した直後（まだ仮のセッションの
-// 状態）に呼ぶ。新しいパスワードを設定して、本来のログインを完了させる。
-export async function completePasswordReset(...args: Parameters<typeof completePasswordResetInner>) {
-  return toResult("completePasswordReset", () => completePasswordResetInner(...args));
+// ホーム画面に追加したアプリでは、メールのリンクを開くと別のブラウザでログイン
+// してしまうことがあるため、同じメールに書かれた数字を入力してもログインできるようにする。
+export async function verifyLoginCode(...args: Parameters<typeof verifyLoginCodeInner>) {
+  return toResult("verifyLoginCode", () => verifyLoginCodeInner(...args));
 }
 
-async function completePasswordResetInner(newPassword: string) {
-  if (newPassword.length < 8) throw new Error("パスワードは8文字以上にしてください");
+async function verifyLoginCodeInner(email: string, code: string) {
+  const token = code.replace(/\D/g, "");
+  if (token.length < 6) throw new Error("メールに届いた数字を入力してください");
   const supabase = await createClient();
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !userData.user) throw new Error("セッションの有効期限が切れました。もう一度パスワード再設定をお試しください。");
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) throw error;
-}
-
-export async function updateLoginPassword(...args: Parameters<typeof updateLoginPasswordInner>) {
-  return toResult("updateLoginPassword", () => updateLoginPasswordInner(...args));
-}
-
-async function updateLoginPasswordInner(currentPassword: string, newPassword: string) {
-  await requireContext();
-  if (newPassword.length < 8) throw new Error("新しいパスワードは8文字以上にしてください");
-  const supabase = await createClient();
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !userData.user?.email) throw new Error("ログイン情報を確認できませんでした");
-  const { error: reauthErr } = await supabase.auth.signInWithPassword({ email: userData.user.email, password: currentPassword });
-  if (reauthErr) throw new Error("現在のパスワードが違います");
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) throw error;
+  const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: "email" });
+  if (error) {
+    if (error.status === 429) throw new Error("短時間に何度も試されたため、少し時間をおいてからお試しください。");
+    throw new Error("数字が違うか、有効期限が切れています。もう一度メールを送ってお試しください。");
+  }
 }
 
 // ============================================================
@@ -1168,8 +1163,7 @@ export async function acceptStaffInvite(...args: Parameters<typeof acceptStaffIn
   return toResult("acceptStaffInvite", () => acceptStaffInviteInner(...args));
 }
 
-async function acceptStaffInviteInner(inviteId: string, fields: { email: string; password: string; displayName: string }) {
-  if (fields.password.length < 8) throw new Error("パスワードは8文字以上にしてください");
+async function acceptStaffInviteInner(inviteId: string, fields: { email: string; displayName: string }) {
   if (!fields.email.trim()) throw new Error("メールアドレスは必須です");
 
   const admin = createServiceRoleClient();
@@ -1188,7 +1182,8 @@ async function acceptStaffInviteInner(inviteId: string, fields: { email: string;
 
   const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
     email: fields.email.trim(),
-    password: fields.password,
+    // パスワードではログインしない。誰も知らないランダムな値にしておく。
+    password: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url"),
     email_confirm: true,
   });
   if (userErr || !userRes.user) {
@@ -1212,6 +1207,12 @@ async function acceptStaffInviteInner(inviteId: string, fields: { email: string;
     await admin.from("staff_departments").insert(invite.department_ids.map((department_id: string) => ({ profile_id: userRes.user.id, department_id })));
   }
   await admin.from("staff_invites").update({ used_by: userRes.user.id }).eq("id", inviteId);
+  // そのままログイン用のメールを送る（失敗しても登録は済んでいるので、次の画面の「もう一度送る」で送り直せる）。
+  try {
+    await requestLoginLinkInner(fields.email);
+  } catch (e) {
+    console.error("acceptStaffInvite login link", e);
+  }
 
   return { email: fields.email.trim() };
 }

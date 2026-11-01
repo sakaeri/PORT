@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { headingWeight } from "@/lib/style";
 import { errorMessage, unwrap } from "@/lib/errors";
 import { acceptStaffInvite } from "@/app/actions";
-import { createClient } from "@/lib/supabase/client";
+import LoginCodeStep from "@/components/LoginCodeStep";
 import type { StaffRole } from "@/lib/supabase/types";
 
 const card: React.CSSProperties = {
@@ -49,10 +48,9 @@ export default function JoinForm({
   inviteId: string;
   invite: { role: StaffRole; valid: boolean; orgDisplayName: string } | null;
 }) {
-  const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [sentTo, setSentTo] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -74,12 +72,8 @@ export default function JoinForm({
     setError("");
     setSubmitting(true);
     try {
-      unwrap(await acceptStaffInvite(inviteId, { email, password, displayName }));
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (signInError) throw signInError;
-      router.push("/");
-      router.refresh();
+      unwrap(await acceptStaffInvite(inviteId, { email, displayName }));
+      setSentTo(email.trim());
     } catch (e) {
       setError(errorMessage(e, "登録できませんでした"));
       setSubmitting(false);
@@ -90,8 +84,13 @@ export default function JoinForm({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>{invite.orgDisplayName}に参加</div>
-        <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)", marginTop: 4 }}>ログイン情報を設定してください。</div>
       </div>
+
+      {sentTo ? (
+        <div style={card}>
+          <LoginCodeStep email={sentTo} />
+        </div>
+      ) : (
 
       <form onSubmit={submit} style={card}>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -102,10 +101,6 @@ export default function JoinForm({
           <span style={label}>ログインメールアドレス</span>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="vid-input" style={input} required />
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <span style={label}>パスワード（8文字以上）</span>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="vid-input" style={input} required minLength={8} />
-        </div>
 
         {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
 
@@ -113,6 +108,7 @@ export default function JoinForm({
           {submitting ? "登録中…" : "登録して始める"}
         </button>
       </form>
+      )}
     </div>
   );
 }

@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
-import { setInitialProfile, requestMagicLink, signInWithPasswordLogin } from "@/app/actions";
+import { setInitialProfile, requestMagicLink, verifyLoginCode } from "@/app/actions";
 import GateInfo from "@/components/chat/GateInfo";
+import InfoTooltip from "@/components/chat/InfoTooltip";
 
 const input: React.CSSProperties = {
   width: "100%",
@@ -19,8 +20,6 @@ const input: React.CSSProperties = {
   borderRadius: "var(--radius-md)",
   outline: "none",
 };
-
-const subLink: React.CSSProperties = { padding: 0, cursor: "pointer", fontSize: 11.5, color: "var(--color-neutral-500)", background: "transparent", border: "none", textDecoration: "underline" };
 
 function tabBtn(active: boolean): React.CSSProperties {
   return {
@@ -43,15 +42,12 @@ function tabBtn(active: boolean): React.CSSProperties {
 export default function AccountGate({ orgDisplayName, isDesk, initialError }: { orgDisplayName: string; isDesk?: boolean; initialError?: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<"new" | "existing">("new");
-  // ログインは基本メールのリンク。パスワードを設定済みの人だけ切り替えて使う。
-  const [usePassword, setUsePassword] = useState(false);
-  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [sending, setSending] = useState(false);
   const [sentTo, setSentTo] = useState("");
-  const [sentForReset, setSentForReset] = useState(false);
   const [error, setError] = useState(initialError ?? "");
 
   async function submitNew() {
@@ -94,34 +90,12 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
     }
   }
 
-  async function sendResetLink() {
-    if (!email.trim()) {
-      setError("メールアドレスをご入力ください");
-      return;
-    }
+  async function submitCode() {
+    if (!code.trim()) return;
     setSending(true);
     setError("");
     try {
-      const r = await requestMagicLink(email, { resetPassword: true });
-      if (r.error !== null) return setError(r.error || "送信できませんでした");
-      setSentForReset(true);
-      setSentTo(email);
-    } catch (e) {
-      setError(errorMessage(e, "送信できませんでした"));
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function submitPasswordLogin() {
-    if (!email.trim() || !password) {
-      setError("メールアドレスとパスワードをご入力ください");
-      return;
-    }
-    setSending(true);
-    setError("");
-    try {
-      const r = await signInWithPasswordLogin(email, password);
+      const r = await verifyLoginCode(sentTo, code);
       if (r.error !== null) {
         setError(r.error || "ログインできませんでした");
         setSending(false);
@@ -190,13 +164,43 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
             {sentTo ? (
               <>
                 <div style={{ fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>
-                  {sentTo} 宛にメールをお送りしました。メール内のリンクを開くと{sentForReset ? "、新しいパスワードを設定できます。" : "ご利用いただけます。"}
+                  {sentTo} 宛にメールをお送りしました。メール内のリンクを開くとご利用いただけます。
+                  {mode === "existing" && "メールに書かれた数字を入力しても、ログインできます。"}
                 </div>
+                {/* ホーム画面に追加したアプリでは、リンクが別のブラウザで開いてしまうことがあるため数字でも入れる。 */}
+                {mode === "existing" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <input
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && submitCode()}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="メールに届いた数字"
+                      maxLength={10}
+                      className="vid-input"
+                      style={{ ...input, height: 44, fontSize: 18, letterSpacing: "0.2em", textAlign: "center" }}
+                    />
+                    {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+                    <button
+                      onClick={submitCode}
+                      disabled={sending || !code.trim()}
+                      style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending || !code.trim() ? 0.6 : 1 }}
+                    >
+                      {sending ? "確認中…" : "ログイン"}
+                    </button>
+                    {/* 登録の無いアドレスでも同じ表示にしているので、届かない人への案内を添える。 */}
+                    <div style={{ fontSize: 11.5, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-500)" }}>
+                      届かない場合は、ご登録のないアドレスかもしれません。「はじめてご利用の方」からご登録ください。
+                    </div>
+                  </div>
+                )}
                 {/* アドレスの打ち間違いや、メールが届かないときに入力画面へ戻れるように。 */}
                 <button
                   onClick={() => {
                     setSentTo("");
-                    setSentForReset(false);
+                    setCode("");
+                    setError("");
                   }}
                   style={{ alignSelf: "center", padding: 4, cursor: "pointer", fontSize: 12, color: "var(--color-accent)", background: "transparent", border: "none", textDecoration: "underline" }}
                 >
@@ -209,6 +213,9 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                   メールに届いたリンクから、
                   <br />
                   チャット画面へログインできます。
+                  <span style={{ marginLeft: 4, verticalAlign: "middle", display: "inline-flex" }}>
+                    <InfoTooltip text="パスワードは使いません。ご登録のメールアドレスに届くリンクを開くだけでログインできるので、パスワードが漏れたり使い回されたりする心配がありません。リンクは届いてから15分間有効です。" />
+                  </span>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => setMode("new")} style={tabBtn(mode === "new")}>
@@ -243,42 +250,14 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="登録済みのメールアドレス" autoComplete="email" className="vid-input" style={input} />
-                    {usePassword && (
-                      <input
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && submitPasswordLogin()}
-                        type="password"
-                        placeholder="パスワード"
-                        autoComplete="current-password"
-                        className="vid-input"
-                        style={input}
-                      />
-                    )}
                     {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
                     <button
-                      onClick={usePassword ? submitPasswordLogin : submitLogin}
+                      onClick={submitLogin}
                       disabled={sending}
                       style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending ? 0.6 : 1 }}
                     >
-                      {sending ? (usePassword ? "ログイン中…" : "送信中…") : usePassword ? "ログイン" : "ログインリンクを送る"}
+                      {sending ? "送信中…" : "ログインリンクを送る"}
                     </button>
-                    <div style={{ display: "flex", justifyContent: usePassword ? "space-between" : "center", gap: 12 }}>
-                      {usePassword && (
-                        <button onClick={sendResetLink} disabled={sending} style={subLink}>
-                          パスワードをお忘れの方
-                        </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          setUsePassword((v) => !v);
-                          setError("");
-                        }}
-                        style={subLink}
-                      >
-                        {usePassword ? "メールのリンクでログイン" : "パスワードでログイン"}
-                      </button>
-                    </div>
                   </div>
                 )}
               </>
