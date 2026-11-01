@@ -178,6 +178,39 @@ button:disabled {
   }
 }
 
+/* 印刷・PDF保存はインクを使わないよう、テーマに関係なく白い背景・濃い文字にする。 */
+@media print {
+  html,
+  html[data-vid-theme="light"],
+  html[data-vid-theme="dark"] {
+    --color-bg: #ffffff;
+    --color-surface: #ffffff;
+    --color-text: #1c2b22;
+    --color-divider: color-mix(in srgb, #1c2b22 22%, transparent);
+    --color-neutral-100: #1c2b22;
+    --color-neutral-200: #28392e;
+    --color-neutral-300: #3c4b3f;
+    --color-neutral-400: #546254;
+    --color-neutral-500: #5c6a5c;
+    --color-neutral-600: #748071;
+    --color-accent: #0f5a44;
+    --color-accent-100: #092018;
+    --color-accent-200: #0c3526;
+    --color-accent-300: #0e4a37;
+    --color-accent-800: #c3d9cc;
+    --color-accent-900: #ffffff;
+    --color-section: #ffffff;
+    --color-section-glow: #ffffff;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+  }
+  html,
+  body {
+    background: #ffffff !important;
+  }
+}
+
 /* 「今日やること」の各項目に、印刷・PDF保存時だけチェックボックスを付ける
    （画面上はチェックを入れても保存されないため、印刷時のみ表示する）。 */
 .print-checkbox {
