@@ -22,18 +22,7 @@ const input: React.CSSProperties = {
   outline: "none",
 };
 
-function tabBtn(active: boolean): React.CSSProperties {
-  return {
-    flex: 1,
-    height: 38,
-    cursor: "pointer",
-    fontSize: 12.5,
-    color: active ? "var(--color-accent-100)" : "var(--color-accent)",
-    background: active ? "var(--color-accent-900)" : "transparent",
-    border: "1px solid var(--color-accent)",
-    borderRadius: "var(--radius-md)",
-  };
-}
+const heading: React.CSSProperties = { fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, textAlign: "center" };
 
 // 入口の画面。VerifyGate（見えないCAPTCHA＋匿名セッション開始）の直後に必ず経由する。
 // 「登録」ではなく「まずは相談してみる」（窓口では「お問い合わせ」）のフォームにして、
@@ -151,6 +140,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
             単発から定期まで柔軟に対応いたします。
           </div>
         )}
+        {!isDesk && <GateInfo />}
 
         <div
           style={{
@@ -212,14 +202,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
               </>
             ) : (
               <>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => setMode("new")} style={tabBtn(mode === "new")}>
-                    {isDesk ? "お問い合わせ" : "まずは相談してみる"}
-                  </button>
-                  <button onClick={() => setMode("existing")} style={tabBtn(mode === "existing")}>
-                    ログイン
-                  </button>
-                </div>
+                <div style={heading}>{mode === "existing" ? "ログイン" : isDesk ? "お問い合わせ" : "まずは相談してみる"}</div>
                 {mode === "new" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <input value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前" className="vid-input" style={input} />
@@ -272,7 +255,18 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
             )}
         </div>
 
-        {!isDesk && <GateInfo />}
+        {/* 相談フォームとは別物に見えるよう、ログインはカードの外に置く。 */}
+        {!sentTo && (
+          <button
+            onClick={() => {
+              setMode(mode === "new" ? "existing" : "new");
+              setError("");
+            }}
+            style={{ width: "100%", height: 40, marginTop: 4, cursor: "pointer", fontSize: 13, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent-800)", borderRadius: "var(--radius-md)" }}
+          >
+            {mode === "new" ? "ご利用中の方はこちら（ログイン）" : isDesk ? "お問い合わせに戻る" : "相談フォームに戻る"}
+          </button>
+        )}
         {!isDesk && (
           <a href="/legal" target="_blank" rel="noreferrer" style={{ alignSelf: "center", fontSize: 11, color: "var(--color-neutral-500)" }}>
             特定商取引法に基づく表記
