@@ -193,7 +193,10 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
   const lastMessageId = messages[messages.length - 1]?.id;
   useEffect(() => {
     const mark = () => {
-      if (document.visibilityState === "visible") markChatRead().catch(() => {});
+      if (document.visibilityState !== "visible") return;
+      markChatRead().catch(() => {});
+      // トークを開いたら読んだことになるので、ホーム画面のアイコンの数字も消す。
+      (navigator as Navigator & { clearAppBadge?: () => Promise<void> }).clearAppBadge?.().catch(() => {});
     };
     mark();
     document.addEventListener("visibilitychange", mark);

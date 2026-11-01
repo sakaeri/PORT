@@ -40,9 +40,26 @@ async function getCustomerEmail(admin: Admin, customerId: string): Promise<strin
 
 
 // 依頼主の、通知を許可した端末へプッシュ通知を送る（メールとは別に。メールが無くても送る）。
+// ホーム画面のアイコンには、依頼主がまだ読んでいない担当者からのメッセージの数を出す。
 async function pushToCustomer(admin: Admin, customerId: string, payload: { title: string; body: string; url: string }) {
   const { data: customer } = await admin.from("customers").select("profile_id").eq("id", customerId).maybeSingle();
-  if (customer?.profile_id) await sendPush(admin, [customer.profile_id], payload);
+  if (!customer?.profile_id) return;
+  await sendPush(admin, [customer.profile_id], { ...payload, badge: await customerUnreadCount(admin, customerId) });
+}
+
+async function customerUnreadCount(admin: Admin, customerId: string): Promise<number | undefined> {
+  const { data: thread } = await admin.from("threads").select("id, customer_last_read_at").eq("customer_id", customerId).eq("kind", "customer").maybeSingle();
+  if (!thread) return undefined;
+  let q = admin
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("thread_id", thread.id)
+    .is("deleted_at", null)
+    .not("sender_role", "is", null)
+    .neq("sender_role", "client");
+  if (thread.customer_last_read_at) q = q.gt("sent_at", thread.customer_last_read_at);
+  const { count } = await q;
+  return count ?? undefined;
 }
 
 async function getOrgSlug(admin: Admin, orgId: string): Promise<{ displayName: string; slug: string | null }> {
