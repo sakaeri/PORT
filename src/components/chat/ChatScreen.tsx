@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Header from "@/components/chat/Header";
 import Composer, { type PendingAttachment } from "@/components/chat/Composer";
 import { takePendingInquiry } from "@/lib/pending-inquiry";
+import PushBanner from "@/components/chat/PushPrompt";
 import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, IntakeCard, IntakeAnswerBubble } from "@/components/chat/Bubbles";
 import { ProgressPanel, CancelDialog, ReportsDialog } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
@@ -334,6 +335,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
 
   return (
     <div style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--color-bg)", fontFamily: "var(--font-body)", color: "var(--color-text)" }}>
+      <PushBanner />
       <Header
         brandName={ctx.orgDisplayName}
         activeCount={activeCount}

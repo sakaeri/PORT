@@ -1,3 +1,4 @@
+import { sendPush } from "@/lib/push";
 import type { createServiceRoleClient } from "@/lib/supabase/server";
 import { emailSubject, renderEmail } from "@/lib/email-layout";
 
@@ -38,6 +39,12 @@ async function getCustomerEmail(admin: Admin, customerId: string): Promise<strin
 }
 
 
+// 依頼主の、通知を許可した端末へプッシュ通知を送る（メールとは別に。メールが無くても送る）。
+async function pushToCustomer(admin: Admin, customerId: string, payload: { title: string; body: string; url: string }) {
+  const { data: customer } = await admin.from("customers").select("profile_id").eq("id", customerId).maybeSingle();
+  if (customer?.profile_id) await sendPush(admin, [customer.profile_id], payload);
+}
+
 async function getOrgSlug(admin: Admin, orgId: string): Promise<{ displayName: string; slug: string | null }> {
   const { data } = await admin.from("organizations").select("display_name, slug").eq("id", orgId).maybeSingle();
   return { displayName: data?.display_name ?? "", slug: data?.slug ?? null };
@@ -49,6 +56,7 @@ function customerChatUrl(slug: string | null): string {
 
 export async function notifyCustomerQuoteCreated(admin: Admin, orgId: string, customerId: string, amount: number, title: string) {
   try {
+    await pushToCustomer(admin, customerId, { title: "お見積りが届いています", body: `${title}・¥${amount.toLocaleString("ja-JP")}`, url: customerChatUrl((await getOrgSlug(admin, orgId)).slug) });
     const email = await getCustomerEmail(admin, customerId);
     if (!email) return;
     const { displayName, slug } = await getOrgSlug(admin, orgId);
@@ -64,6 +72,7 @@ export async function notifyCustomerQuoteCreated(admin: Admin, orgId: string, cu
 
 export async function notifyCustomerCompletionReport(admin: Admin, orgId: string, customerId: string) {
   try {
+    await pushToCustomer(admin, customerId, { title: "完了報告が届いています", body: "ご依頼いただいた作業が完了しました。", url: customerChatUrl((await getOrgSlug(admin, orgId)).slug) });
     const email = await getCustomerEmail(admin, customerId);
     if (!email) return;
     const { displayName, slug } = await getOrgSlug(admin, orgId);
@@ -106,10 +115,15 @@ export async function notifyCustomerNewMessage(admin: Admin, threadId: string) {
   try {
     const { data: thread } = await admin.from("threads").select("org_id, customer_id, desk_id").eq("id", threadId).maybeSingle();
     if (!thread?.customer_id) return;
-    const email = await getCustomerEmail(admin, thread.customer_id);
-    if (!email) return;
     // 問い合わせ窓口（TeeRA など）のトークは、その窓口の名前でやわらかく知らせる。
     const desk = thread.desk_id ? (await admin.from("inquiry_desks").select("name, slug").eq("id", thread.desk_id).maybeSingle()).data : null;
+    await pushToCustomer(admin, thread.customer_id, {
+      title: desk ? `${desk.name}からお返事が届いています` : "新しいメッセージがあります",
+      body: desk ? "チャットにお返事をお送りしました。" : "担当者から新しいメッセージが届いています。",
+      url: customerChatUrl(desk ? desk.slug : (await getOrgSlug(admin, thread.org_id)).slug),
+    });
+    const email = await getCustomerEmail(admin, thread.customer_id);
+    if (!email) return;
     if (desk) {
       await sendEmail(
         email,
@@ -139,6 +153,11 @@ export async function notifyCustomerNewMessage(admin: Admin, threadId: string) {
 // 気づけず、定期対応の引き落としに間に合わないためメールでも知らせる。
 export async function notifyCustomerAutoRechargeFailed(admin: Admin, orgId: string, customerId: string, stopped: boolean) {
   try {
+    await pushToCustomer(admin, customerId, {
+      title: stopped ? "自動チャージを停止しました" : "自動チャージに失敗しました",
+      body: "マイページからカード情報をご確認ください。",
+      url: customerChatUrl((await getOrgSlug(admin, orgId)).slug),
+    });
     const email = await getCustomerEmail(admin, customerId);
     if (!email) return;
     const { displayName, slug } = await getOrgSlug(admin, orgId);

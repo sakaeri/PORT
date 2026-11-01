@@ -645,3 +645,13 @@ async function sendHqMessageInner(body: string) {
   await admin.from("threads").update({ last_msg_at: now }).eq("id", threadId);
 }
 
+// プッシュ通知を許可した端末を登録する（同じ端末で別の人がログインし直したら、その人の宛先に付け替える）。
+export async function savePushSubscription(sub: { endpoint: string; p256dh: string; auth: string }) {
+  return toResult("savePushSubscription", async () => {
+    const ctx = await requireContext();
+    if (!sub.endpoint.startsWith("https://") || !sub.p256dh || !sub.auth) throw new Error("通知を登録できませんでした");
+    const admin = createServiceRoleClient();
+    const { error } = await admin.from("push_subscriptions").upsert({ user_id: ctx.userId, endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, { onConflict: "endpoint" });
+    if (error) throw error;
+  });
+}
