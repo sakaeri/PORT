@@ -63,6 +63,11 @@ export default async function StaffPage() {
   }
   const myDepartmentIds = departmentIdsByProfile.get(ctx.userId) ?? [];
 
+  // 最後にトークが動いたスタッフを上にするため。
+  const staffThreadIds = (summaries ?? []).flatMap((s) => (s.thread_id ? [s.thread_id] : []));
+  const { data: threadTimes } = staffThreadIds.length > 0 ? await supabase.from("threads").select("id, last_msg_at").in("id", staffThreadIds) : { data: [] };
+  const lastMessageAtByThreadId = new Map((threadTimes ?? []).map((t) => [t.id, t.last_msg_at ?? ""]));
+
   type Summary = NonNullable<typeof summaries>[number];
   const summaryByProfileId = new Map((summaries ?? []).map((s) => [s.staff_profile_id, s]));
 
@@ -81,7 +86,11 @@ export default async function StaffPage() {
     (p) => ctx.role !== "dept_manager" || p.role !== "dept_leader" || (departmentIdsByProfile.get(p.id) ?? []).some((id) => myDepartmentIds.includes(id)),
   );
 
-  const staff = visibleProfiles.map((p) => {
+  const lastMessageAt = (profileId: string) => {
+    const threadId = summaryByProfileId.get(profileId)?.thread_id;
+    return (threadId && lastMessageAtByThreadId.get(threadId)) || "";
+  };
+  const staff = [...visibleProfiles].sort((a, b) => lastMessageAt(b.id).localeCompare(lastMessageAt(a.id))).map((p) => {
     const summary = summaryByProfileId.get(p.id) ?? null;
     return {
       id: p.id,

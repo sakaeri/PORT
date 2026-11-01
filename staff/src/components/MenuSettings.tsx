@@ -401,7 +401,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
     setImportNote("");
     try {
       const added = await importTaskExampleMenus(orgId);
-      setMenus((m) => [...m, ...added.map((a) => ({ ...a, report_field_presets: [] }))]);
+      setMenus((m) => [...added.map((a) => ({ ...a, report_field_presets: [] })), ...m]);
       setImportNote(added.length > 0 ? `${added.length}件追加しました` : "すべて追加済みです");
     } catch {
       setImportNote("追加できませんでした");
@@ -419,7 +419,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
   async function handleAdd() {
     const id = await createMenu(orgId);
     const created: Menu = { id, org_id: orgId, label: "新しいメニュー", note: null, icon: null, price: null, lead_hours: 24, active: true, department_id: null, report_field_presets: [] };
-    setMenus((m) => [...m, created]);
+    setMenus((m) => [created, ...m]);
     setNewMenuId(id);
     openMenu(created);
   }
@@ -753,7 +753,7 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
   async function handleAdd() {
     const id = await createIntakeForm(orgId);
     const created: IntakeForm = { id, org_id: orgId, label: "", note: null, sort: 999, intake_fields: [] };
-    setTemplates((t) => [...t, created]);
+    setTemplates((t) => [created, ...t]);
     setCreatedId(id);
     openTemplate(created);
   }

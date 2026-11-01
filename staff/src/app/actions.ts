@@ -642,6 +642,12 @@ async function createCaseRequestInner(
         .insert(items.map((it, i) => ({ request_id: request.id, menu_id: it.menuId, label: it.label, price: it.price, payout: it.payout, qty: it.qty, sort: i })));
       if (itemsError) throw itemsError;
     }
+    // 使ったメニューを「最近使った順」の一番上へ（担当マネージャーはメニューを
+    // 編集できないので service-role で日時だけ進める）。
+    const usedMenuIds = [...new Set(items.flatMap((it) => (it.menuId ? [it.menuId] : [])))];
+    if (usedMenuIds.length > 0) {
+      await admin.from("menus").update({ last_used_at: new Date().toISOString() }).in("id", usedMenuIds).eq("org_id", ctx.orgId);
+    }
 
     // 定期対応の雛形を作っておく。初回の支払いが確定するまでは active=false
     // のままで、pay_request_from_balance が確定と同時に有効化する。
@@ -1000,6 +1006,7 @@ export async function sendTemplateMessage(threadId: string, templateId: string) 
   });
   if (error) throw error;
   await supabase.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
+  await admin.from("intake_forms").update({ last_used_at: new Date().toISOString() }).eq("id", form.id);
   if (shouldNotify) await notifyCustomerNewMessage(admin, threadId);
 }
 

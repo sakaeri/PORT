@@ -48,7 +48,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       .order("sent_at", { referencedTable: "messages", ascending: true })
       .maybeSingle(),
     isManagerAssigning ? supabase.from("staff_departments").select("profile_id, department_id") : Promise.resolve({ data: [] }),
-    supabase.from("menus").select("id, label, note, price, payout").eq("org_id", ctx.orgId).eq("active", true).order("sort", { ascending: true }),
+    supabase.from("menus").select("id, label, note, price, payout").eq("org_id", ctx.orgId).eq("active", true).order("last_used_at", { ascending: false }).order("sort", { ascending: true }),
   ]);
   if (!request) notFound();
 

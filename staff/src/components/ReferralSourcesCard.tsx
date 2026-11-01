@@ -75,7 +75,7 @@ export default function ReferralSourcesCard({ initialSources, canEdit }: { initi
     setError("");
     try {
       const { data } = unwrap(await createReferralSource(name));
-      setSources((rows) => [...rows, { ...data!, customers: [] }]);
+      setSources((rows) => [{ ...data!, customers: [] }, ...rows]);
       setName("");
       setAdding(false);
     } catch (e) {
