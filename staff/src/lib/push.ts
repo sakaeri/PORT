@@ -16,7 +16,7 @@ function configure(): boolean {
 // 指定した人たちの、通知を許可した全端末へプッシュ通知を送る。鍵が未設定なら何もしない。
 // 端末側で通知をやめた（期限切れ・解除済み）宛先は、送った時点で消しておく。
 // 失敗しても呼び出し元の処理は止めない。
-export async function sendPush(admin: Admin, userIds: string[], payload: { title: string; body: string; url: string }) {
+export async function sendPush(admin: Admin, userIds: string[], payload: { title: string; body: string; url: string; badge?: number }) {
   try {
     if (!userIds.length || !configure()) return;
     const { data: subs } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("user_id", userIds);

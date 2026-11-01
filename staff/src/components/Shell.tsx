@@ -88,6 +88,14 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     };
   }, [ctx.orgId]);
 
+  // ホーム画面のアイコンの数字は、ナビの赤丸（未読の依頼主＋気にかける案件）の合計にそろえる。
+  useEffect(() => {
+    const total = unreadCount + attentionCount;
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    if (total > 0) nav.setAppBadge?.(total).catch(() => {});
+    else nav.clearAppBadge?.().catch(() => {});
+  }, [unreadCount, attentionCount]);
+
   // ページ遷移したら開きっぱなしのドロワーを閉じる。
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting UI state on route change (external navigation event), not state derived from props/state

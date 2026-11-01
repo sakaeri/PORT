@@ -6,13 +6,21 @@ self.addEventListener("push", (event) => {
   } catch {
     data = { body: event.data ? event.data.text() : "" };
   }
+  // ホーム画面のアイコンの数字。件数が分かればその数、分からなければ印だけ付ける。
+  const badge =
+    "setAppBadge" in self.navigator
+      ? (typeof data.badge === "number" && data.badge > 0 ? self.navigator.setAppBadge(data.badge) : self.navigator.setAppBadge()).catch(() => {})
+      : Promise.resolve();
   event.waitUntil(
-    self.registration.showNotification(data.title || "中央秘書事務所", {
-      body: data.body || "",
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      data: { url: data.url || "/" },
-    }),
+    Promise.all([
+      badge,
+      self.registration.showNotification(data.title || "中央秘書事務所", {
+        body: data.body || "",
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        data: { url: data.url || "/" },
+      }),
+    ]),
   );
 });
 
