@@ -158,7 +158,9 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
             {sentTo ? (
               <>
                 <div style={{ fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>
-                  {sentTo} 宛にメールをお送りしました。メール内のリンクを開くか、メールに書かれた数字を入力してください。
+                  {sentTo} にログイン用のメールをお送りしました。
+                  <br />
+                  メール内のボタンを押すか、確認コードを入力してください。
                 </div>
                 {/* ホーム画面に追加したアプリでは、リンクが別のブラウザで開いてしまうことがあるため数字でも入れる。 */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -168,7 +170,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                     onKeyDown={(e) => e.key === "Enter" && submitCode()}
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    placeholder="メールに届いた数字"
+                    placeholder="確認コード"
                     maxLength={10}
                     className="vid-input"
                     style={{ ...input, height: 44, fontSize: 18, letterSpacing: "0.2em", textAlign: "center" }}
@@ -181,14 +183,10 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                   >
                     {sending ? "確認中…" : "ログイン"}
                   </button>
-                  {/* 登録の無いアドレスでも同じ表示にしているので、届かない人への案内を添える。 */}
-                  {mode === "existing" && (
-                    <div style={{ fontSize: 11.5, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-500)" }}>
-                      届かない場合は、ご登録のないアドレスかもしれません。「{isDesk ? "お問い合わせ" : "まずは相談してみる"}」からお送りください。
-                    </div>
-                  )}
                 </div>
-                {/* アドレスの打ち間違いや、メールが届かないときに入力画面へ戻れるように。 */}
+                {/* アドレスの打ち間違いや、メールが届かないときに入力画面へ戻れるように。
+                    登録の無いアドレスでも同じ表示にしているので、届かないときの案内は ⓘ に入れる。 */}
+                <div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 4 }}>
                 <button
                   onClick={() => {
                     setSentTo("");
@@ -199,6 +197,10 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                 >
                   アドレスを直す・もう一度送る
                 </button>
+                <InfoTooltip
+                  text={`メールが届かないときは、迷惑メールのフォルダもご確認ください。ご登録のないアドレスには届きません。はじめての方は「${isDesk ? "お問い合わせ" : "まずは相談してみる"}」からお送りください。確認コードは届いてから15分間有効です。`}
+                />
+                </div>
               </>
             ) : (
               <>
