@@ -82,7 +82,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
   // whenever the visitor had light mode (or acked reports) already saved,
   // producing a hydration mismatch.
   const [ackedIds, setAckedIds] = useState<Set<string>>(() => new Set());
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from localStorage/the DOM (set outside React), not state derived from props/state
     setAckedIds(readAcked());
