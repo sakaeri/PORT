@@ -11,12 +11,8 @@ import Modal from "@/components/Modal";
 // 依頼主アプリの公開URL（OrgsAdmin.tsx の事業者URLと同じドメイン）。
 const CLIENT_APP_ORIGIN = "https://port.s-stylegolf.com";
 
+// 一覧は外枠で囲まず、ページの背景にそのまま白い行を並べる（枠の二重を避ける）。
 const card: React.CSSProperties = {
-  padding: 16,
-  borderRadius: "var(--radius-md)",
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-divider)",
-  boxShadow: "var(--shadow-sm)",
   display: "flex",
   flexDirection: "column",
   gap: 12,
@@ -183,7 +179,7 @@ export default function InquiryDesksCard({
               }}
               placeholder="窓口の名前（例：TeeRA）"
               className="vid-input"
-              style={{ ...input, flex: "none", height: 38 }}
+              style={{ ...input, flex: "none", height: 38, background: "var(--color-surface)" }}
             />
             {error && <div style={{ fontSize: 12, color: "var(--color-accent-200)" }}>{error}</div>}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -204,7 +200,7 @@ export default function InquiryDesksCard({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {desks.map((d) => (
-          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", background: "var(--color-bg)" }}>
+          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", background: "var(--color-surface)" }}>
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2, opacity: d.active ? 1 : 0.55 }}>
               <span style={{ fontSize: 13.5 }}>{d.name}</span>
               {editingId === d.id ? (
