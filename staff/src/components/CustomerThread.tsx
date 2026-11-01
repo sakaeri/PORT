@@ -568,6 +568,7 @@ export default function CustomerThread({
   memos,
   ratings,
   latestRequest,
+  deskName,
   initialHasMoreOlder,
   canSeeHqFeedback,
   canDeleteTemplates,
@@ -577,6 +578,8 @@ export default function CustomerThread({
   referral,
 }: {
   customer: { id: string; name: string; staffLabel: string | null; memberNo: string | null; balance: number };
+  // 問い合わせ窓口（TeeRA など）のトークのとき、その窓口名。残高・見積もり・評価などは出さない。
+  deskName?: string | null;
   thread: { id: string; archived: boolean; departmentId: string | null } | null;
   departments: { id: string; name: string }[];
   initialMessages: Message[];
@@ -849,7 +852,7 @@ export default function CustomerThread({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{staffLabel ?? customer.name}</div>
           <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {customer.memberNo ?? "—"}
+            {deskName ? `${deskName}受付` : (customer.memberNo ?? "—")}
             {staffLabel && `・本人の登録名：${customer.name}`}
           </div>
         </div>
@@ -904,12 +907,14 @@ export default function CustomerThread({
         </div>
       )}
 
+      {!deskName && (
       <div style={{ padding: "14px 20px 0", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>残高</span>
           <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>¥{balance.toLocaleString("ja-JP")}</span>
         </div>
       </div>
+      )}
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
         {!thread && <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>まだやり取りがありません。</div>}
@@ -1026,7 +1031,7 @@ export default function CustomerThread({
           }
           leftButton={
             <>
-              {thread && (
+              {thread && !deskName && (
                 <button
                   onClick={() => setShowQuote(true)}
                   aria-label="見積もりを作る"
@@ -1075,13 +1080,13 @@ export default function CustomerThread({
               <X size={18} />
             </button>
           )}
-          <RatingsSummary ratings={ratings} />
+          {!deskName && <RatingsSummary ratings={ratings} />}
           <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
           {referral && <ReferralSection customerId={customer.id} referral={referral} onBalanceChange={setBalance} />}
-          {canSeeHqFeedback && (
+          {canSeeHqFeedback && !deskName && (
             <HqFeedbackSection threadId={hqFeedbackThreadId} unread={hqFeedbackUnread} orgId={orgId} currentUserId={currentUserId} />
           )}
-          <CaseSummarySection thread={thread} latestRequest={latestRequest} onOpenQuote={() => setShowQuote(true)} />
+          {!deskName && <CaseSummarySection thread={thread} latestRequest={latestRequest} onOpenQuote={() => setShowQuote(true)} />}
         </div>
       </>
     )}

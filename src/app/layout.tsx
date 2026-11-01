@@ -9,17 +9,17 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#16281f",
+  themeColor: "#f3efe2",
   // ホーム画面から開いたとき、画面下のホームバーの分の余白（safe-area）を測れるようにする。
   viewportFit: "cover",
 };
 
 // Runs before paint so the persisted theme choice applies with no flash of
-// the wrong theme (mirrors the prototype's _initTheme(), default dark).
+// the wrong theme. Default is light (easier to read for most people); dark only if chosen.
 const themeInitScript = `
 (function () {
   try {
-    var v = localStorage.getItem('VID_theme') === 'light' ? 'light' : 'dark';
+    var v = localStorage.getItem('VID_theme') === 'dark' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-vid-theme', v);
   } catch (e) {}
 })();
@@ -28,7 +28,7 @@ const themeInitScript = `
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // テーマの属性（data-vid-theme）は描画前のスクリプトで付けるので、そこだけの食い違いは警告しない。
-    <html lang="ja" suppressHydrationWarning>
+    <html lang="ja" data-vid-theme="light" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

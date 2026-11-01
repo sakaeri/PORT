@@ -125,8 +125,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     initialMessages = mapMessageRows(rows.slice().reverse());
   }
 
+  // 問い合わせ窓口（TeeRA など）のトークなら、その窓口名を出して、残高・見積もりなどは出さない。
+  const deskName = customer.desk_id ? ((await supabase.from("inquiry_desks").select("name").eq("id", customer.desk_id).maybeSingle()).data?.name ?? "窓口") : null;
+
   return (
     <CustomerThread
+      deskName={deskName}
       customer={{ id: customer.id, name: customer.name, staffLabel: customer.staff_label, memberNo: customer.member_no, balance: customer.balance }}
       thread={thread ? { id: thread.id, archived: !!thread.archived_at, departmentId: thread.department_id } : null}
       departments={(departmentRows ?? []).map((d) => ({ id: d.id, name: d.name }))}
