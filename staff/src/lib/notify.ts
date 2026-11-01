@@ -31,7 +31,10 @@ async function getCustomerEmail(admin: Admin, customerId: string): Promise<strin
   const { data: customer } = await admin.from("customers").select("profile_id").eq("id", customerId).maybeSingle();
   if (!customer?.profile_id) return null;
   const { data } = await admin.auth.admin.getUserById(customer.profile_id);
-  return data.user?.email ?? null;
+  // 入口のフォームから送って、まだ確認メールを開いていない人にも、ふつうの問い合わせ
+  // フォームと同じように返信のお知らせを届ける（確認待ちのアドレス new_email）。
+  // email は確認前だと空文字で返ってくるので ?? ではなく || でつなぐ。
+  return data.user?.email || data.user?.new_email || null;
 }
 
 

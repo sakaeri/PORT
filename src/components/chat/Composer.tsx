@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Paperclip, ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/react";
 import { FileIcon } from "@/components/chat/icons";
 import { createClient } from "@/lib/supabase/client";
@@ -27,6 +27,8 @@ interface Props {
   orgId: string;
   deskId: string | null;
   onSend: (text: string, attachments: PendingAttachment[]) => Promise<void>;
+  // 入力欄にあらかじめ入れておく文（入口のフォームに書いたご相談内容など）。
+  prefill?: string;
 }
 
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20MB。Supabase側の上限に確実に収まるよう、送信前にここで弾く
@@ -48,8 +50,12 @@ function isTouchDevice() {
   return typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 }
 
-export default function Composer({ threadId, orgId, deskId, onSend }: Props) {
+export default function Composer({ threadId, orgId, deskId, onSend, prefill }: Props) {
   const [draft, setDraft] = useState("");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time prefill handed over from the entry form
+    if (prefill) setDraft(prefill);
+  }, [prefill]);
   const [history, setHistory] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [uploading, setUploading] = useState(false);

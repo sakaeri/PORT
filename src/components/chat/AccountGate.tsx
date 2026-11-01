@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
-import { setInitialProfile, requestMagicLink, verifyLoginCode } from "@/app/actions";
+import { submitFirstInquiry, requestMagicLink, verifyLoginCode } from "@/app/actions";
+import { savePendingInquiry } from "@/lib/pending-inquiry";
 import GateInfo from "@/components/chat/GateInfo";
 import InfoTooltip from "@/components/chat/InfoTooltip";
 
@@ -21,53 +22,45 @@ const input: React.CSSProperties = {
   outline: "none",
 };
 
-function tabBtn(active: boolean): React.CSSProperties {
-  return {
-    flex: 1,
-    height: 38,
-    cursor: "pointer",
-    fontSize: 12.5,
-    color: active ? "var(--color-accent-100)" : "var(--color-accent)",
-    background: active ? "var(--color-accent-900)" : "transparent",
-    border: "1px solid var(--color-accent)",
-    borderRadius: "var(--radius-md)",
-  };
-}
+const heading: React.CSSProperties = { fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, textAlign: "center" };
 
-// 事業の方針で、ログイン（メールアドレスの確認）なしでは使えないようにした
-// ゲート画面。VerifyGate（見えないCAPTCHA＋匿名セッション開始）の直後に、
-// この画面を必ず経由させる。匿名セッション自体は今まで通り裏で作られて
-// いるが、名前・メールアドレスを登録して確認メールのリンクを開くまでは
-// チャット画面を見せない（page.tsx 側で ctx.isAnonymous を見て出し分ける）。
+// 入口の画面。VerifyGate（見えないCAPTCHA＋匿名セッション開始）の直後に必ず経由する。
+// 「登録」ではなく「まずは相談してみる」（窓口では「お問い合わせ」）のフォームにして、
+// 身構えずに送れるようにしている。送るとその場でトークに届き、画面はトークに切り替わる
+// （page.tsx が ctx.pendingEmail を見て出し分ける）。登録済みの人は「ログイン」から。
 export default function AccountGate({ orgDisplayName, isDesk, initialError }: { orgDisplayName: string; isDesk?: boolean; initialError?: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [agreed, setAgreed] = useState(false);
+  const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [sentTo, setSentTo] = useState("");
   const [error, setError] = useState(initialError ?? "");
 
   async function submitNew() {
-    if (!name.trim() || !email.trim()) {
-      setError("お名前とメールアドレスをご入力ください");
-      return;
-    }
-    if (!agreed) {
-      setError("利用規約への同意が必要です");
+    if (!name.trim() || !email.trim() || !body.trim()) {
+      setError(isDesk ? "お名前・メールアドレス・お問い合わせ内容をご入力ください" : "お名前・メールアドレス・ご相談内容をご入力ください");
       return;
     }
     setSending(true);
     setError("");
+    savePendingInquiry(body);
     try {
-      const r = await setInitialProfile(name, email, "", agreed);
-      if (r.error !== null) return setError(r.error || "作成できませんでした");
+      const r = await submitFirstInquiry(name, email, body);
+      if (r.error !== null) {
+        setError(r.error || "送信できませんでした");
+        setSending(false);
+        return;
+      }
+      // ふつうはトークに切り替わる。登録済みのアドレスだった場合はログイン用のメールが
+      // 届いているので、送信済みの画面のまま数字を入力できるようにしておく。
       setSentTo(email);
+      setSending(false);
+      router.refresh();
     } catch (e) {
-      setError(errorMessage(e, "作成できませんでした"));
-    } finally {
+      setError(errorMessage(e, "送信できませんでした"));
       setSending(false);
     }
   }
@@ -147,6 +140,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
             単発から定期まで柔軟に対応いたします。
           </div>
         )}
+        {!isDesk && <GateInfo />}
 
         <div
           style={{
@@ -164,37 +158,36 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
             {sentTo ? (
               <>
                 <div style={{ fontSize: 13.5, lineHeight: 1.7, textAlign: "center", opacity: 0.85 }}>
-                  {sentTo} 宛にメールをお送りしました。メール内のリンクを開くとご利用いただけます。
-                  {mode === "existing" && "メールに書かれた数字を入力しても、ログインできます。"}
+                  {sentTo} 宛にメールをお送りしました。メール内のリンクを開くか、メールに書かれた数字を入力してください。
                 </div>
                 {/* ホーム画面に追加したアプリでは、リンクが別のブラウザで開いてしまうことがあるため数字でも入れる。 */}
-                {mode === "existing" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <input
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && submitCode()}
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      placeholder="メールに届いた数字"
-                      maxLength={10}
-                      className="vid-input"
-                      style={{ ...input, height: 44, fontSize: 18, letterSpacing: "0.2em", textAlign: "center" }}
-                    />
-                    {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
-                    <button
-                      onClick={submitCode}
-                      disabled={sending || !code.trim()}
-                      style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending || !code.trim() ? 0.6 : 1 }}
-                    >
-                      {sending ? "確認中…" : "ログイン"}
-                    </button>
-                    {/* 登録の無いアドレスでも同じ表示にしているので、届かない人への案内を添える。 */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <input
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && submitCode()}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="メールに届いた数字"
+                    maxLength={10}
+                    className="vid-input"
+                    style={{ ...input, height: 44, fontSize: 18, letterSpacing: "0.2em", textAlign: "center" }}
+                  />
+                  {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
+                  <button
+                    onClick={submitCode}
+                    disabled={sending || !code.trim()}
+                    style={{ height: 40, cursor: "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending || !code.trim() ? 0.6 : 1 }}
+                  >
+                    {sending ? "確認中…" : "ログイン"}
+                  </button>
+                  {/* 登録の無いアドレスでも同じ表示にしているので、届かない人への案内を添える。 */}
+                  {mode === "existing" && (
                     <div style={{ fontSize: 11.5, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-500)" }}>
-                      届かない場合は、ご登録のないアドレスかもしれません。「はじめてご利用の方」からご登録ください。
+                      届かない場合は、ご登録のないアドレスかもしれません。「{isDesk ? "お問い合わせ" : "まずは相談してみる"}」からお送りください。
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
                 {/* アドレスの打ち間違いや、メールが届かないときに入力画面へ戻れるように。 */}
                 <button
                   onClick={() => {
@@ -209,46 +202,44 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
               </>
             ) : (
               <>
-                <div style={{ fontSize: 12.5, lineHeight: 1.7, textAlign: "center", opacity: 0.75 }}>
-                  メールに届いたリンクから、
-                  <br />
-                  チャット画面へログインできます。
-                  <span style={{ marginLeft: 4, verticalAlign: "middle", display: "inline-flex" }}>
-                    <InfoTooltip text="パスワードは使いません。ご登録のメールアドレスに届くリンクを開くだけでログインできるので、パスワードが漏れたり使い回されたりする心配がありません。リンクは届いてから15分間有効です。" />
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => setMode("new")} style={tabBtn(mode === "new")}>
-                    はじめてご利用の方
-                  </button>
-                  <button onClick={() => setMode("existing")} style={tabBtn(mode === "existing")}>
-                    ログイン
-                  </button>
-                </div>
+                <div style={heading}>{mode === "existing" ? "ログイン" : isDesk ? "お問い合わせ" : "まずは相談してみる"}</div>
                 {mode === "new" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <input value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前" className="vid-input" style={input} />
-                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="メールアドレス" className="vid-input" style={input} />
-                    <label style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: 11.5, lineHeight: 1.6, color: "var(--color-neutral-400)", cursor: "pointer" }}>
-                      <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
-                      <span>
-                        <a href="/terms" target="_blank" rel="noreferrer" style={{ color: "var(--color-accent)" }}>
-                          利用規約
-                        </a>
-                        に同意する
-                      </span>
-                    </label>
+                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="メールアドレス" autoComplete="email" className="vid-input" style={input} />
+                    <textarea
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      placeholder={isDesk ? "お問い合わせ内容" : "ご相談内容（ざっくりで大丈夫です）"}
+                      rows={4}
+                      maxLength={4000}
+                      className="vid-input"
+                      style={{ ...input, height: "auto", minHeight: 96, padding: "10px 12px", lineHeight: 1.6, resize: "vertical" }}
+                    />
                     {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
                     <button
                       onClick={submitNew}
-                      disabled={sending || !agreed}
-                      style={{ height: 40, cursor: sending || !agreed ? "not-allowed" : "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending || !agreed ? 0.6 : 1 }}
+                      disabled={sending}
+                      style={{ height: 40, cursor: sending ? "wait" : "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending ? 0.6 : 1 }}
                     >
-                      {sending ? "送信中…" : "メールでリンクを受け取る"}
+                      {sending ? "送信中…" : isDesk ? "送信する" : "相談する"}
                     </button>
+                    <div style={{ fontSize: 11, lineHeight: 1.6, textAlign: "center", color: "var(--color-neutral-500)" }}>
+                      送信すると
+                      <a href="/terms" target="_blank" rel="noreferrer" style={{ color: "var(--color-accent)" }}>
+                        利用規約
+                      </a>
+                      に同意したものとみなします。
+                    </div>
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 12, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-400)" }}>
+                      メールに届くリンクからログインできます。
+                      <span style={{ marginLeft: 4, verticalAlign: "middle", display: "inline-flex" }}>
+                        <InfoTooltip text="パスワードは使いません。ご登録のメールアドレスに届くリンクを開くだけでログインできるので、パスワードが漏れたり使い回されたりする心配がありません。リンクは届いてから15分間有効です。" />
+                      </span>
+                    </div>
                     <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="登録済みのメールアドレス" autoComplete="email" className="vid-input" style={input} />
                     {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}
                     <button
@@ -264,7 +255,18 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
             )}
         </div>
 
-        {!isDesk && <GateInfo />}
+        {/* 相談フォームとは別物に見えるよう、ログインはカードの外に置く。 */}
+        {!sentTo && (
+          <button
+            onClick={() => {
+              setMode(mode === "new" ? "existing" : "new");
+              setError("");
+            }}
+            style={{ width: "100%", height: 40, marginTop: 4, cursor: "pointer", fontSize: 13, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent-800)", borderRadius: "var(--radius-md)" }}
+          >
+            {mode === "new" ? "ご利用中の方はこちら（ログイン）" : isDesk ? "お問い合わせに戻る" : "相談フォームに戻る"}
+          </button>
+        )}
         {!isDesk && (
           <a href="/legal" target="_blank" rel="noreferrer" style={{ alignSelf: "center", fontSize: 11, color: "var(--color-neutral-500)" }}>
             特定商取引法に基づく表記

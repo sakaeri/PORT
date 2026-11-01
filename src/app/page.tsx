@@ -66,11 +66,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
     );
   }
 
-  // 事業の方針で、メールアドレスの確認（ログイン）をしていない人にはチャット
-  // 画面を見せない。匿名セッション自体はVerifyGateが裏で作っているが、
-  // ここでAccountGateを挟み、名前・メールの登録 or 既存アカウントへの
-  // ログインを済ませるまで先に進ませない。
-  if (ctx.isAnonymous) {
+  // 入口のフォーム（お名前・メールアドレス・ご相談内容）を送るか、既存アカウントに
+  // ログインするまではチャット画面を見せない。匿名セッション自体はVerifyGateが裏で
+  // 作っている。フォームを送ったあとは、メールアドレスの確認前でも同じ端末ならトークを
+  // 見られる（お金に関わる操作だけは確認が済んでから。actions の requireConfirmed）。
+  if (ctx.isAnonymous && !ctx.pendingEmail) {
     const { loginError } = await searchParams;
     return <AccountGate orgDisplayName={ctx.orgDisplayName} isDesk={!!ctx.desk} initialError={loginError ? "リンクの有効期限が切れているか、すでに使用されています。もう一度お試しください。" : undefined} />;
   }

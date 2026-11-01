@@ -238,18 +238,25 @@ async function updateCustomerNameInner(name: string) {
   if (error) throw error;
 }
 
-export async function setInitialProfile(name: string, email: string, phone: string, agreedToTerms: boolean) {
-  return toResult("setInitialProfile", () => setInitialProfileInner(name, email, phone, agreedToTerms));
+// 入口の「まずは相談してみる」（窓口では「お問い合わせ」）。お名前・メールアドレス・
+// ご相談内容を受け取り、ご相談はその場でトークに届ける（秘書がすぐ返信できる）。
+// メールアドレスには確認メールを送る。確認前でも、同じ端末ならそのままトークを見られ、
+// 返信のお知らせメールも届く（本部側の notify が確認待ちのアドレスにも送る）。
+// 利用規約は「送信すると同意したものとみなす」形（画面のボタンの下に表示）。
+export async function submitFirstInquiry(name: string, email: string, body: string) {
+  return toResult("submitFirstInquiry", () => submitFirstInquiryInner(name, email, body));
 }
 
-async function setInitialProfileInner(name: string, email: string, phone: string, agreedToTerms: boolean) {
+async function submitFirstInquiryInner(name: string, email: string, body: string) {
   const ctx = await requireContext();
+  if (!ctx.isAnonymous) throw new Error("すでにログインしています");
   const supabase = await createClient();
   const trimmedName = name.trim();
   const trimmedEmail = email.trim();
-  if (!trimmedName || !trimmedEmail) throw new Error("お名前とメールアドレスをご入力ください");
-  // クライアント側のチェックボックスだけに頼らず、サーバー側でも必ず確認する。
-  if (!agreedToTerms) throw new Error("利用規約への同意が必要です");
+  const trimmedBody = body.trim();
+  if (!trimmedName || !trimmedEmail || !trimmedBody) throw new Error("お名前・メールアドレス・内容をご入力ください");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) throw new Error("メールアドレスの形式をご確認ください");
+  if (trimmedBody.length > 4000) throw new Error("内容は4,000文字以内でお願いします");
 
   const h = await headers();
   const host = h.get("host");
@@ -262,30 +269,53 @@ async function setInitialProfileInner(name: string, email: string, phone: string
     // Supabaseのバージョンによってエラーコードの付き方が変わり、コードが
     // 付かない場合もあるため、コードに加えて英語メッセージ中の
     // "already"（already registered / already exists 等）も拾う。
-    // こうしないと素通りして、意味の分からない汎用エラーになってしまう。
     const code = emailErr.code ?? "";
     if (code === "email_exists" || code === "user_already_exists" || code.includes("already") || /already/i.test(emailErr.message)) {
       // 登録済みかどうかを画面で明かさず、そのアドレスにログイン用のリンクを送る
-      // （本人なら、届いたリンクからそのまま自分のアカウントに入れる）。
+      // （本人なら、届いたリンクから自分のトークに入れる。書いた内容は画面側で
+      // 覚えておき、ログイン後の入力欄に戻す）。
       return requestMagicLinkInner(trimmedEmail);
     }
+    if (emailErr.status === 429) throw new Error("短時間に何度も送信されたため、少し時間をおいてからお試しください。");
     throw emailErr;
   }
 
   // 名前と規約への同意は、メールアドレスが受け付けられてから保存する。先に保存すると、
   // 登録済みのアドレスで弾かれたときに、名前だけ付いた仮の依頼主が本部の一覧に残ってしまう。
   await supabase.from("customers").update({ name: trimmedName, terms_accepted_at: new Date().toISOString() }).eq("id", ctx.customerId);
+  await sendMessageInner(trimmedBody, []);
+}
 
-  if (phone.trim()) {
-    const { data: existing } = await supabase
-      .from("customer_vault_items")
-      .select("id")
-      .eq("customer_id", ctx.customerId)
-      .eq("label", "電話番号")
-      .maybeSingle();
-    if (existing) await supabase.from("customer_vault_items").update({ value: phone.trim() }).eq("id", existing.id);
-    else await supabase.from("customer_vault_items").insert({ customer_id: ctx.customerId, label: "電話番号", value: phone.trim() });
+// 確認メールを送り直す（届かない・期限が切れた・アドレスを打ち間違えたとき）。
+// まだ確認していない人（匿名のまま）だけが使う。
+export async function resendEmailConfirmation(email: string) {
+  return toResult("resendEmailConfirmation", () => resendEmailConfirmationInner(email));
+}
+
+async function resendEmailConfirmationInner(email: string) {
+  const ctx = await requireContext();
+  if (!ctx.isAnonymous) throw new Error("メールアドレスは確認済みです");
+  const trimmed = email.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) throw new Error("メールアドレスの形式をご確認ください");
+  const supabase = await createClient();
+  const h = await headers();
+  const host = h.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  await rememberReturnPath();
+  const { error } = await supabase.auth.updateUser({ email: trimmed }, { emailRedirectTo: `${protocol}://${host}/auth/confirm` });
+  if (error) {
+    if (error.status === 429) throw new Error("短時間に何度も送信されたため、少し時間をおいてからお試しください。");
+    // 登録済みのアドレスかどうかは明かさない。
+    const code = error.code ?? "";
+    if (code === "email_exists" || code === "user_already_exists" || /already/i.test(error.message)) return;
+    console.error("resendEmailConfirmation", error.code, error.message);
+    throw new Error("送信できませんでした。しばらくしてからもう一度お試しください。");
   }
+}
+
+// お金に関わる操作は、メールアドレスの確認が済んでから（端末をなくしても入り直せるように）。
+function requireConfirmed(ctx: { isAnonymous: boolean }) {
+  if (ctx.isAnonymous) throw new Error("お支払いの前に、メールアドレスの確認をお願いします。届いた確認メールのボタンを押してください（マイページから送り直せます）。");
 }
 
 export async function updateAvatar(url: string) {
@@ -380,6 +410,7 @@ export async function payFromBalance(requestId: string) {
 
 async function payFromBalanceInner(requestId: string) {
   const ctx = await requireContext();
+  requireConfirmed(ctx);
   const supabase = await createClient();
   const { error } = await supabase.rpc("pay_request_from_balance", { p_request_id: requestId });
   if (error) throw error;
@@ -468,6 +499,7 @@ export async function startBalanceCharge(amountYen: number) {
 
 async function startBalanceChargeInner(amountYen: number): Promise<string> {
   const ctx = await requireContext();
+  requireConfirmed(ctx);
   if (!Number.isInteger(amountYen) || amountYen < 1000) throw new Error("チャージ額は1,000円以上で指定してください");
 
   const stripe = getStripe();
@@ -515,6 +547,7 @@ export async function startAutoRechargeSetup(thresholdYen: number, amountYen: nu
 
 async function startAutoRechargeSetupInner(thresholdYen: number, amountYen: number): Promise<string> {
   const ctx = await requireContext();
+  requireConfirmed(ctx);
   if (!Number.isInteger(thresholdYen) || thresholdYen < 1) throw new Error("しきい値を入力してください");
   if (!Number.isInteger(amountYen) || amountYen < 1000) throw new Error("チャージ額は1,000円以上で指定してください");
 

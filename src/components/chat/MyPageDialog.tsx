@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage, unwrap } from "@/lib/errors";
 import { X, CheckCircle, Sun, MoonStars } from "@phosphor-icons/react";
-import { updateCustomerName, changeEmail, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge } from "@/app/actions";
+import { updateCustomerName, changeEmail, resendEmailConfirmation, startBalanceCharge, startAutoRechargeSetup, disableAutoRecharge } from "@/app/actions";
 import { headingWeight } from "@/lib/style";
 import AvatarPicker from "@/components/chat/AvatarPicker";
 import HqChatPanel from "@/components/chat/HqChatPanel";
@@ -63,6 +63,7 @@ export default function MyPageDialog({
   userId,
   customerName,
   currentEmail,
+  pendingEmail,
   isStaffAccount,
   avatarUrl,
   onAvatarChange,
@@ -77,6 +78,8 @@ export default function MyPageDialog({
   userId: string;
   customerName: string;
   currentEmail: string | null;
+  // 入口のフォームから送って、確認メールをまだ開いていないときのアドレス。
+  pendingEmail: string | null;
   isStaffAccount: boolean;
   avatarUrl: string | null;
   onAvatarChange: (url: string | null) => void;
@@ -209,13 +212,29 @@ export default function MyPageDialog({
     setEmError("");
     setEmSaving(true);
     try {
-      const r = await changeEmail(emNext);
+      // 確認前なら、新しいアドレスに確認メールを送り直す（打ち間違いの直しも兼ねる）。
+      const r = pendingEmail ? await resendEmailConfirmation(emNext) : await changeEmail(emNext);
       if (r.error !== null) return setEmError(r.error || "保存できませんでした");
       setEmOpen(false);
       setEmError("");
       setEmDone(true);
     } catch (e) {
       setEmError(errorMessage(e, "保存できませんでした"));
+    } finally {
+      setEmSaving(false);
+    }
+  }
+
+  async function resendConfirmation() {
+    if (!pendingEmail || emSaving) return;
+    setEmError("");
+    setEmSaving(true);
+    try {
+      const r = await resendEmailConfirmation(pendingEmail);
+      if (r.error !== null) return setEmError(r.error || "送信できませんでした");
+      setEmDone(true);
+    } catch (e) {
+      setEmError(errorMessage(e, "送信できませんでした"));
     } finally {
       setEmSaving(false);
     }
@@ -264,7 +283,15 @@ export default function MyPageDialog({
             {/* メールアドレス */}
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               <div style={rowBox}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email || "未登録"}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {email || pendingEmail || "未登録"}
+                  {pendingEmail && <span style={{ marginLeft: 8, fontSize: 11.5, color: "var(--color-neutral-500)" }}>確認待ち</span>}
+                </span>
+                {pendingEmail && (
+                  <button onClick={resendConfirmation} disabled={emSaving} style={smallBtn}>
+                    確認メールを送る
+                  </button>
+                )}
                 {!isStaffAccount && (
                   <button onClick={() => setEmOpen((v) => !v)} style={smallBtn}>
                     {email ? "変更" : "登録"}
@@ -295,9 +322,10 @@ export default function MyPageDialog({
               {emDone && (
                 <span style={{ display: "flex", alignItems: "flex-start", gap: 5, fontSize: 11, lineHeight: 1.6, color: "var(--color-accent-300)" }}>
                   <CheckCircle size={13} style={{ flex: "none", marginTop: 2 }} />
-                  新しいアドレスに確認メールをお送りしました。メール内のリンクを開くと変更が完了します。
+                  {pendingEmail ? "確認メールをお送りしました。メール内のボタンを押すと確認が完了します。" : "新しいアドレスに確認メールをお送りしました。メール内のリンクを開くと変更が完了します。"}
                 </span>
               )}
+              {emError && !emOpen && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{emError}</span>}
             </div>
 
 

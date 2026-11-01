@@ -112,6 +112,8 @@ export const getCustomerContext = cache(async (): Promise<CustomerContext | null
     threadId: thread.id,
     email: auth.user.email ?? null,
     isAnonymous: auth.user.is_anonymous ?? false,
+    // 入口のフォームから送って、メールアドレスの確認を待っている間のアドレス。
+    pendingEmail: auth.user.is_anonymous ? (auth.user.new_email ?? null) : null,
     // 本部・スタッフのアカウントでも依頼主画面に入れる（同じログイン）。その場合の
     // メールアドレスは本部画面のログインと共用なので、ここでは変えさせない。
     isStaffAccount: !!profile && profile.role !== "client",
