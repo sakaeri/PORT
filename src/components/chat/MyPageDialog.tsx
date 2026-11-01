@@ -1,5 +1,6 @@
 "use client";
 
+import { PushSettingRow } from "@/components/chat/PushPrompt";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage, unwrap } from "@/lib/errors";
@@ -328,6 +329,8 @@ export default function MyPageDialog({
               {emError && !emOpen && <span style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{emError}</span>}
             </div>
 
+
+            <PushSettingRow rowStyle={rowBox} buttonStyle={smallBtn} />
 
             {/* 画面の色合い */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

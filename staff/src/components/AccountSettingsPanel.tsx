@@ -1,5 +1,6 @@
 "use client";
 
+import { PushSettingRow } from "@/components/PushPrompt";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, CircleNotch } from "@phosphor-icons/react";
@@ -271,6 +272,7 @@ export default function AccountSettingsPanel({
           </div>
         )}
 
+        <PushSettingRow rowStyle={row} buttonStyle={smallBtn} />
       </div>
 
       {error && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</span>}

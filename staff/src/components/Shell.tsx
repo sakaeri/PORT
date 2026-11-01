@@ -1,5 +1,6 @@
 "use client";
 
+import PushBanner from "@/components/PushPrompt";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -280,6 +281,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
         )}
 
         <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <PushBanner />
           <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
         </main>
         {showMyName && (
@@ -321,6 +323,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <PushBanner />
         <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>{children}</div>
       </main>
       {showMyName && (

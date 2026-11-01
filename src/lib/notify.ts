@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { emailSubject, renderEmail } from "@/lib/email-layout";
+import { sendPush } from "@/lib/push";
 
 type Admin = ReturnType<typeof createServiceRoleClient>;
 
@@ -54,9 +55,14 @@ export async function notifyNewInquiry(orgId: string, threadId: string) {
     const recipientIds = [...new Set([...(staff ?? []).map((s) => s.id), ...managerIds])];
     if (!recipientIds.length) return;
 
-    const emails = await emailsFor(admin, recipientIds);
     const staffUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
     const openUrl = staffUrl && thread?.customer_id ? `${staffUrl}/customers/${thread.customer_id}` : staffUrl;
+    await sendPush(admin, recipientIds, {
+      title: "新しいメッセージがあります",
+      body: desk ? `${desk.name}のお問い合わせ窓口に新しいメッセージが届きました。` : "依頼主から新しいメッセージが届きました。",
+      url: openUrl,
+    });
+    const emails = await emailsFor(admin, recipientIds);
     await sendStaffEmail(
       admin,
       emails,
@@ -103,9 +109,10 @@ export async function notifyStaffPaymentConfirmed(orgId: string, requestId: stri
     const profileIds = [...new Set([...(owners ?? []).map((o) => o.id), ...(managers ?? []).map((m) => m.id)])];
     if (!profileIds.length) return;
 
-    const emails = await emailsFor(admin, profileIds);
     const staffUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
     const caseUrl = staffUrl ? `${staffUrl}/cases/${requestId}` : "";
+    await sendPush(admin, profileIds, { title: "依頼が確定しました", body: `${request.title}・¥${request.amount.toLocaleString("ja-JP")}`, url: caseUrl });
+    const emails = await emailsFor(admin, profileIds);
     await sendStaffEmail(
       admin,
       emails,

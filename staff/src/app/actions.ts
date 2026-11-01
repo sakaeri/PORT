@@ -1494,3 +1494,16 @@ async function grantReferralCreditInner(customerId: string, sourceId: string): P
   if (error) throw new Error(error.message);
   return data;
 }
+
+// プッシュ通知を許可した端末を登録する（同じ端末で別の人がログインし直したら、その人の宛先に付け替える）。
+export async function savePushSubscription(...args: Parameters<typeof savePushSubscriptionInner>) {
+  return toResult("savePushSubscription", () => savePushSubscriptionInner(...args));
+}
+
+async function savePushSubscriptionInner(sub: { endpoint: string; p256dh: string; auth: string }) {
+  const ctx = await requireContext();
+  if (!sub.endpoint.startsWith("https://") || !sub.p256dh || !sub.auth) throw new Error("通知を登録できませんでした");
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from("push_subscriptions").upsert({ user_id: ctx.userId, endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, { onConflict: "endpoint" });
+  if (error) throw error;
+}

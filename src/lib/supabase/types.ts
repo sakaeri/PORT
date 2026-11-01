@@ -65,6 +65,19 @@ export interface ReportDetail {
 export interface Database {
   public: {
     Tables: {
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["push_subscriptions"]["Row"]> & { user_id: string; endpoint: string; p256dh: string; auth: string };
+        Update: Partial<Database["public"]["Tables"]["push_subscriptions"]["Row"]>;
+        Relationships: [];
+      };
       staff_departments: {
         Row: { profile_id: string; department_id: string };
         Insert: Database["public"]["Tables"]["staff_departments"]["Row"];
