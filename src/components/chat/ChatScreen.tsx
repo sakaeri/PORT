@@ -5,6 +5,7 @@ import { dayHeading, dayKey } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import Header from "@/components/chat/Header";
 import Composer, { type PendingAttachment } from "@/components/chat/Composer";
+import { takePendingInquiry } from "@/lib/pending-inquiry";
 import { TextBubble, FilesBubble, NoticeBubble, MenuPickBubble, RequestCard, IntakeCard, IntakeAnswerBubble } from "@/components/chat/Bubbles";
 import { ProgressPanel, CancelDialog, ReportsDialog } from "@/components/chat/Dialogs";
 import MyPageDialog from "@/components/chat/MyPageDialog";
@@ -50,6 +51,17 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
   // 「今日」「昨日」の判定用。開いた時点の時刻で固定する。
   const [nowIso] = useState(() => new Date().toISOString());
   const [messages, setMessages] = useState(initialMessages);
+  // 入口のフォームに書いたご相談内容。トークに届いていなければ（登録済みのアドレスで
+  // 送ってログインし直した場合）入力欄に戻す。
+  const [prefill, setPrefill] = useState("");
+  useEffect(() => {
+    const text = takePendingInquiry();
+    if (!text) return;
+    const delivered = initialMessages.some((m) => m.sender_role === "client" && m.body?.trim() === text.trim());
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of browser storage after mount
+    if (!delivered) setPrefill(text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on first mount
+  }, []);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
   const [hasMoreOlder, setHasMoreOlder] = useState(!!initialHasMoreOlder);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -360,7 +372,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
         })}
       </div>
 
-      <Composer threadId={ctx.threadId} orgId={ctx.orgId} deskId={ctx.desk?.id ?? null} onSend={handleSend} />
+      <Composer threadId={ctx.threadId} orgId={ctx.orgId} deskId={ctx.desk?.id ?? null} onSend={handleSend} prefill={prefill} />
 
       {showProgress && (
         <ProgressPanel
@@ -394,6 +406,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
           userId={ctx.userId}
           customerName={ctx.customerName}
           currentEmail={ctx.email}
+          pendingEmail={ctx.pendingEmail}
           isStaffAccount={ctx.isStaffAccount}
           avatarUrl={avatarUrl}
           onAvatarChange={setAvatarUrl}

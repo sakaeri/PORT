@@ -72,6 +72,8 @@ export interface CustomerContext {
   threadId: string;
   email: string | null;
   isAnonymous: boolean;
+  // 入口のフォームから送って、メールアドレスの確認を待っている間のアドレス（確認済みなら null）。
+  pendingEmail: string | null;
   isStaffAccount: boolean;
   avatarUrl: string | null;
   // チャージ残高（円）。
