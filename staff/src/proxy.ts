@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Next.js 16 renamed `middleware.ts` to `proxy.ts` (same runtime purpose).
-// Staff log in with a real email/password (no anonymous sign-in, unlike the
+// Staff log in with an emailed login link or code (no anonymous sign-in, unlike the
 // client app) — this just refreshes the session cookie and sends anyone
 // without a session to /login. Role checking (owner/reception only) happens
 // in the authenticated layout, since it needs a DB read.
@@ -36,13 +36,11 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getUser();
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
   // /join: スタッフの招待リンク（招待された本人はまだログインしていない）。
-  // /auth/confirm: パスワード再設定リンクの着地点（まだセッションが無い状態で来る）。
-  // /reset-password: 再設定リンクを踏んだ直後の、新しいパスワードを設定する画面。
+  // /auth/confirm: ログイン用メールのリンクの着地点（まだセッションが無い状態で来る）。
   const isPublicRoute =
     isLoginRoute ||
     request.nextUrl.pathname.startsWith("/join") ||
     request.nextUrl.pathname.startsWith("/auth/confirm") ||
-    request.nextUrl.pathname.startsWith("/reset-password") ||
     // Vercel の定期実行（自動チャージ・定期対応）。ログインはなく、CRON_SECRET で確認する。
     request.nextUrl.pathname.startsWith("/api/cron/") ||
     // ホーム画面に追加するときの設定ファイル。ブラウザはログイン情報なしで取りに来る。

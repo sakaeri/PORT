@@ -25,7 +25,6 @@ interface Props {
   initialMessages: MessageWithExtras[];
   initialBundles: RequestBundle[];
   initialHasMoreOlder?: boolean;
-  openPasswordSetup?: boolean;
 }
 
 const ACKED_KEY = "VID_acked_reports";
@@ -46,7 +45,7 @@ function writeAcked(ids: Set<string>) {
   }
 }
 
-export default function ChatScreen({ ctx, initialMessages, initialBundles, initialHasMoreOlder, openPasswordSetup }: Props) {
+export default function ChatScreen({ ctx, initialMessages, initialBundles, initialHasMoreOlder }: Props) {
   const router = useRouter();
   // 「今日」「昨日」の判定用。開いた時点の時刻で固定する。
   const [nowIso] = useState(() => new Date().toISOString());
@@ -58,11 +57,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
   const [searchQuery, setSearchQuery] = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showReports, setShowReports] = useState(false);
-  // 「パスワードをお忘れの方」のリンクから来たら、マイページのパスワード設定を開いて迎える。
-  const [showMyPage, setShowMyPage] = useState(!!openPasswordSetup);
-  useEffect(() => {
-    if (openPasswordSetup) window.history.replaceState(null, "", window.location.pathname);
-  }, [openPasswordSetup]);
+  const [showMyPage, setShowMyPage] = useState(false);
   const [openMyPageWithCharge, setOpenMyPageWithCharge] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState("");
@@ -399,7 +394,6 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
           userId={ctx.userId}
           customerName={ctx.customerName}
           currentEmail={ctx.email}
-          hasPassword={ctx.hasPassword}
           isStaffAccount={ctx.isStaffAccount}
           avatarUrl={avatarUrl}
           onAvatarChange={setAvatarUrl}
@@ -413,7 +407,6 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
           autoRecharge={ctx.autoRecharge}
           initialChargeOpen={openMyPageWithCharge}
           isDesk={!!ctx.desk}
-          initialPasswordOpen={!!openPasswordSetup}
         />
       )}
     </div>

@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getCustomerContext } from "@/lib/data";
 import { notifyNewInquiry, notifyStaffPaymentConfirmed } from "@/lib/notify";
@@ -101,16 +100,15 @@ export async function markChatRead() {
   await admin.from("threads").update({ customer_last_read_at: new Date().toISOString() }).eq("id", ctx.threadId);
 }
 
-// 既存アカウントへのログイン（マジックリンク）。今の匿名セッションのトーク内容は
-// 引き継がれない — 呼び出し側（UI）で事前に確認を取ってから呼ぶこと。
-// resetPassword: ログイン画面の「パスワードをお忘れの方」から。リンクを開いて
-// ログインしたあと、マイページのパスワード設定をそのまま開く（auth/confirm が
-// この cookie を見て振り分ける）。
-export async function requestMagicLink(email: string, opts?: { resetPassword?: boolean }) {
-  return toResult("requestMagicLink", () => requestMagicLinkInner(email, opts));
+// 既存アカウントへのログイン（マジックリンク）。ログインはこの方法だけ（パスワードは使わない）。
+// 今の匿名セッションのトーク内容は引き継がれない。
+// 登録の無いアドレスでも、送った時と同じ表示にする（どのアドレスが登録済みか
+// 分からないように。表示側で「届かなければ新規登録を」と案内する）。
+export async function requestMagicLink(email: string) {
+  return toResult("requestMagicLink", () => requestMagicLinkInner(email));
 }
 
-async function requestMagicLinkInner(email: string, opts?: { resetPassword?: boolean }) {
+async function requestMagicLinkInner(email: string) {
   const trimmed = email.trim();
   if (!trimmed) throw new Error("メールアドレスをご入力ください");
   const supabase = await createClient();
@@ -127,101 +125,31 @@ async function requestMagicLinkInner(email: string, opts?: { resetPassword?: boo
   });
   if (error) {
     if (error.status === 429 || /rate limit/i.test(error.message)) throw new Error("短時間に何度も送信されたため、少し時間をおいてからお試しください。");
-    if (error.code === "otp_disabled" || /signups? not allowed/i.test(error.message)) {
-      throw new Error("このメールアドレスのご登録が見つかりませんでした。初めてのご利用の場合は「はじめてご利用の方」から登録してください。");
-    }
+    if (error.code === "otp_disabled" || /signups? not allowed/i.test(error.message)) return;
     console.error("requestMagicLink", error.code, error.message);
     throw new Error("送信できませんでした。しばらくしてからもう一度お試しください。");
   }
-  if (opts?.resetPassword) {
-    (await cookies()).set("vid_setpw", "1", { httpOnly: true, sameSite: "lax", secure: protocol === "https", maxAge: 60 * 60, path: "/" });
-  } else {
-    // 少し前に「パスワードをお忘れの方」を押していても、ふつうのログインでは
-    // パスワード設定の画面を開かない。
-    (await cookies()).delete("vid_setpw");
-  }
 }
 
-// 任意で設定できるパスワードでのログイン。基本はマジックリンクで、パスワードは
-// メールを開かずに入りたい人のための選択肢。忘れた場合はマジックリンクで入り、
-// マイページから設定し直してもらう（再設定メールの仕組みは持たない）。
-export async function signInWithPasswordLogin(email: string, password: string) {
-  return toResult("signInWithPasswordLogin", () => signInWithPasswordLoginInner(email, password));
+// ホーム画面に追加したアプリでは、メールのリンクを開くと別のブラウザでログイン
+// してしまうことがあるため、同じメールに書かれた数字を入力してもログインできるようにする。
+export async function verifyLoginCode(email: string, code: string) {
+  return toResult("verifyLoginCode", () => verifyLoginCodeInner(email, code));
 }
 
-async function signInWithPasswordLoginInner(email: string, password: string) {
-  const trimmed = email.trim();
-  if (!trimmed || !password) throw new Error("メールアドレスとパスワードをご入力ください");
+async function verifyLoginCodeInner(email: string, code: string) {
+  const token = code.replace(/\D/g, "");
+  if (token.length < 6) throw new Error("メールに届いた数字をご入力ください");
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email: trimmed, password });
+  const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: "email" });
   if (error) {
     if (error.status === 429) throw new Error("短時間に何度も試されたため、少し時間をおいてからお試しください。");
-    throw new Error("メールアドレスかパスワードが正しくありません");
+    throw new Error("数字が違うか、有効期限が切れています。もう一度メールを送ってお試しください。");
   }
-  (await cookies()).delete("vid_setpw");
-}
-
-// パスワードを設定済みかどうかは Supabase 側で取れないので user_metadata に印を残す。
-export async function setLoginPassword(password: string) {
-  return toResult("setLoginPassword", () => setLoginPasswordInner(password));
+  (await cookies()).delete("vid_next");
 }
 
 const STAFF_ACCOUNT_MESSAGE = "本部画面と共用のアカウントのため、こちらでは変更できません。本部画面のアカウント設定から変更してください。";
-
-async function setLoginPasswordInner(password: string) {
-  const ctx = await requireContext();
-  if (ctx.isAnonymous) throw new Error("認証されていません");
-  if (ctx.isStaffAccount) throw new Error(STAFF_ACCOUNT_MESSAGE);
-  if (password.length < 8) throw new Error("パスワードは8文字以上にしてください");
-  const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({ password, data: { has_password: true } });
-  if (error) {
-    if (error.code === "same_password") throw new Error("現在と同じパスワードです");
-    if (error.code === "weak_password") {
-      const reasons = (error as { reasons?: string[] }).reasons ?? [];
-      if (reasons.includes("pwned")) throw new Error("過去に流出したことのあるパスワードのため使えません。ほかでは使っていない、別のパスワードにしてください。");
-      throw new Error("推測されやすいパスワードです。別のものにしてください。");
-    }
-    if (error.code === "reauthentication_needed") throw new Error("安全のため、一度ログアウトしてメールのリンクから入り直してから設定してください");
-    console.error("setLoginPassword", error.code, error.message);
-    throw new Error("設定できませんでした。しばらくしてからもう一度お試しください。");
-  }
-}
-
-// パスワードをやめて、マジックリンクだけに戻す。Supabase にはパスワードを消す
-// 操作がないため、誰も知らないランダムな値に置き換えて実質的に無効にする。
-export async function removeLoginPassword() {
-  return toResult("removeLoginPassword", removeLoginPasswordInner);
-}
-
-async function removeLoginPasswordInner() {
-  const ctx = await requireContext();
-  if (ctx.isAnonymous) throw new Error("認証されていません");
-  if (ctx.isStaffAccount) throw new Error(STAFF_ACCOUNT_MESSAGE);
-  const admin = createServiceRoleClient();
-  const { data: current } = await admin.auth.admin.getUserById(ctx.userId);
-  const email = current.user?.email;
-  if (!email) throw new Error("認証されていません");
-  const random = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
-  const { error } = await admin.auth.admin.updateUserById(ctx.userId, {
-    password: random,
-    user_metadata: { ...(current.user?.user_metadata ?? {}), has_password: false },
-  });
-  if (error) {
-    console.error("removeLoginPassword", error.code, error.message);
-    throw new Error("操作できませんでした。しばらくしてからもう一度お試しください。");
-  }
-  // パスワードを置き換えるとログイン中のセッションも切られるため、本人の
-  // ログインをこの場で張り直す（メールは送らない。リンクを発行してすぐ使う）。
-  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({ type: "magiclink", email });
-  if (linkErr || !link.properties?.hashed_token) {
-    console.error("removeLoginPassword relogin", linkErr);
-    return;
-  }
-  const supabase = await createClient();
-  const { error: verifyErr } = await supabase.auth.verifyOtp({ type: "email", token_hash: link.properties.hashed_token });
-  if (verifyErr) console.error("removeLoginPassword relogin", verifyErr.code, verifyErr.message);
-}
 
 export async function sendMessage(text: string, attachments: { path: string; name: string; mime: string; bytes: number }[]) {
   return toResult("sendMessage", () => sendMessageInner(text, attachments));
@@ -337,7 +265,9 @@ async function setInitialProfileInner(name: string, email: string, phone: string
     // こうしないと素通りして、意味の分からない汎用エラーになってしまう。
     const code = emailErr.code ?? "";
     if (code === "email_exists" || code === "user_already_exists" || code.includes("already") || /already/i.test(emailErr.message)) {
-      throw new Error("このメールアドレスは既に登録されています。すでにご利用の方は「ログイン」をお試しください。");
+      // 登録済みかどうかを画面で明かさず、そのアドレスにログイン用のリンクを送る
+      // （本人なら、届いたリンクからそのまま自分のアカウントに入れる）。
+      return requestMagicLinkInner(trimmedEmail);
     }
     throw emailErr;
   }
@@ -374,13 +304,12 @@ export async function removeAvatar() {
 
 // メールアドレスの変更は「新しいアドレスの確認だけ」で完了する（Supabase の
 // Secure email change はオフ。前のアドレスがもう使えない人でも変えられるように）。
-// 代わりに、パスワードを設定している人は変更時にパスワードを確認し、変更後は
-// 前のアドレスへお知らせを送る（auth/confirm → notifyEmailChanged）。
-export async function changeEmail(newEmail: string, password?: string) {
-  return toResult("changeEmail", () => changeEmailInner(newEmail, password));
+// 変更後は前のアドレスへお知らせを送る（auth/confirm → notifyEmailChanged）。
+export async function changeEmail(newEmail: string) {
+  return toResult("changeEmail", () => changeEmailInner(newEmail));
 }
 
-async function changeEmailInner(newEmail: string, password?: string) {
+async function changeEmailInner(newEmail: string) {
   const ctx = await requireContext();
   if (ctx.isAnonymous) throw new Error("認証されていません");
   if (ctx.isStaffAccount) throw new Error(STAFF_ACCOUNT_MESSAGE);
@@ -388,17 +317,6 @@ async function changeEmailInner(newEmail: string, password?: string) {
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;
   if (!user?.email) throw new Error("認証されていません");
-
-  if (user.user_metadata?.has_password === true) {
-    if (!password) throw new Error("パスワードをご入力ください");
-    // 本人のセッションに影響しないよう、cookie を持たない使い捨てのクライアントで確かめる。
-    const verifier = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { error: pwErr } = await verifier.auth.signInWithPassword({ email: user.email, password });
-    if (pwErr) throw new Error("パスワードが正しくありません");
-    await verifier.auth.signOut({ scope: "local" });
-  }
 
   const h = await headers();
   const host = h.get("host");

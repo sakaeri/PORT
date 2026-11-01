@@ -230,7 +230,7 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+otp_expiry = 900
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
@@ -248,8 +248,12 @@ otp_expiry = 3600
 # content_path = "./supabase/templates/invite.html"
 
 # ログイン系メールは本番の Supabase 管理画面（Authentication → Emails → Templates）で
-# 日本語テンプレートを設定済み。ここに置いているのはその写し（メールアドレス確認のみ）で、
+# 日本語テンプレートを設定済み。ここに置いているのはその写し（メールアドレス確認・ログイン）で、
 # 通知メールのデザイン（src/lib/email-layout.ts）もこれに合わせてある。
+[auth.email.template.magic_link]
+subject = "【中央秘書事務所】ログインのご案内"
+content_path = "./supabase/templates/magic_link.html"
+
 [auth.email.template.email_change]
 subject = "【中央秘書事務所】メールアドレスの確認をお願いします"
 content_path = "./supabase/templates/email_change.html"

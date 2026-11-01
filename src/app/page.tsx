@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: ctx?.orgDisplayName ?? "PORT" };
 }
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ loginError?: string; setpw?: string }> }) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ loginError?: string }> }) {
   // 初回訪問はまだ匿名セッションが存在しない（proxy.tsはもう自動でサイン
   // インしない）。これは想定内の状態なので、VerifyGateで見えない認証を
   // 済ませてから完了させる。以下の「読み込みに失敗しました」は、認証済み
@@ -76,7 +76,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
   }
 
   const [{ messages, hasMoreOlder }, requestBundles] = await Promise.all([getThreadMessages(ctx.threadId), getRequestBundles(ctx.threadId)]);
-  const { setpw } = await searchParams;
 
   return (
     <ChatScreen
@@ -84,7 +83,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
       initialMessages={messages}
       initialBundles={requestBundles}
       initialHasMoreOlder={hasMoreOlder}
-      openPasswordSetup={setpw === "1"}
     />
   );
 }

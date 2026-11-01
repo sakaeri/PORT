@@ -72,7 +72,6 @@ export interface CustomerContext {
   threadId: string;
   email: string | null;
   isAnonymous: boolean;
-  hasPassword: boolean;
   isStaffAccount: boolean;
   avatarUrl: string | null;
   // チャージ残高（円）。
