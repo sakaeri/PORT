@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch } from "@phosphor-icons/react";
+import { ArrowUUpLeft, X, PaperPlaneTilt, CircleNotch, CaretRight } from "@phosphor-icons/react";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 // 指で操作する端末（スマホ・タブレット）かどうか。
 function isTouchDevice() {
@@ -13,6 +14,7 @@ function isTouchDevice() {
 // 消す（✕）が入力中に出る、Enterで送信・Shift+Enterで改行（スマホでは Enter は改行）——という
 // クライアント側チャット(src/components/chat/Composer.tsx)と同じ振る舞い。
 // 添付ボタンなど入力欄の左に置くものは leftButton で呼び出し側から渡す。
+// スマホでは入力欄をタップしている間だけ左のボタンをしまって、入力欄を横いっぱいに広げる。
 export default function TextComposer({
   value,
   onChange,
@@ -37,7 +39,10 @@ export default function TextComposer({
   hasAttachments?: boolean;
 }) {
   const [history, setHistory] = useState<string[]>([]);
+  const [focused, setFocused] = useState(false);
+  const isMobile = useIsMobile();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const collapsed = isMobile && focused && !!leftButton;
 
   function autoGrow(reset = false) {
     const el = textareaRef.current;
@@ -82,7 +87,18 @@ export default function TextComposer({
     <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 8, padding: "12px 18px", paddingBottom: "calc(12px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--color-divider)" }}>
     {above}
     <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-      {leftButton}
+      {collapsed ? (
+        // 押すと入力欄から離れて、しまったボタンが戻る。
+        <button
+          onClick={() => textareaRef.current?.blur()}
+          aria-label="ボタンを表示"
+          style={{ flex: "none", width: 28, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-neutral-400)", background: "transparent", border: "none" }}
+        >
+          <CaretRight size={16} />
+        </button>
+      ) : (
+        leftButton
+      )}
       <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
         <textarea
           ref={textareaRef}
@@ -96,6 +112,8 @@ export default function TextComposer({
               handleSend();
             }
           }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={placeholder}
           rows={1}
           className="vid-textarea"
@@ -142,6 +160,8 @@ export default function TextComposer({
       </div>
       <button
         onClick={handleSend}
+        // 送信ボタンを押しても入力欄から離れない（スマホでキーボードが閉じず、左のボタンも戻らない）。
+        onMouseDown={(e) => e.preventDefault()}
         disabled={sendDisabled}
         aria-label="送信"
         aria-busy={sending}
