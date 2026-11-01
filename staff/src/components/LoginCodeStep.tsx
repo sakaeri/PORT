@@ -48,9 +48,9 @@ export default function LoginCodeStep({ email, onBack }: { email: string; onBack
   return (
     <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-        {email} 宛にメールを送りました。メールのリンクを開くか、メールに書かれた数字を入力してください。
+        {email} にログイン用のメールを送りました。メール内のボタンを押すか、確認コードを入力してください。
         <span style={{ marginLeft: 4, display: "inline-flex", verticalAlign: "middle" }}>
-          <InfoTooltip text="パスワードは使いません。メールが届かない場合は、登録されていないアドレスか、迷惑メールに振り分けられているかもしれません。リンクと数字は届いてから15分間有効です。" />
+          <InfoTooltip text="パスワードは使いません。メールが届かない場合は、登録されていないアドレスか、迷惑メールに振り分けられているかもしれません。ボタンと確認コードは届いてから15分間有効です。" />
         </span>
       </div>
       <input
@@ -58,7 +58,7 @@ export default function LoginCodeStep({ email, onBack }: { email: string; onBack
         onChange={(e) => setCode(e.target.value)}
         inputMode="numeric"
         autoComplete="one-time-code"
-        placeholder="メールに届いた数字"
+        placeholder="確認コード"
         maxLength={10}
         className="vid-input"
         style={{ width: "100%", height: 44, padding: "6px 12px", fontSize: 18, letterSpacing: "0.2em", textAlign: "center", color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none" }}

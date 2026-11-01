@@ -139,12 +139,12 @@ export async function verifyLoginCode(email: string, code: string) {
 
 async function verifyLoginCodeInner(email: string, code: string) {
   const token = code.replace(/\D/g, "");
-  if (token.length < 6) throw new Error("メールに届いた数字をご入力ください");
+  if (token.length < 6) throw new Error("確認コードをご入力ください");
   const supabase = await createClient();
   const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: "email" });
   if (error) {
     if (error.status === 429) throw new Error("短時間に何度も試されたため、少し時間をおいてからお試しください。");
-    throw new Error("数字が違うか、有効期限が切れています。もう一度メールを送ってお試しください。");
+    throw new Error("確認コードが違うか、有効期限が切れています。もう一度メールを送ってお試しください。");
   }
   (await cookies()).delete("vid_next");
 }
