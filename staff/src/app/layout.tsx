@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "中央秘書事務所 本部",
   description: "受付・スタッフ向け業務画面",
   // iPhone の「ホーム画面に追加」で、アプリのように全画面で開く。
-  appleWebApp: { capable: true, title: "中央秘書 本部", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "中央秘書 本部", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {

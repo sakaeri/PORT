@@ -228,7 +228,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
   if (isMobile) {
     return (
       <div style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-body)" }}>
-        <div className="app-shell-chrome" style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, height: 52, padding: "0 var(--space-4)", background: "var(--color-nav-bg)", borderBottom: "1px solid var(--color-nav-border)" }}>
+        <div className="app-shell-chrome" style={{ flex: "none", display: "flex", alignItems: "center", gap: 10, minHeight: 52, padding: "0 var(--space-4)", paddingTop: "env(safe-area-inset-top)", boxSizing: "content-box", background: "var(--color-nav-bg)", borderBottom: "1px solid var(--color-nav-border)" }}>
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="メニューを開く"

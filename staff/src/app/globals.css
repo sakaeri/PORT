@@ -131,7 +131,9 @@ body {
 
 body {
   margin: 0;
-  background: var(--color-bg);
+  /* 画面の外側（スマホの一番上・引っぱったときに見える部分）はヘッダーと同じ緑にする。
+     中身の背景は各画面の外枠（Shell など）が var(--color-bg) で塗る。 */
+  background: var(--color-nav-bg);
   color: var(--color-text);
   font-family: var(--font-body);
 }
