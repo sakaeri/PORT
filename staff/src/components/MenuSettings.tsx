@@ -249,6 +249,12 @@ const input: React.CSSProperties = {
 // など他のModal内フォームと同じく、ここでは var(--color-surface) にして区別する）。
 const modalInput: React.CSSProperties = { ...input, background: "var(--color-surface)" };
 const label: React.CSSProperties = { fontSize: 12, color: "var(--color-neutral-500)" };
+// 一覧は外枠で囲まず、ページの背景にそのまま白い行を並べる（枠の二重を避ける）。
+const listSection: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+};
 const card: React.CSSProperties = {
   padding: 16,
   borderRadius: "var(--radius-md)",
@@ -494,7 +500,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
   }
 
   return (
-    <div style={card}>
+    <div style={listSection}>
       {/* スマホでは見出しが縦に潰れないよう、ボタンは次の行に回す。 */}
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>受付メニュー</div>
@@ -514,7 +520,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
       </div>
       {importNote && <div style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>{importNote}</div>}
       {menus.length > 8 && (
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="メニューを検索" className="vid-input" style={input} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="メニューを検索" className="vid-input" style={modalInput} />
       )}
       {!canEdit && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>メニューの編集は本部のみ行えます。</div>}
 
@@ -530,7 +536,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
             <div key={m.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
               <button
                 onClick={() => openMenu(m)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-surface)", border: "none", textAlign: "left", color: "var(--color-text)" }}
               >
                 {SelectedIcon && <SelectedIcon size={15} color="var(--color-accent)" style={{ flex: "none" }} />}
                 <span style={{ flex: 1, fontSize: 13.5, opacity: m.active ? 1 : 0.5 }}>{m.label || "（無題）"}</span>
@@ -772,7 +778,7 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
   }
 
   return (
-    <div style={card}>
+    <div style={listSection}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>返信テンプレ</div>
         <InfoTooltip text="受付がトークからワンタップで送る定型の返信です。項目を付けると依頼主が入力するフォームになります。" />
@@ -792,7 +798,7 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
             <div key={t.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", overflow: "hidden" }}>
               <button
                 onClick={() => openTemplate(t)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "none", textAlign: "left", color: "var(--color-text)" }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-surface)", border: "none", textAlign: "left", color: "var(--color-text)" }}
               >
                 <span style={{ flex: 1, fontSize: 13.5 }}>{t.label || "（無題）"}</span>
                 <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{t.intake_fields.length > 0 ? `項目${t.intake_fields.length}件` : "定型文のみ"}</span>

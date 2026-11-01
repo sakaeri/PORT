@@ -16,12 +16,8 @@ export type ReferralSourceWithCustomers = {
   customers: { id: string; label: string }[];
 };
 
+// 一覧は外枠で囲まず、ページの背景にそのまま白い行を並べる（枠の二重を避ける）。
 const card: React.CSSProperties = {
-  padding: 16,
-  borderRadius: "var(--radius-md)",
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-divider)",
-  boxShadow: "var(--shadow-sm)",
   display: "flex",
   flexDirection: "column",
   gap: 12,
@@ -131,7 +127,7 @@ export default function ReferralSourcesCard({ initialSources, canEdit }: { initi
               }}
               placeholder="例：〇〇税理士事務所"
               className="vid-input"
-              style={{ ...input, flex: "none", height: 38 }}
+              style={{ ...input, flex: "none", height: 38, background: "var(--color-surface)" }}
               autoFocus
             />
             {error && <div style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{error}</div>}
@@ -158,7 +154,7 @@ export default function ReferralSourcesCard({ initialSources, canEdit }: { initi
               setEditingId(null);
               setError("");
             }}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", textAlign: "left", color: "var(--color-text)", opacity: s.active ? 1 : 0.55 }}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", cursor: "pointer", background: "var(--color-surface)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", textAlign: "left", color: "var(--color-text)", opacity: s.active ? 1 : 0.55 }}
           >
             <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {s.name}
