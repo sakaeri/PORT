@@ -52,7 +52,6 @@ import type { InquiryDesk } from "@/app/actions";
 import Modal from "@/components/Modal";
 import {
   createMenu,
-  importTaskExampleMenus,
   updateMenu,
   deleteMenu,
   createIntakeForm,
@@ -239,28 +238,16 @@ const input: React.CSSProperties = {
   padding: "6px 10px",
   fontSize: 13.5,
   color: "var(--color-text)",
-  background: "var(--color-bg)",
+  // 入力欄は背景（クリーム色）と見分けやすいよう白にする（ダークではカードと同じ色）。
+  background: "var(--color-input)",
   border: "1px solid var(--color-divider)",
   borderRadius: "var(--radius-md)",
   outline: "none",
 };
-// Modal.tsx のボックス背景が var(--color-bg) なので、その中に置く入力欄は
-// 同じ var(--color-bg) だと背景と色が被って見えなくなる（AccountSettingsPanel.tsx
-// など他のModal内フォームと同じく、ここでは var(--color-surface) にして区別する）。
-const modalInput: React.CSSProperties = { ...input, background: "var(--color-surface)" };
+const modalInput: React.CSSProperties = input;
 const label: React.CSSProperties = { fontSize: 12, color: "var(--color-neutral-500)" };
 // 一覧は外枠で囲まず、ページの背景にそのまま白い行を並べる（枠の二重を避ける）。
 const listSection: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-};
-const card: React.CSSProperties = {
-  padding: 16,
-  borderRadius: "var(--radius-md)",
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-divider)",
-  boxShadow: "var(--shadow-sm)",
   display: "flex",
   flexDirection: "column",
   gap: 12,
@@ -395,26 +382,8 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
   const [saveError, setSaveError] = useState("");
   const [presetsMenuId, setPresetsMenuId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [importing, setImporting] = useState(false);
-  const [importNote, setImportNote] = useState("");
   const q = query.trim().toLowerCase();
   const visibleMenus = q ? menus.filter((m) => m.label.toLowerCase().includes(q)) : menus;
-
-  async function handleImport() {
-    if (importing) return;
-    if (!confirm("「頼めること」一覧（約100件）のうち、まだ無いものを受付メニューに追加します。金額は空欄で作るので、あとで入れてください。よろしいですか？")) return;
-    setImporting(true);
-    setImportNote("");
-    try {
-      const added = await importTaskExampleMenus(orgId);
-      setMenus((m) => [...added.map((a) => ({ ...a, report_field_presets: [] })), ...m]);
-      setImportNote(added.length > 0 ? `${added.length}件追加しました` : "すべて追加済みです");
-    } catch {
-      setImportNote("追加できませんでした");
-    } finally {
-      setImporting(false);
-    }
-  }
 
   function openMenu(m: Menu) {
     setOpenId(m.id);
@@ -507,18 +476,12 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
         <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの秘書が対応するかは、依頼主の画面の「担当秘書」で割り当てます。編集は本部だけができます" />
         <div style={{ flex: 1 }} />
         {canEdit && (
-          <button onClick={handleImport} disabled={importing} style={{ ...smallBtn, opacity: importing ? 0.6 : 1 }}>
-            {importing ? "追加中…" : "頼めること一覧から追加"}
-          </button>
-        )}
-        {canEdit && (
           <button onClick={handleAdd} style={smallBtn}>
             <Plus size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
             メニューを追加
           </button>
         )}
       </div>
-      {importNote && <div style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>{importNote}</div>}
       {menus.length > 8 && (
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="メニューを検索" className="vid-input" style={modalInput} />
       )}
@@ -867,7 +830,7 @@ function TermsCard({ orgId, initialContent, canEdit }: { orgId: string; initialC
   }
 
   return (
-    <div style={card}>
+    <div style={listSection}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>利用規約</div>
         <InfoTooltip text="依頼主が新規登録のときに同意する利用規約の本文です（/terms に表示されます）。ここで直すとすぐに反映されます。法的な内容は専門家に確認することをおすすめします。" />

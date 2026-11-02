@@ -57,34 +57,34 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
   const { year, month, back } = selectedMonth((await searchParams).m);
   const prev = shiftMonth(year, month, -1);
   const next = shiftMonth(year, month, 1);
-  const monthNav: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, verticalAlign: "middle", color: "var(--color-neutral-400)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" };
+  const monthNav: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, color: "var(--color-neutral-400)" };
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 900, width: "100%", margin: "0 auto" }}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>
-        売上・実績
+      {/* 見出しは左、月の切り替えは右端に置く。 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22, whiteSpace: "nowrap" }}>売上・実績</div>
+        <InfoTooltip text="総売上・秘書への支払い・完了件数は、入金日ではなく完了報告を出した（完了した）月で集計しています。秘書への支払いは、窓口ごとの売上からロイヤリティを引いた額の合計です（ロイヤリティ未設定の窓口は含みません）。チャージ金額は依頼主が実際にチャージした額、紹介登録はその月に付けた紹介特典です。行をタップするとその案件トークに移動します。" />
+        <div style={{ flex: 1 }} />
         {back < MAX_MONTHS_BACK ? (
           <Link href={`/stats?m=${monthKeyFromYM(prev.year, prev.month)}`} aria-label="前の月" style={monthNav}>
-            <CaretLeft size={13} />
+            <CaretLeft size={16} />
           </Link>
         ) : (
           <span style={{ ...monthNav, opacity: 0.3 }}>
-            <CaretLeft size={13} />
+            <CaretLeft size={16} />
           </span>
         )}
-        <span style={{ fontSize: 15, color: "var(--color-neutral-500)", margin: "0 8px", verticalAlign: "middle" }}>{`${year}年${month}月`}</span>
+        <span style={{ fontSize: 15, whiteSpace: "nowrap" }}>{`${year}年${month}月`}</span>
         {back > 0 ? (
           <Link href={back === 1 ? "/stats" : `/stats?m=${monthKeyFromYM(next.year, next.month)}`} aria-label="次の月" style={monthNav}>
-            <CaretRight size={13} />
+            <CaretRight size={16} />
           </Link>
         ) : (
           <span style={{ ...monthNav, opacity: 0.3 }}>
-            <CaretRight size={13} />
+            <CaretRight size={16} />
           </span>
         )}
-        <span style={{ marginLeft: 8, verticalAlign: "middle" }}>
-          <InfoTooltip text="総売上・秘書への支払い・完了件数は、入金日ではなく完了報告を出した（完了した）月で集計しています。秘書への支払いは、窓口ごとの売上からロイヤリティを引いた額の合計です（ロイヤリティ未設定の窓口は含みません）。チャージ金額は依頼主が実際にチャージした額、紹介登録はその月に付けた紹介特典です。行をタップするとその案件トークに移動します。" />
-        </span>
       </div>
       <OrgStats orgId={ctx.orgId} orgDisplayName={ctx.orgDisplayName} viewerRole={ctx.role} viewerUserId={ctx.userId} year={year} month={month} isCurrentMonth={back === 0} />
     </div>
@@ -248,9 +248,9 @@ async function OrgStats({
         <StatTile label="総売上" value={yen(grandMonthRevenue)} />
         <StatTile label="完了件数" value={`${grandMonthCompleted}件`} />
         <StatTile label="チャージ金額" value={yen(monthCharges)} />
-        <StatTile label="紹介登録" value={monthReferrals > 0 ? `${monthReferrals}人・${yen(monthReferrals * REFERRAL_CREDIT)}` : "0人"} />
+        <StatTile label="紹介登録" value={`${monthReferrals}人`} sub={monthReferrals > 0 ? yen(monthReferrals * REFERRAL_CREDIT) : undefined} />
         <StatTile label="秘書への支払い" value={yen(grandPayout)} />
-        <StatTile label="評価" small value={grandRatingCount > 0 ? `★${grandRatingAvg?.toFixed(1)}（${grandRatingCount}件）` : "まだありません"} />
+        <StatTile label="評価" value={grandRatingCount > 0 ? `★${grandRatingAvg?.toFixed(1)}` : "なし"} sub={grandRatingCount > 0 ? `${grandRatingCount}件` : undefined} />
       </div>
 
       <DepartmentStatsList departments={stats} canEditRoyalty={viewerRole === "owner"} />
@@ -259,12 +259,14 @@ async function OrgStats({
 }
 
 // small：スマホでは文字を小さくして、長い値（「まだありません」など）が切れないようにする。
-function StatTile({ label, value, small }: { label: string; value: string; small?: boolean }) {
+// 数字はどのタイルも同じ大きさ（スマホでは少し小さく）。補足（金額・件数）は下に小さく出す。
+function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div style={{ minWidth: 0, padding: "12px 10px", borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}>
       <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>
-      <div className={small ? "vid-stat-small" : undefined} style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <div className="vid-stat-value" style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {value}
+        {sub && <span style={{ marginLeft: 4, fontSize: 10.5, fontWeight: 400, color: "var(--color-neutral-500)" }}>{sub}</span>}
       </div>
     </div>
   );

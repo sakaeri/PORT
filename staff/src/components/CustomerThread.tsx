@@ -1116,6 +1116,7 @@ type ReferralInfo = {
 
 // 「〇〇の紹介です」と言われたら、紹介元を選んで 5,000円分の紹介特典を付ける（1人1回）。
 function ReferralSection({ customerId, referral, onBalanceChange }: { customerId: string; referral: ReferralInfo; onBalanceChange: (balance: number) => void }) {
+  const router = useRouter();
   const [sourceName, setSourceName] = useState(referral.sourceName);
   const [selected, setSelected] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1132,6 +1133,8 @@ function ReferralSection({ customerId, referral, onBalanceChange }: { customerId
       onBalanceChange(data!);
       setSourceName(name);
       setSelected("");
+      // 横の欄を閉じて開き直したときに、付ける前の状態（選ぶ欄）に戻って見えないよう、画面の情報も取り直す。
+      router.refresh();
     } catch (e) {
       setError(errorMessage(e, "付けられませんでした"));
     } finally {
