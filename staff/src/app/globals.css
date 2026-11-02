@@ -49,6 +49,7 @@
      のまま — 参考モックアップの通り、メニューはテーマに関わらず同じ
      見た目にする。light側のブロックでは上書きしないこと。 */
   --color-nav-bg: #0f2a22;
+  --color-input: var(--color-surface);
   --color-nav-active-bg: #1d3a2c;
   --color-nav-border: color-mix(in srgb, #f3ede0 14%, transparent);
   --color-nav-text: #f3ede0;
@@ -80,6 +81,7 @@
 
 /* Light theme override — default is dark; opt in with data-vid-theme="light" */
 html[data-vid-theme="light"] {
+  --color-input: #ffffff;
   --color-bg: #f3efe2;
   --color-surface: #fbf8f2;
   --color-text: #1c2b22;
@@ -233,9 +235,9 @@ button:disabled {
   background: var(--color-bg) !important;
 }
 
-/* 売上・実績の数字のうち、長くなりやすいもの（評価）はスマホでは小さく出す。 */
+/* 売上・実績の数字は、スマホではどのタイルもそろえて少し小さく出す。 */
 @media (max-width: 720px) {
-  .vid-stat-small {
-    font-size: 13px !important;
+  .vid-stat-value {
+    font-size: 15px !important;
   }
 }
