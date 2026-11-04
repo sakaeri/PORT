@@ -67,20 +67,22 @@ async function getOrgSlug(admin: Admin, orgId: string): Promise<{ displayName: s
   return { displayName: data?.display_name ?? "", slug: data?.slug ?? null };
 }
 
-function customerChatUrl(slug: string | null): string {
-  return slug ? `https://port.s-stylegolf.com/${slug}` : "https://port.s-stylegolf.com";
+// お客さんのチャットを開くURL。事業所はドメインで決まるのでトップのまま。問い合わせ窓口だけ /窓口の合言葉 を付ける。
+// （以前は事業所の slug を付けていたが、/事業所slug というページは無いので 404 になっていた。）
+function customerChatUrl(deskSlug: string | null): string {
+  return deskSlug ? `https://port.s-stylegolf.com/${deskSlug}` : "https://port.s-stylegolf.com";
 }
 
 export async function notifyCustomerQuoteCreated(admin: Admin, orgId: string, customerId: string, amount: number, title: string) {
   try {
-    await pushToCustomer(admin, customerId, { title: "お見積りが届いています", body: `${title}・¥${amount.toLocaleString("ja-JP")}`, url: customerChatUrl((await getOrgSlug(admin, orgId)).slug) });
+    await pushToCustomer(admin, customerId, { title: "お見積りが届いています", body: `${title}・¥${amount.toLocaleString("ja-JP")}`, url: customerChatUrl(null) });
     const email = await getCustomerEmail(admin, customerId);
     if (!email) return;
-    const { displayName, slug } = await getOrgSlug(admin, orgId);
+    const { displayName } = await getOrgSlug(admin, orgId);
     await sendEmail(
       email,
       emailSubject(displayName, "お見積りが届いています"),
-      renderEmail({ orgName: displayName, heading: "お見積りが届いています", lines: [`${title}・¥${amount.toLocaleString("ja-JP")}`, "内容をご確認のうえ、よろしければご依頼を確定してください。"], url: customerChatUrl(slug), buttonLabel: "お見積りを確認する" }),
+      renderEmail({ orgName: displayName, heading: "お見積りが届いています", lines: [`${title}・¥${amount.toLocaleString("ja-JP")}`, "内容をご確認のうえ、よろしければご依頼を確定してください。"], url: customerChatUrl(null), buttonLabel: "お見積りを確認する" }),
     );
   } catch (e) {
     console.error("notifyCustomerQuoteCreated failed", e);
@@ -89,14 +91,14 @@ export async function notifyCustomerQuoteCreated(admin: Admin, orgId: string, cu
 
 export async function notifyCustomerCompletionReport(admin: Admin, orgId: string, customerId: string) {
   try {
-    await pushToCustomer(admin, customerId, { title: "完了報告が届いています", body: "ご依頼いただいた作業が完了しました。", url: customerChatUrl((await getOrgSlug(admin, orgId)).slug) });
+    await pushToCustomer(admin, customerId, { title: "完了報告が届いています", body: "ご依頼いただいた作業が完了しました。", url: customerChatUrl(null) });
     const email = await getCustomerEmail(admin, customerId);
     if (!email) return;
-    const { displayName, slug } = await getOrgSlug(admin, orgId);
+    const { displayName } = await getOrgSlug(admin, orgId);
     await sendEmail(
       email,
       emailSubject(displayName, "完了報告が届いています"),
-      renderEmail({ orgName: displayName, heading: "完了報告が届いています", lines: ["ご依頼いただいた作業が完了しました。トーク画面から報告内容をご確認ください。"], url: customerChatUrl(slug), buttonLabel: "完了報告を確認する" }),
+      renderEmail({ orgName: displayName, heading: "完了報告が届いています", lines: ["ご依頼いただいた作業が完了しました。トーク画面から報告内容をご確認ください。"], url: customerChatUrl(null), buttonLabel: "完了報告を確認する" }),
     );
   } catch (e) {
     console.error("notifyCustomerCompletionReport failed", e);
@@ -137,7 +139,7 @@ export async function notifyCustomerNewMessage(admin: Admin, threadId: string) {
     await pushToCustomer(admin, thread.customer_id, {
       title: desk ? `${desk.name}からお返事が届いています` : "新しいメッセージがあります",
       body: desk ? "チャットにお返事をお送りしました。" : "担当者から新しいメッセージが届いています。",
-      url: customerChatUrl(desk ? desk.slug : (await getOrgSlug(admin, thread.org_id)).slug),
+      url: customerChatUrl(desk ? desk.slug : null),
     });
     const email = await getCustomerEmail(admin, thread.customer_id);
     if (!email) return;
@@ -155,11 +157,11 @@ export async function notifyCustomerNewMessage(admin: Admin, threadId: string) {
       );
       return;
     }
-    const { displayName, slug } = await getOrgSlug(admin, thread.org_id);
+    const { displayName } = await getOrgSlug(admin, thread.org_id);
     await sendEmail(
       email,
       emailSubject(displayName, "新着メッセージがあります"),
-      renderEmail({ orgName: displayName, heading: "新着メッセージがあります", lines: ["担当者から新しいメッセージが届いています。"], url: customerChatUrl(slug), buttonLabel: "トークを確認する" }),
+      renderEmail({ orgName: displayName, heading: "新着メッセージがあります", lines: ["担当者から新しいメッセージが届いています。"], url: customerChatUrl(null), buttonLabel: "トークを確認する" }),
     );
   } catch (e) {
     console.error("notifyCustomerNewMessage failed", e);
@@ -173,11 +175,11 @@ export async function notifyCustomerAutoRechargeFailed(admin: Admin, orgId: stri
     await pushToCustomer(admin, customerId, {
       title: stopped ? "自動チャージを停止しました" : "自動チャージに失敗しました",
       body: "マイページからカード情報をご確認ください。",
-      url: customerChatUrl((await getOrgSlug(admin, orgId)).slug),
+      url: customerChatUrl(null),
     });
     const email = await getCustomerEmail(admin, customerId);
     if (!email) return;
-    const { displayName, slug } = await getOrgSlug(admin, orgId);
+    const { displayName } = await getOrgSlug(admin, orgId);
     await sendEmail(
       email,
       emailSubject(displayName, stopped ? "自動チャージを停止しました" : "自動チャージに失敗しました"),
@@ -189,7 +191,7 @@ export async function notifyCustomerAutoRechargeFailed(admin: Admin, orgId: stri
             ? "カードへの請求に続けて失敗したため、自動チャージを停止しました。マイページから設定し直してください。"
             : "自動チャージに失敗しました。カード情報をご確認のうえ、必要であればマイページから設定し直してください。",
         ],
-        url: customerChatUrl(slug),
+        url: customerChatUrl(null),
         buttonLabel: "トーク画面を開く",
       }),
     );
