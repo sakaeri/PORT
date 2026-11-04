@@ -171,27 +171,30 @@ export default function CasesList({
                 )}
               </div>
               <div style={{ fontSize: 11, color: "var(--color-neutral-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lastMessagePreview ?? "まだ記録がありません"}</div>
-            </Link>
-            {canSeeAmount && <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>¥{r.amount.toLocaleString("ja-JP")}</div>}
-            {r.dueAt && ["preparing", "started"].includes(r.phase) && (
-              <div
-                style={{
-                  flex: "none",
-                  fontSize: 11,
-                  padding: "3px 10px",
-                  borderRadius: 6,
-                  border: `1px solid ${r.overdue ? "var(--stb-seal-ink)" : "var(--color-divider)"}`,
-                  color: r.overdue ? "var(--stb-seal-ink)" : "var(--color-neutral-400)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                納期：{new Date(r.dueAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                {r.overdue && "（超過）"}
+              {/* 金額・納期・状態は下の段にまとめて、狭い画面では折り返す（横にはみ出さないように）。 */}
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                {canSeeAmount && <div style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>¥{r.amount.toLocaleString("ja-JP")}</div>}
+                {r.dueAt && ["preparing", "started"].includes(r.phase) && (
+                  <div
+                    style={{
+                      flex: "none",
+                      fontSize: 11,
+                      padding: "3px 10px",
+                      borderRadius: 6,
+                      border: `1px solid ${r.overdue ? "var(--stb-seal-ink)" : "var(--color-divider)"}`,
+                      color: r.overdue ? "var(--stb-seal-ink)" : "var(--color-neutral-400)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    納期：{new Date(r.dueAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    {r.overdue && "（超過）"}
+                  </div>
+                )}
+                <div style={{ flex: "none", fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)", whiteSpace: "nowrap" }}>
+                  {r.reportPending ? "報告済み（承認待ち）" : PHASE_LABEL[r.phase]}
+                </div>
               </div>
-            )}
-            <div style={{ flex: "none", fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)", whiteSpace: "nowrap" }}>
-              {r.reportPending ? "報告済み（承認待ち）" : PHASE_LABEL[r.phase]}
-            </div>
+            </Link>
             <RowKebabMenu
               archived={r.archived}
               onToggleArchive={r.threadId ? () => toggleArchive(r) : undefined}
