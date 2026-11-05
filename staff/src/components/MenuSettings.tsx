@@ -533,7 +533,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <span style={label}>詳細内容</span>
-                    <input value={draft.note ?? ""} onChange={(e) => patchDraft({ note: e.target.value })} disabled={!canEdit} className="vid-input" style={input} />
+                    <textarea value={draft.note ?? ""} onChange={(e) => patchDraft({ note: e.target.value })} disabled={!canEdit} rows={4} className="vid-input" style={{ ...input, height: "auto", padding: "8px 10px", lineHeight: 1.6, resize: "vertical" }} />
                   </div>
 
                   {canEdit && (

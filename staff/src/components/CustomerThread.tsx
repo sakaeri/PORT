@@ -497,7 +497,7 @@ function QuoteBubble({ msg }: { msg: Message }) {
         )}
       </div>
       <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: headingWeight, lineHeight: 1.3 }}>{p.title}</div>
-      {p.note && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{p.note}</div>}
+      {p.note && <div style={{ fontSize: 12, color: "var(--color-neutral-500)", whiteSpace: "pre-wrap" }}>{p.note}</div>}
       {msg.requestAmount != null && <div style={{ fontSize: 17, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{msg.requestAmount.toLocaleString("ja-JP")}</div>}
       {p.due && <div style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>{p.dueDate ? `完了予定：${p.due}` : `対応の目安：${p.due}`}</div>}
       {p.payDeadline && <div style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>支払い期限：{p.payDeadline}</div>}
@@ -505,11 +505,11 @@ function QuoteBubble({ msg }: { msg: Message }) {
       {phase === "completed" && msg.report && (
         <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ fontSize: 10.5, color: "var(--color-accent)" }}>完了報告</div>
-          <div style={{ fontSize: 12.5 }}>{msg.report.summary}</div>
+          <div style={{ fontSize: 12.5, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{msg.report.summary}</div>
           {msg.report.details.map((d, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, fontSize: 12 }}>
-              <span style={{ width: 60, flex: "none", color: "var(--color-neutral-400)" }}>{d.label}</span>
-              <span style={{ minWidth: 0, flex: 1 }}>{d.value}</span>
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <span style={{ fontSize: 10.5, color: "var(--color-neutral-400)" }}>{d.label}</span>
+              <span style={{ fontSize: 12.5, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{d.value}</span>
             </div>
           ))}
         </div>
@@ -534,7 +534,7 @@ function MenuPickBubble({ msg }: { msg: Message }) {
           ))}
         </div>
       )}
-      {p.note && <div style={{ fontSize: 12.5, paddingTop: 6, borderTop: p.rows?.length ? "none" : "1px solid var(--color-divider)" }}>{p.note}</div>}
+      {p.note && <div style={{ fontSize: 12.5, whiteSpace: "pre-wrap", paddingTop: 6, borderTop: p.rows?.length ? "none" : "1px solid var(--color-divider)" }}>{p.note}</div>}
     </div>
   );
 }

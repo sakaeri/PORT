@@ -468,7 +468,7 @@ async function requestRecurringFollowupInner(requestId: string) {
   const ctx = await requireContext();
   const admin = createServiceRoleClient();
 
-  const { data: r, error } = await admin.from("requests").select("phase, cadence").eq("id", requestId).eq("customer_id", ctx.customerId).single();
+  const { data: r, error } = await admin.from("requests").select("title, phase, cadence").eq("id", requestId).eq("customer_id", ctx.customerId).single();
   if (error || !r) throw new Error("依頼が見つかりません");
   if (r.phase !== "completed") throw new Error("完了した依頼のみ申し込めます");
   if (r.cadence) throw new Error("すでに定期の依頼です");
@@ -483,6 +483,9 @@ async function requestRecurringFollowupInner(requestId: string) {
     await admin.from("messages").insert({ thread_id: caseThread.id, sender_id: null, sender_role: null, kind: "notice", body });
     await admin.from("threads").update({ last_msg_at: now }).eq("id", caseThread.id);
   }
+  // 案件トークの記録だけでは秘書が気づけないので、依頼主のトークにも本人の言葉として送る
+  // （依頼主一覧で未読になり、新着メッセージとして通知・メールも届く）。
+  await sendMessageInner(`「${r.title}」を、次回からも定期でお願いしたいです。`, []);
 }
 
 // チャージ残高の入金。Stripeの埋め込み型Checkout（ui_mode: "embedded_page"）用の
