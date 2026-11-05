@@ -1,5 +1,6 @@
 "use client";
 
+import { ReportFollowups } from "@/components/chat/Bubbles";
 import { useState } from "react";
 import { X, Timer } from "@phosphor-icons/react";
 import { StepIcon } from "@/components/chat/icons";
@@ -226,27 +227,43 @@ export function CancelDialog({
 }
 
 // ---------- 報告書一覧 ----------
-export function ReportsDialog({ bundles, ackedIds, onAck, onClose }: { bundles: RequestBundle[]; ackedIds: Set<string>; onAck: (id: string) => void; onClose: () => void }) {
+export function ReportsDialog({
+  bundles,
+  ackedIds,
+  onAck,
+  onClose,
+  onSubmitRating,
+  onSkipRating,
+}: {
+  bundles: RequestBundle[];
+  ackedIds: Set<string>;
+  onAck: (id: string) => void;
+  onClose: () => void;
+  onSubmitRating: (id: string, stars: number, comment: string) => Promise<void>;
+  onSkipRating: (id: string) => Promise<void>;
+}) {
   const all = bundles.filter((b) => b.request.phase === "completed" && b.report?.sent_at);
   const unread = all.filter((b) => !ackedIds.has(b.request.id));
   // 確認済みにしたものは消さず、下の折りたたみにしまう（あとから見返せるように）。
   const acked = all.filter((b) => ackedIds.has(b.request.id));
   const [showAcked, setShowAcked] = useState(false);
 
-  function card({ request: r, report }: RequestBundle, canAck: boolean) {
+  function card({ request: r, report, rating }: RequestBundle, canAck: boolean) {
     return (
       <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 12, borderRadius: "var(--radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-divider)" }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 14 }}>{r.title}</div>
         <div style={{ fontSize: 11, color: "var(--color-neutral-600)" }}>{report?.sent_at ? `${dateLabel(report.sent_at)} ${timeLabel(report.sent_at)}` : ""}</div>
-        <p style={{ margin: 0, fontSize: 13, opacity: 0.8 }}>{report?.summary}</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, opacity: 0.85, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{report?.summary}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {report?.details.map((d, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
-              <span style={{ color: "var(--color-neutral-500)", flex: "none", width: 64 }}>{d.label}</span>
-              <span>{d.value}</span>
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{d.label}</span>
+              <span style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{d.value}</span>
             </div>
           ))}
         </div>
+        {/* 一覧からも、チャットに戻らず評価・定期のお願いができるように。 */}
+        <ReportFollowups request={r} rating={rating} onSubmitRating={onSubmitRating} onSkipRating={onSkipRating} />
         {canAck && (
           <button onClick={() => onAck(r.id)} style={{ alignSelf: "flex-end", height: 29, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-bg)", background: "var(--color-accent-400)", border: "none", borderRadius: "var(--radius-md)" }}>
             確認済み

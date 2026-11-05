@@ -91,14 +91,14 @@ export async function notifyCustomerQuoteCreated(admin: Admin, orgId: string, cu
 
 export async function notifyCustomerCompletionReport(admin: Admin, orgId: string, customerId: string) {
   try {
-    await pushToCustomer(admin, customerId, { title: "完了報告が届いています", body: "ご依頼いただいた作業が完了しました。", url: customerChatUrl(null) });
+    await pushToCustomer(admin, customerId, { title: "完了報告が届いています", body: "ご依頼いただいた作業が完了しました。", url: `${customerChatUrl(null)}/?open=reports` });
     const email = await getCustomerEmail(admin, customerId);
     if (!email) return;
     const { displayName } = await getOrgSlug(admin, orgId);
     await sendEmail(
       email,
       emailSubject(displayName, "完了報告が届いています"),
-      renderEmail({ orgName: displayName, heading: "完了報告が届いています", lines: ["ご依頼いただいた作業が完了しました。トーク画面から報告内容をご確認ください。"], url: customerChatUrl(null), buttonLabel: "完了報告を確認する" }),
+      renderEmail({ orgName: displayName, heading: "完了報告が届いています", lines: ["ご依頼いただいた作業が完了しました。トーク画面から報告内容をご確認ください。"], url: `${customerChatUrl(null)}/?open=reports`, buttonLabel: "完了報告を確認する" }),
     );
   } catch (e) {
     console.error("notifyCustomerCompletionReport failed", e);

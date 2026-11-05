@@ -254,13 +254,13 @@ export default function CaseDetail({
         {request.phase === "started" && report?.pending && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
             <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{canApprove ? "スタッフが提出した完了報告（未送信）" : "完了報告を提出しました。秘書の確認をお待ちください。"}</div>
-            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{report.summary}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{report.summary}</div>
             {report.details.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {report.details.map((d, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
-                    <span style={{ width: 72, flex: "none", color: "var(--color-neutral-500)" }}>{d.label}</span>
-                    <span style={{ minWidth: 0, flex: 1 }}>{d.value}</span>
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{d.label}</span>
+                    <span style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{d.value}</span>
                   </div>
                 ))}
               </div>
@@ -293,13 +293,13 @@ export default function CaseDetail({
         {request.phase === "completed" && report && (
           <div style={{ borderTop: "1px solid var(--color-divider)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>完了報告</div>
-            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{report.summary}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{report.summary}</div>
             {report.details.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
                 {report.details.map((d, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
-                    <span style={{ width: 72, flex: "none", color: "var(--color-neutral-500)" }}>{d.label}</span>
-                    <span style={{ minWidth: 0, flex: 1 }}>{d.value}</span>
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{d.label}</span>
+                    <span style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{d.value}</span>
                   </div>
                 ))}
               </div>

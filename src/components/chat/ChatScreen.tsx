@@ -70,6 +70,14 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
   const [searchQuery, setSearchQuery] = useState("");
   const [showProgress, setShowProgress] = useState(false);
   const [showReports, setShowReports] = useState(false);
+  // 完了報告のメール・通知（/?open=reports）から来たら、報告書一覧を開いた状態で迎える。
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("open") !== "reports") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the URL (external browser state) after mount
+    setShowReports(true);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
   const [showMyPage, setShowMyPage] = useState(false);
   const [openMyPageWithCharge, setOpenMyPageWithCharge] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
@@ -397,7 +405,22 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
           }}
         />
       )}
-      {showReports && <ReportsDialog bundles={bundles} ackedIds={ackedIds} onAck={ackReport} onClose={() => setShowReports(false)} />}
+      {showReports && (
+        <ReportsDialog
+          bundles={bundles}
+          ackedIds={ackedIds}
+          onAck={ackReport}
+          onClose={() => setShowReports(false)}
+          onSubmitRating={async (id, stars, comment) => {
+            unwrap(await submitRating(id, stars, comment));
+            await refresh();
+          }}
+          onSkipRating={async (id) => {
+            unwrap(await skipRating(id));
+            await refresh();
+          }}
+        />
+      )}
       {cancelTargetBundle && (
         <CancelDialog
           confirming={busy}

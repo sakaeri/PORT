@@ -239,7 +239,7 @@ export function MenuPickBubble({ msg }: { msg: MessageWithExtras }) {
             ))}
           </div>
         )}
-        {p.note && <div style={{ fontSize: 12, lineHeight: 1.55, paddingTop: 7, borderTop: "1px solid color-mix(in srgb, var(--color-bubble-self-text) 25%, transparent)" }}>{p.note}</div>}
+        {p.note && <div style={{ fontSize: 12, lineHeight: 1.55, whiteSpace: "pre-wrap", paddingTop: 7, borderTop: "1px solid color-mix(in srgb, var(--color-bubble-self-text) 25%, transparent)" }}>{p.note}</div>}
       </div>
       <Meta isSelf time={timeLabel(msg.sent_at)} />
     </div>
@@ -275,45 +275,10 @@ export function RequestCard({
 }) {
   const { request: r, items, report, rating } = bundle;
   const payload = msg.payload as { title?: string; note?: string; due?: string; dueDate?: string };
-  const [stars, setStars] = useState(0);
-  const [comment, setComment] = useState("");
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState("");
   const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
   const [attachmentErrorId, setAttachmentErrorId] = useState<string | null>(null);
-  const [recurringRequesting, setRecurringRequesting] = useState(false);
-  const [recurringRequested, setRecurringRequested] = useState(false);
-  const [recurringError, setRecurringError] = useState("");
-  const [ratingBusy, setRatingBusy] = useState(false);
-  const [ratingError, setRatingError] = useState("");
-
-  // 連打で二重に送らないよう、送っている間は止める。
-  async function handleRating(send: () => Promise<void>) {
-    if (ratingBusy) return;
-    setRatingBusy(true);
-    setRatingError("");
-    try {
-      await send();
-    } catch (e) {
-      setRatingError(errorMessage(e, "送信できませんでした"));
-    } finally {
-      setRatingBusy(false);
-    }
-  }
-
-  async function handleRequestRecurring() {
-    if (recurringRequesting || recurringRequested) return;
-    setRecurringRequesting(true);
-    setRecurringError("");
-    try {
-      unwrap(await requestRecurringFollowup(r.id));
-      setRecurringRequested(true);
-    } catch (e) {
-      setRecurringError(errorMessage(e, "送信できませんでした"));
-    } finally {
-      setRecurringRequesting(false);
-    }
-  }
 
   async function openReportAttachment(path: string, id: string) {
     if (openingAttachmentId) return;
@@ -365,7 +330,7 @@ export function RequestCard({
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, lineHeight: 1.2, marginTop: 2 }}>
             {payload.title ?? r.title}
           </div>
-          {payload.note && <p style={{ margin: "6px 0 0", fontSize: 13, opacity: 0.8 }}>{payload.note}</p>}
+          {payload.note && <p style={{ margin: "6px 0 0", fontSize: 13, opacity: 0.8, whiteSpace: "pre-wrap" }}>{payload.note}</p>}
           {items.length > 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 10, paddingTop: 9, borderTop: "1px solid var(--color-divider)" }}>
               {items.map((it) => (
@@ -492,12 +457,12 @@ export function RequestCard({
               <CheckCircle size={12} />
               完了報告
             </div>
-            <p style={{ margin: "6px 0 0", fontSize: 13, opacity: 0.8 }}>{report.summary}</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
+            <p style={{ margin: "6px 0 0", fontSize: 13, lineHeight: 1.6, opacity: 0.85, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{report.summary}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
               {report.details.map((d, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5 }}>
-                  <span style={{ color: "var(--color-neutral-500)", flex: "none", width: 64 }}>{d.label}</span>
-                  <span>{d.value}</span>
+                <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 11, color: "var(--color-neutral-500)" }}>{d.label}</span>
+                  <span style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{d.value}</span>
                 </div>
               ))}
             </div>
@@ -529,85 +494,140 @@ export function RequestCard({
             </p>
             <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-neutral-500)" }}>秘書</div>
 
-            {!rating && (
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 12.5 }}>今回の対応はいかがでしたか</div>
-                <div style={{ display: "flex", gap: 4 }}>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} onClick={() => setStars(n)} aria-label={`星${n}`} style={{ width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: n <= stars ? "var(--color-accent)" : "var(--color-neutral-700)", background: "transparent", border: "none", padding: 0 }}>
-                      <Star size={22} weight={n <= stars ? "fill" : "regular"} />
-                    </button>
-                  ))}
-                  <span style={{ alignSelf: "center", marginLeft: 6, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
-                    {["", "申し訳ありません", "ご期待に届きませんでした", "ありがとうございます", "ありがとうございます", "ありがとうございます"][stars]}
-                  </span>
-                </div>
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="ひとことあれば（任意）。よかった点も、直してほしい点も"
-                  className="vid-textarea"
-                  style={{ width: "100%", minHeight: 62, padding: "9px 10px", fontFamily: "var(--font-body)", fontSize: 12.5, lineHeight: 1.7, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none", resize: "vertical" }}
-                />
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <button
-                    onClick={() => handleRating(() => onSubmitRating(r.id, stars, comment))}
-                    disabled={stars === 0 || ratingBusy}
-                    style={{ flex: 1, height: 34, cursor: stars ? "pointer" : "not-allowed", fontSize: 12.5, color: stars ? "var(--color-accent)" : "var(--color-neutral-600)", background: "transparent", border: `1px solid ${stars ? "var(--color-accent)" : "var(--color-divider)"}`, borderRadius: "var(--radius-md)" }}
-                  >
-                    {ratingBusy ? "送信中…" : "送る"}
-                  </button>
-                  <button onClick={() => handleRating(() => onSkipRating(r.id))} disabled={ratingBusy} style={{ height: 34, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
-                    今回はスキップ
-                  </button>
-                </div>
-                {ratingError && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{ratingError}</span>}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, color: "var(--color-neutral-600)" }}>
-                  評価は担当者には直接届きません
-                  <InfoTooltip text="星もひとことも、まず運営だけが受け取ります。お伝えしたほうがよい内容は運営が判断してお伝えします。" />
-                </div>
-              </div>
-            )}
-
-            {rating && (
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--color-divider)", display: "flex", alignItems: "flex-start", gap: 7 }}>
-                {rating.skipped ? <MinusCircle size={14} color="var(--color-neutral-500)" style={{ flex: "none", marginTop: 1 }} /> : <CheckCircle weight="fill" size={14} color="var(--color-neutral-500)" style={{ flex: "none", marginTop: 1 }} />}
-                <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-                  {rating.skipped
-                    ? "評価はスキップしました。あとから送りたいときは、このまま返信でお知らせください。"
-                    : rating.comment
-                      ? "ご評価ありがとうございました。いただいたひとことは運営が確認します。"
-                      : "ご評価ありがとうございました。"}
-                </span>
-              </div>
-            )}
-
-            {!r.cadence && (
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
-                {recurringRequested ? (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
-                    <CheckCircle weight="fill" size={14} color="var(--color-neutral-500)" style={{ flex: "none", marginTop: 1 }} />
-                    <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>お伝えしました。秘書から改めてご連絡します。</span>
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleRequestRecurring}
-                      disabled={recurringRequesting}
-                      style={{ height: 34, padding: "0 14px", cursor: recurringRequesting ? "default" : "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
-                    >
-                      {recurringRequesting ? "送信中…" : "次回からも定期でお願いしたい"}
-                    </button>
-                    {recurringError && <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--color-accent-200)" }}>{recurringError}</div>}
-                  </>
-                )}
-              </div>
-            )}
+            <ReportFollowups request={r} rating={rating} onSubmitRating={onSubmitRating} onSkipRating={onSkipRating} />
           </div>
         )}
       </div>
       <Meta isSelf={false} time={timeLabel(msg.sent_at)} senderName={msg.senderName} orgDisplayName={orgDisplayName} />
     </div>
+  );
+}
+
+// 完了報告への評価と「次回からも定期で」。トークの見積もりカードと、報告書一覧の両方で使う。
+export function ReportFollowups({
+  request: r,
+  rating,
+  onSubmitRating,
+  onSkipRating,
+}: {
+  request: RequestBundle["request"];
+  rating: RequestBundle["rating"];
+  onSubmitRating: (id: string, stars: number, comment: string) => Promise<void>;
+  onSkipRating: (id: string) => Promise<void>;
+}) {
+  const [stars, setStars] = useState(0);
+  const [comment, setComment] = useState("");
+  const [recurringRequesting, setRecurringRequesting] = useState(false);
+  const [recurringRequested, setRecurringRequested] = useState(false);
+  const [recurringError, setRecurringError] = useState("");
+  const [ratingBusy, setRatingBusy] = useState(false);
+  const [ratingError, setRatingError] = useState("");
+
+  // 連打で二重に送らないよう、送っている間は止める。
+  async function handleRating(send: () => Promise<void>) {
+    if (ratingBusy) return;
+    setRatingBusy(true);
+    setRatingError("");
+    try {
+      await send();
+    } catch (e) {
+      setRatingError(errorMessage(e, "送信できませんでした"));
+    } finally {
+      setRatingBusy(false);
+    }
+  }
+
+  async function handleRequestRecurring() {
+    if (recurringRequesting || recurringRequested) return;
+    setRecurringRequesting(true);
+    setRecurringError("");
+    try {
+      unwrap(await requestRecurringFollowup(r.id));
+      setRecurringRequested(true);
+    } catch (e) {
+      setRecurringError(errorMessage(e, "送信できませんでした"));
+    } finally {
+      setRecurringRequesting(false);
+    }
+  }
+
+  return (
+    <>
+    {!rating && (
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ fontSize: 12.5 }}>今回の対応はいかがでしたか</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button key={n} onClick={() => setStars(n)} aria-label={`星${n}`} style={{ width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: n <= stars ? "var(--color-accent)" : "var(--color-neutral-700)", background: "transparent", border: "none", padding: 0 }}>
+              <Star size={22} weight={n <= stars ? "fill" : "regular"} />
+            </button>
+          ))}
+          <span style={{ alignSelf: "center", marginLeft: 6, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
+            {["", "申し訳ありません", "ご期待に届きませんでした", "ありがとうございます", "ありがとうございます", "ありがとうございます"][stars]}
+          </span>
+        </div>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="ひとことあれば（任意）。よかった点も、直してほしい点も"
+          className="vid-textarea"
+          style={{ width: "100%", minHeight: 62, padding: "9px 10px", fontFamily: "var(--font-body)", fontSize: 12.5, lineHeight: 1.7, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)", outline: "none", resize: "vertical" }}
+        />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            onClick={() => handleRating(() => onSubmitRating(r.id, stars, comment))}
+            disabled={stars === 0 || ratingBusy}
+            style={{ flex: 1, height: 34, cursor: stars ? "pointer" : "not-allowed", fontSize: 12.5, color: stars ? "var(--color-accent)" : "var(--color-neutral-600)", background: "transparent", border: `1px solid ${stars ? "var(--color-accent)" : "var(--color-divider)"}`, borderRadius: "var(--radius-md)" }}
+          >
+            {ratingBusy ? "送信中…" : "送る"}
+          </button>
+          <button onClick={() => handleRating(() => onSkipRating(r.id))} disabled={ratingBusy} style={{ height: 34, padding: "0 12px", cursor: "pointer", fontSize: 12, color: "var(--color-neutral-500)", background: "transparent", border: "none" }}>
+            今回はスキップ
+          </button>
+        </div>
+        {ratingError && <span style={{ fontSize: 11.5, color: "var(--color-accent-200)" }}>{ratingError}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, color: "var(--color-neutral-600)" }}>
+          評価は担当者には直接届きません
+          <InfoTooltip text="星もひとことも、まず運営だけが受け取ります。お伝えしたほうがよい内容は運営が判断してお伝えします。" />
+        </div>
+      </div>
+    )}
+
+    {rating && (
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--color-divider)", display: "flex", alignItems: "flex-start", gap: 7 }}>
+        {rating.skipped ? <MinusCircle size={14} color="var(--color-neutral-500)" style={{ flex: "none", marginTop: 1 }} /> : <CheckCircle weight="fill" size={14} color="var(--color-neutral-500)" style={{ flex: "none", marginTop: 1 }} />}
+        <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
+          {rating.skipped
+            ? "評価はスキップしました。あとから送りたいときは、このまま返信でお知らせください。"
+            : rating.comment
+              ? "ご評価ありがとうございました。いただいたひとことは運営が確認します。"
+              : "ご評価ありがとうございました。"}
+        </span>
+      </div>
+    )}
+
+    {!r.cadence && (
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--color-divider)" }}>
+        {recurringRequested ? (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+            <CheckCircle weight="fill" size={14} color="var(--color-neutral-500)" style={{ flex: "none", marginTop: 1 }} />
+            <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>お伝えしました。秘書から改めてご連絡します。</span>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={handleRequestRecurring}
+              disabled={recurringRequesting}
+              style={{ height: 34, padding: "0 14px", cursor: recurringRequesting ? "default" : "pointer", fontSize: 12.5, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
+            >
+              {recurringRequesting ? "送信中…" : "次回からも定期でお願いしたい"}
+            </button>
+            {recurringError && <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--color-accent-200)" }}>{recurringError}</div>}
+          </>
+        )}
+      </div>
+    )}
+    </>
   );
 }
 
@@ -658,7 +678,7 @@ export function IntakeCard({ msg, answered }: { msg: MessageWithExtras; answered
       <div style={{ width: "min(300px, 100%)", display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}>
         <span style={kicker}>確認事項</span>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, lineHeight: 1.3 }}>{p.formLabel}</div>
-        {p.note && <p style={{ margin: 0, fontSize: 12.5, opacity: 0.8 }}>{p.note}</p>}
+        {p.note && <p style={{ margin: 0, fontSize: 12.5, opacity: 0.8, whiteSpace: "pre-wrap" }}>{p.note}</p>}
 
         {!submitted && !answered ? (
           <>
