@@ -41,6 +41,8 @@ export async function proxy(request: NextRequest) {
     isLoginRoute ||
     request.nextUrl.pathname.startsWith("/join") ||
     request.nextUrl.pathname.startsWith("/auth/confirm") ||
+    // /auth/open: 通知メールのボタンの着地点（ここでログインさせてから目的の画面へ送る）。
+    request.nextUrl.pathname.startsWith("/auth/open") ||
     // Vercel の定期実行（自動チャージ・定期対応）。ログインはなく、CRON_SECRET で確認する。
     request.nextUrl.pathname.startsWith("/api/cron/") ||
     // ホーム画面に追加するときの設定ファイル。ブラウザはログイン情報なしで取りに来る。

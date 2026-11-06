@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { emailSubject, renderEmail } from "@/lib/email-layout";
 import { sendPush } from "@/lib/push";
+import { emailOpenUrl } from "@/lib/email-link";
 
 type Admin = ReturnType<typeof createServiceRoleClient>;
 
@@ -18,13 +19,22 @@ async function sendStaffEmail(admin: Admin, emails: string[], subject: string, h
   });
 }
 
-async function emailsFor(admin: Admin, profileIds: string[]): Promise<string[]> {
-  const emails: string[] = [];
+async function recipientsFor(admin: Admin, profileIds: string[]): Promise<{ id: string; email: string }[]> {
+  const out: { id: string; email: string }[] = [];
   for (const id of profileIds) {
     const { data } = await admin.auth.admin.getUserById(id);
-    if (data.user?.email) emails.push(data.user.email);
+    if (data.user?.email) out.push({ id, email: data.user.email });
   }
-  return emails;
+  return out;
+}
+
+// スタッフへの通知メール。ボタンを押すとその人としてログインした状態で開くよう、
+// リンクが一人ずつ違うので、あて先ごとに1通ずつ送る。
+async function sendStaffEmails(admin: Admin, recipients: { id: string; email: string }[], subject: string, html: (url: string) => string, path: string) {
+  const staffUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
+  for (const r of recipients) {
+    await sendStaffEmail(admin, [r.email], subject, html(emailOpenUrl(staffUrl, r.id, path)));
+  }
 }
 
 // 依頼主からのメッセージが「本部が未読の状態で」届いたときだけ、その事業所の
@@ -62,12 +72,12 @@ export async function notifyNewInquiry(orgId: string, threadId: string) {
       body: desk ? `${desk.name}のお問い合わせ窓口に新しいメッセージが届きました。` : "依頼主から新しいメッセージが届きました。",
       url: openUrl,
     });
-    const emails = await emailsFor(admin, recipientIds);
-    await sendStaffEmail(
+    await sendStaffEmails(
       admin,
-      emails,
+      await recipientsFor(admin, recipientIds),
       emailSubject(org?.display_name ?? "", "新着メッセージがあります"),
-      renderEmail({ orgName: org?.display_name ?? "", heading: "新着メッセージがあります", lines: [desk ? `${desk.name}のお問い合わせ窓口に新しいメッセージが届きました。` : "依頼主から新しいメッセージが届きました。"], url: openUrl, buttonLabel: "トークを確認する" }),
+      (url) => renderEmail({ orgName: org?.display_name ?? "", heading: "新着メッセージがあります", lines: [desk ? `${desk.name}のお問い合わせ窓口に新しいメッセージが届きました。` : "依頼主から新しいメッセージが届きました。"], url, buttonLabel: "トークを確認する" }),
+      thread?.customer_id ? `/customers/${thread.customer_id}` : "/",
     );
   } catch (e) {
     console.error("notifyNewInquiry failed", e);
@@ -112,18 +122,18 @@ export async function notifyStaffPaymentConfirmed(orgId: string, requestId: stri
     const staffUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
     const caseUrl = staffUrl ? `${staffUrl}/cases/${requestId}` : "";
     await sendPush(admin, profileIds, { title: "依頼が確定しました", body: `${request.title}・¥${request.amount.toLocaleString("ja-JP")}`, url: caseUrl });
-    const emails = await emailsFor(admin, profileIds);
-    await sendStaffEmail(
+    await sendStaffEmails(
       admin,
-      emails,
+      await recipientsFor(admin, profileIds),
       emailSubject(org?.display_name ?? "", "依頼が確定しました"),
-      renderEmail({
+      (url) => renderEmail({
         orgName: org?.display_name ?? "",
         heading: "依頼が確定しました",
         lines: ["依頼主が依頼を確定し、お支払いが完了しました。", `${request.title}・¥${request.amount.toLocaleString("ja-JP")}`],
-        url: caseUrl,
+        url,
         buttonLabel: "案件を確認する",
       }),
+      `/cases/${requestId}`,
     );
   } catch (e) {
     console.error("notifyStaffPaymentConfirmed failed", e);
