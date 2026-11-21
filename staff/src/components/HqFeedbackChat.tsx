@@ -120,7 +120,7 @@ export default function HqFeedbackChat({ threadId, orgId, currentUserId }: { thr
                     borderRadius: "var(--radius-md)",
                     fontSize: 12.5,
                     lineHeight: 1.5,
-                    whiteSpace: "pre-wrap",
+                    whiteSpace: "pre-wrap", overflowWrap: "anywhere",
                     background: isOwn ? "var(--color-bubble-self-bg)" : "var(--color-bubble-other-bg)",
                     color: isOwn ? "var(--color-bubble-self-text)" : "var(--color-bubble-other-text)",
                     border: isOwn ? "none" : "1px solid var(--color-divider)",

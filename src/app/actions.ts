@@ -77,17 +77,20 @@ async function toResult(label: string, fn: () => Promise<unknown>): Promise<Acti
 // 依頼主自身のセッションではこの更新が黙って0件のまま失敗する — service role
 // で書く（last_msg_at を進めるだけの安全な操作なので、ここだけRLSを迂回する）。
 //
-// 更新の直前の状態（前回の last_msg_at／last_read_at）を見て、「本部が
-// 読んだ後に初めて届いた1通」かどうかを返す。未読のまま連続でメッセージが
-// 来た場合は2通目以降 false になり、notifyNewInquiry 側で毎通メールしない
-// ようにするため（本当に最初の問い合わせ時は前回のメッセージが無いので true）。
-async function touchThread(threadId: string): Promise<boolean> {
+// 「本部が最後に読んだ後、依頼主から届いた最初の1通（＝今送ったもの）」かどうかを返す。
+// 未読のまま続けて送られた2通目以降は false にして、notifyNewInquiry が毎通知らせないようにする。
+// 以前は last_msg_at と last_read_at の比較で決めていたが、トークを作った時点で
+// last_msg_at が入る（最初のあいさつ）ため、新しい依頼主の最初の1通が「すでに未読あり」と
+// 見なされ、通知が一度も届かなかった。今は依頼主のメッセージの数で決める。
+// inserted: 今回の送信で入れたメッセージの数（ファイルと本文を一緒に送ると2）。
+async function touchThread(threadId: string, inserted = 1): Promise<boolean> {
   const admin = createServiceRoleClient();
-  const { data: before } = await admin.from("threads").select("last_msg_at, last_read_at").eq("id", threadId).maybeSingle();
+  const { data: before } = await admin.from("threads").select("last_read_at").eq("id", threadId).maybeSingle();
   await admin.from("threads").update({ last_msg_at: new Date().toISOString() }).eq("id", threadId);
-  if (!before || before.last_msg_at == null) return true;
-  const alreadyUnread = before.last_read_at == null || before.last_read_at < before.last_msg_at;
-  return !alreadyUnread;
+  let q = admin.from("messages").select("id", { count: "exact", head: true }).eq("thread_id", threadId).eq("sender_role", "client").is("deleted_at", null);
+  if (before?.last_read_at) q = q.gt("sent_at", before.last_read_at);
+  const { count } = await q;
+  return (count ?? 0) <= inserted;
 }
 
 // 依頼主がトーク画面を見ている間に呼ぶ。本部側の notifyCustomerNewMessage が
@@ -185,7 +188,7 @@ async function sendMessageInner(text: string, attachments: { path: string; name:
       .insert({ thread_id: ctx.threadId, sender_id: ctx.userId, sender_role: "client", kind: "text", body: trimmed });
     if (error) throw error;
   }
-  const shouldNotify = await touchThread(ctx.threadId);
+  const shouldNotify = await touchThread(ctx.threadId, (attachments.length > 0 ? 1 : 0) + (trimmed ? 1 : 0));
   if (shouldNotify) await notifyNewInquiry(ctx.orgId, ctx.threadId);
 }
 

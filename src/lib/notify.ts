@@ -67,7 +67,11 @@ export async function notifyNewInquiry(orgId: string, threadId: string) {
 
     const staffUrl = process.env.NEXT_PUBLIC_STAFF_APP_URL ?? "";
     const openUrl = staffUrl && thread?.customer_id ? `${staffUrl}/customers/${thread.customer_id}` : staffUrl;
+    // ホーム画面のアイコンに、未読の依頼主の数を出す（数字が無いと、開くまで気づけない）。
+    // （本部アプリ用の関数なので、こちらの型定義には載っていない。）
+    const { data: unread } = await admin.rpc("unread_customer_count" as never, { p_org_id: orgId } as never);
     await sendPush(admin, recipientIds, {
+      badge: typeof unread === "number" ? unread : undefined,
       title: "新しいメッセージがあります",
       body: desk ? `${desk.name}のお問い合わせ窓口に新しいメッセージが届きました。` : "依頼主から新しいメッセージが届きました。",
       url: openUrl,
