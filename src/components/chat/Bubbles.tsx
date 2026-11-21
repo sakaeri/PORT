@@ -62,7 +62,7 @@ export function TextBubble({ msg, highlight, orgDisplayName }: { msg: MessageWit
             borderRadius: "var(--radius-lg)",
             fontSize: 14,
             lineHeight: 1.55,
-            whiteSpace: "pre-wrap",
+            whiteSpace: "pre-wrap", overflowWrap: "anywhere",
           }}
         >
           {msg.body}
@@ -204,7 +204,7 @@ export function NoticeBubble({ msg }: { msg: MessageWithExtras }) {
           alignItems: "flex-start",
           gap: 6,
           fontSize: 11.5,
-          whiteSpace: "pre-wrap",
+          whiteSpace: "pre-wrap", overflowWrap: "anywhere",
           color: "var(--color-neutral-500)",
           padding: "6px 10px",
           borderRadius: "var(--radius-md)",
@@ -239,7 +239,7 @@ export function MenuPickBubble({ msg }: { msg: MessageWithExtras }) {
             ))}
           </div>
         )}
-        {p.note && <div style={{ fontSize: 12, lineHeight: 1.55, whiteSpace: "pre-wrap", paddingTop: 7, borderTop: "1px solid color-mix(in srgb, var(--color-bubble-self-text) 25%, transparent)" }}>{p.note}</div>}
+        {p.note && <div style={{ fontSize: 12, lineHeight: 1.55, whiteSpace: "pre-wrap", overflowWrap: "anywhere", paddingTop: 7, borderTop: "1px solid color-mix(in srgb, var(--color-bubble-self-text) 25%, transparent)" }}>{p.note}</div>}
       </div>
       <Meta isSelf time={timeLabel(msg.sent_at)} />
     </div>
@@ -330,7 +330,7 @@ export function RequestCard({
           <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 17, lineHeight: 1.2, marginTop: 2 }}>
             {payload.title ?? r.title}
           </div>
-          {payload.note && <p style={{ margin: "6px 0 0", fontSize: 13, opacity: 0.8, whiteSpace: "pre-wrap" }}>{payload.note}</p>}
+          {payload.note && <p style={{ margin: "6px 0 0", fontSize: 13, opacity: 0.8, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{payload.note}</p>}
           {items.length > 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 10, paddingTop: 9, borderTop: "1px solid var(--color-divider)" }}>
               {items.map((it) => (
@@ -678,7 +678,7 @@ export function IntakeCard({ msg, answered }: { msg: MessageWithExtras; answered
       <div style={{ width: "min(300px, 100%)", display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)", boxShadow: "var(--shadow-sm)" }}>
         <span style={kicker}>確認事項</span>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, lineHeight: 1.3 }}>{p.formLabel}</div>
-        {p.note && <p style={{ margin: 0, fontSize: 12.5, opacity: 0.8, whiteSpace: "pre-wrap" }}>{p.note}</p>}
+        {p.note && <p style={{ margin: 0, fontSize: 12.5, opacity: 0.8, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{p.note}</p>}
 
         {!submitted && !answered ? (
           <>

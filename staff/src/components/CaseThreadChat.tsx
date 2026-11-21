@@ -153,7 +153,7 @@ export default function CaseThreadChat({
                     borderRadius: "var(--radius-md)",
                     fontSize: 13,
                     lineHeight: 1.5,
-                    whiteSpace: "pre-wrap",
+                    whiteSpace: "pre-wrap", overflowWrap: "anywhere",
                     background: isOwn ? "var(--color-bubble-self-bg)" : "var(--color-bubble-other-bg)",
                     color: isOwn ? "var(--color-bubble-self-text)" : "var(--color-bubble-other-text)",
                     border: isOwn ? "none" : "1px solid var(--color-divider)",

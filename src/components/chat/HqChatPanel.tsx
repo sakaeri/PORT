@@ -18,7 +18,7 @@ const bubbleBase: React.CSSProperties = {
   borderRadius: "var(--radius-md)",
   fontSize: 12.5,
   lineHeight: 1.5,
-  whiteSpace: "pre-wrap",
+  whiteSpace: "pre-wrap", overflowWrap: "anywhere",
 };
 
 // 担当マネージャーには見えない、本部との直接のやり取り。マイページから

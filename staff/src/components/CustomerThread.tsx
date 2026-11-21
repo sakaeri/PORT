@@ -497,7 +497,7 @@ function QuoteBubble({ msg }: { msg: Message }) {
         )}
       </div>
       <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: headingWeight, lineHeight: 1.3 }}>{p.title}</div>
-      {p.note && <div style={{ fontSize: 12, color: "var(--color-neutral-500)", whiteSpace: "pre-wrap" }}>{p.note}</div>}
+      {p.note && <div style={{ fontSize: 12, color: "var(--color-neutral-500)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{p.note}</div>}
       {msg.requestAmount != null && <div style={{ fontSize: 17, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{msg.requestAmount.toLocaleString("ja-JP")}</div>}
       {p.due && <div style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>{p.dueDate ? `完了予定：${p.due}` : `対応の目安：${p.due}`}</div>}
       {p.payDeadline && <div style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>支払い期限：{p.payDeadline}</div>}
@@ -534,7 +534,7 @@ function MenuPickBubble({ msg }: { msg: Message }) {
           ))}
         </div>
       )}
-      {p.note && <div style={{ fontSize: 12.5, whiteSpace: "pre-wrap", paddingTop: 6, borderTop: p.rows?.length ? "none" : "1px solid var(--color-divider)" }}>{p.note}</div>}
+      {p.note && <div style={{ fontSize: 12.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere", paddingTop: 6, borderTop: p.rows?.length ? "none" : "1px solid var(--color-divider)" }}>{p.note}</div>}
     </div>
   );
 }
@@ -956,7 +956,7 @@ export default function CustomerThread({
                     borderRadius: "var(--radius-lg)",
                     fontSize: 13.5,
                     lineHeight: 1.5,
-                    whiteSpace: "pre-wrap",
+                    whiteSpace: "pre-wrap", overflowWrap: "anywhere",
                     background: isStaff ? "var(--color-bubble-self-bg)" : "var(--color-bubble-other-bg)",
                     color: isStaff ? "var(--color-bubble-self-text)" : "var(--color-bubble-other-text)",
                     border: isStaff ? "none" : "1px solid var(--color-divider)",
