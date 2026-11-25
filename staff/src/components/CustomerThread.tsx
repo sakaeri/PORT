@@ -867,7 +867,7 @@ export default function CustomerThread({
         </button>
         {thread && departments.length > 0 && (
           <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 11, color: "var(--color-neutral-400)" }}>担当秘書</span>
+            <span style={{ fontSize: 11, color: "var(--color-neutral-400)" }}>担当者</span>
             <ThreadDepartmentControl threadId={thread.id} departments={departments} initialDepartmentId={thread.departmentId} viewerIsOwner={viewerIsOwner} />
           </div>
         )}
@@ -885,7 +885,7 @@ export default function CustomerThread({
       {labelOpen && (
         <div style={{ margin: "14px 20px 0", display: "flex", flexDirection: "column", gap: 6, padding: 10, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
           <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>
-            本部・秘書が社内向けに付ける呼び方です。依頼主本人が登録した名前とは別に持てます（未入力に戻すと本人の登録名を表示します）。
+            本部・担当者が社内向けに付ける呼び方です。依頼主本人が登録した名前とは別に持てます（未入力に戻すと本人の登録名を表示します）。
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <input
@@ -1332,7 +1332,7 @@ function ThreadDepartmentControl({
       value={departmentId}
       onChange={(e) => change(e.target.value)}
       disabled={saving}
-      aria-label="担当秘書"
+      aria-label="担当者"
       className="vid-input"
       style={{
         flex: "none",

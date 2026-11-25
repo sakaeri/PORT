@@ -3,9 +3,9 @@ import type { MetadataRoute } from "next";
 // ホーム画面に追加したとき、アドレスバーのない全画面でアプリのように開くための設定。
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "中央秘書事務所",
-    short_name: "中央秘書 窓口",
-    description: "秘書とのやり取り画面",
+    name: "PORT",
+    short_name: "PORT",
+    description: "お問い合わせのやり取り画面",
     start_url: "/",
     display: "standalone",
     background_color: "#16281f",

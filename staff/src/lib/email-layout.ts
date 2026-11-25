@@ -39,7 +39,7 @@ export function renderEmail({
   ${button}
   <p style="font-size: 12px; line-height: 1.7; color: #9a9a9a; margin: 0;">
     このメールは送信専用です。ご用件はトーク画面からお送りください。<br>
-    ちょっとした頼みごとも、まずはこちらから。${org}
+    ${org}
   </p>
 </div>`;
 }

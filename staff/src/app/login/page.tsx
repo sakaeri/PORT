@@ -49,7 +49,7 @@ export default function LoginPage() {
           boxShadow: "var(--shadow-lg)",
         }}
       >
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>中央秘書事務所 本部</div>
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 20 }}>PORT 管理</div>
         {sentTo ? (
           <LoginCodeStep email={sentTo} onBack={() => setSentTo("")} />
         ) : (

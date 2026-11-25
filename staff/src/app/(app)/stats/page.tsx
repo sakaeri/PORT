@@ -64,7 +64,7 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
       {/* 見出しは左、月の切り替えは右端に置く。 */}
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22, whiteSpace: "nowrap" }}>売上・実績</div>
-        <InfoTooltip text="総売上・秘書への支払い・完了件数は、入金日ではなく完了報告を出した（完了した）月で集計しています。秘書への支払いは、窓口ごとの売上からロイヤリティを引いた額の合計です（ロイヤリティ未設定の窓口は含みません）。チャージ金額は依頼主が実際にチャージした額、紹介登録はその月に付けた紹介特典です。行をタップするとその案件トークに移動します。" />
+        <InfoTooltip text="総売上・担当者への支払い・完了件数は、入金日ではなく完了報告を出した（完了した）月で集計しています。担当者への支払いは、窓口ごとの売上からロイヤリティを引いた額の合計です（ロイヤリティ未設定の窓口は含みません）。チャージ金額は依頼主が実際にチャージした額、紹介登録はその月に付けた紹介特典です。行をタップするとその案件トークに移動します。" />
         <div style={{ flex: 1 }} />
         {back < MAX_MONTHS_BACK ? (
           <Link href={`/stats?m=${monthKeyFromYM(prev.year, prev.month)}`} aria-label="前の月" style={monthNav}>
@@ -249,7 +249,7 @@ async function OrgStats({
         <StatTile label="完了件数" value={`${grandMonthCompleted}件`} />
         <StatTile label="チャージ金額" value={yen(monthCharges)} />
         <StatTile label="紹介登録" value={`${monthReferrals}人`} sub={monthReferrals > 0 ? yen(monthReferrals * REFERRAL_CREDIT) : undefined} />
-        <StatTile label="秘書への支払い" value={yen(grandPayout)} />
+        <StatTile label="担当者への支払い" value={yen(grandPayout)} />
         <StatTile label="評価" value={grandRatingCount > 0 ? `★${grandRatingAvg?.toFixed(1)}` : "なし"} sub={grandRatingCount > 0 ? `${grandRatingCount}件` : undefined} />
       </div>
 

@@ -6,7 +6,6 @@ import { errorMessage } from "@/lib/errors";
 import { headingWeight } from "@/lib/style";
 import { submitFirstInquiry, requestMagicLink, verifyLoginCode } from "@/app/actions";
 import { savePendingInquiry } from "@/lib/pending-inquiry";
-import GateInfo from "@/components/chat/GateInfo";
 import InfoTooltip from "@/components/chat/InfoTooltip";
 
 const input: React.CSSProperties = {
@@ -25,12 +24,15 @@ const input: React.CSSProperties = {
 const heading: React.CSSProperties = { fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 16, textAlign: "center" };
 
 // 入口の画面。VerifyGate（見えないCAPTCHA＋匿名セッション開始）の直後に必ず経由する。
+// 新しいお問い合わせを受けるのは窓口（/teera など）だけ。トップ（窓口ではない）は
+// ご利用中の方のログインだけを出す（以前の秘書サービスの紹介・相談フォームはやめた）。
 // 「登録」ではなく「まずは相談してみる」（窓口では「お問い合わせ」）のフォームにして、
 // 身構えずに送れるようにしている。送るとその場でトークに届き、画面はトークに切り替わる
 // （page.tsx が ctx.pendingEmail を見て出し分ける）。登録済みの人は「ログイン」から。
 export default function AccountGate({ orgDisplayName, isDesk, initialError }: { orgDisplayName: string; isDesk?: boolean; initialError?: string }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"new" | "existing">("new");
+  const loginOnly = !isDesk;
+  const [mode, setMode] = useState<"new" | "existing">(loginOnly ? "existing" : "new");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -41,7 +43,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
 
   async function submitNew() {
     if (!name.trim() || !email.trim() || !body.trim()) {
-      setError(isDesk ? "お名前・メールアドレス・お問い合わせ内容をご入力ください" : "お名前・メールアドレス・ご相談内容をご入力ください");
+      setError("お名前・メールアドレス・お問い合わせ内容をご入力ください");
       return;
     }
     setSending(true);
@@ -131,16 +133,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
           {/* eslint-disable-next-line @next/next/no-img-element -- 固定サイズの静的アセットのため plain img */}
           <img src="/logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 21, textAlign: "center", marginBottom: isDesk ? 10 : 0 }}>{orgDisplayName}</div>
-        {/* 秘書サービスの案内文なので、問い合わせ窓口では出さない。 */}
-        {!isDesk && (
-          <div style={{ fontSize: 13, lineHeight: 1.7, textAlign: "center", color: "var(--color-neutral-400)", marginBottom: 10 }}>
-            ちょっとした頼みごとも、まずはこちらから。
-            <br />
-            単発から定期まで柔軟に対応いたします。
-          </div>
-        )}
-        {!isDesk && <GateInfo />}
+        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 21, textAlign: "center", marginBottom: 10 }}>{orgDisplayName}</div>
 
         <div
           style={{
@@ -198,13 +191,13 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                   アドレスを直す・もう一度送る
                 </button>
                 <InfoTooltip
-                  text={`メールが届かないときは、迷惑メールのフォルダもご確認ください。ご登録のないアドレスには届きません。はじめての方は「${isDesk ? "お問い合わせ" : "まずは相談してみる"}」からお送りください。確認コードは届いてから15分間有効です。`}
+                  text={`メールが届かないときは、迷惑メールのフォルダもご確認ください。ご登録のないアドレスには届きません。${loginOnly ? "" : "はじめての方は「お問い合わせ」からお送りください。"}確認コードは届いてから15分間有効です。`}
                 />
                 </div>
               </>
             ) : (
               <>
-                <div style={heading}>{mode === "existing" ? "ログイン" : isDesk ? "お問い合わせ" : "まずは相談してみる"}</div>
+                <div style={heading}>{mode === "existing" ? "ログイン" : "お問い合わせ"}</div>
                 {mode === "new" ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <input value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前" className="vid-input" style={input} />
@@ -212,7 +205,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                     <textarea
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
-                      placeholder={isDesk ? "お問い合わせ内容" : "ご相談内容（ざっくりで大丈夫です）"}
+                      placeholder="お問い合わせ内容"
                       rows={4}
                       maxLength={4000}
                       className="vid-input"
@@ -224,7 +217,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                       disabled={sending}
                       style={{ height: 40, cursor: sending ? "wait" : "pointer", fontSize: 13.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: sending ? 0.6 : 1 }}
                     >
-                      {sending ? "送信中…" : isDesk ? "送信する" : "相談する"}
+                      {sending ? "送信中…" : "送信する"}
                     </button>
                     <div style={{ fontSize: 11, lineHeight: 1.6, textAlign: "center", color: "var(--color-neutral-500)" }}>
                       送信すると
@@ -258,7 +251,7 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
         </div>
 
         {/* 相談フォームとは別物に見えるよう、ログインはカードの外に置く。 */}
-        {!sentTo && (
+        {!sentTo && !loginOnly && (
           <button
             onClick={() => {
               setMode(mode === "new" ? "existing" : "new");
@@ -266,13 +259,8 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
             }}
             style={{ width: "100%", height: 40, marginTop: 4, cursor: "pointer", fontSize: 13, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent-800)", borderRadius: "var(--radius-md)" }}
           >
-            {mode === "new" ? "ご利用中の方はこちら（ログイン）" : isDesk ? "お問い合わせに戻る" : "相談フォームに戻る"}
+            {mode === "new" ? "ご利用中の方はこちら（ログイン）" : "お問い合わせに戻る"}
           </button>
-        )}
-        {!isDesk && (
-          <a href="/legal" target="_blank" rel="noreferrer" style={{ alignSelf: "center", fontSize: 11, color: "var(--color-neutral-500)" }}>
-            特定商取引法に基づく表記
-          </a>
         )}
       </div>
     </main>

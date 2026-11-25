@@ -39,7 +39,7 @@ const senderStyle: React.CSSProperties = { fontSize: 10.5, whiteSpace: "nowrap",
 function Meta({ isSelf, time, senderName, orgDisplayName }: { isSelf: boolean; time: string; senderName?: string | null; orgDisplayName?: string }) {
   return (
     <div style={{ ...senderRow, alignSelf: isSelf ? "flex-end" : "flex-start" }}>
-      {!isSelf && <span style={senderStyle}>{senderName ? `秘書：${senderName}` : (orgDisplayName ?? "秘書")} ・</span>}
+      {!isSelf && <span style={senderStyle}>{senderName ? `担当：${senderName}` : (orgDisplayName ?? "担当者")} ・</span>}
       <span style={timeStyle}>{time}</span>
     </div>
   );
@@ -492,7 +492,7 @@ export function RequestCard({
             <p style={{ margin: "10px 0 0", paddingTop: 8, borderTop: "1px solid var(--color-divider)", fontSize: 12.5, opacity: 0.75 }}>
               このたびもご依頼いただきありがとうございました。ご不明な点や修正のご希望があれば、このまま返信ください。またのご依頼をお待ちしております。
             </p>
-            <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-neutral-500)" }}>秘書</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-neutral-500)" }}>担当者</div>
 
             <ReportFollowups request={r} rating={rating} onSubmitRating={onSubmitRating} onSkipRating={onSkipRating} />
           </div>
@@ -611,7 +611,7 @@ export function ReportFollowups({
         {recurringRequested ? (
           <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
             <CheckCircle weight="fill" size={14} color="var(--color-neutral-500)" style={{ flex: "none", marginTop: 1 }} />
-            <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>お伝えしました。秘書から改めてご連絡します。</span>
+            <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>お伝えしました。担当者から改めてご連絡します。</span>
           </div>
         ) : (
           <>

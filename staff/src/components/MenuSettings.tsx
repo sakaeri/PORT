@@ -473,7 +473,7 @@ function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initial
       {/* スマホでは見出しが縦に潰れないよう、ボタンは次の行に回す。 */}
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>受付メニュー</div>
-        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの秘書が対応するかは、依頼主の画面の「担当秘書」で割り当てます。編集は本部だけができます" />
+        <InfoTooltip text="依頼主が相談するときに選ぶ一覧です。金額・はじめの質問をここで決めます（金額は依頼主には表示されません）。金額を空欄にすると『相談のみ』の項目になり、見積もり作成時の選択肢には出てきません。どの担当者が対応するかは、依頼主の画面の「担当者」で割り当てます。編集は本部だけができます" />
         <div style={{ flex: 1 }} />
         {canEdit && (
           <button onClick={handleAdd} style={smallBtn}>

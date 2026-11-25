@@ -149,13 +149,14 @@ export async function notifyCustomerNewMessage(admin: Admin, threadId: string) {
     const to = await getCustomerEmail(admin, thread.customer_id);
     if (!to) return;
     if (desk) {
+      // 件名は「【PORT】株式会社〇〇受付へのお問い合わせにお返事が届いています」の形。
       await sendEmail(
         to.email,
-        `${desk.name}からお返事が届いています`,
+        emailSubject("PORT", `${desk.name}へのお問い合わせにお返事が届いています`),
         renderEmail({
-          orgName: `${desk.name} お問い合わせ窓口`,
+          orgName: "PORT",
           heading: "お返事が届いています",
-          lines: ["お問い合わせありがとうございます。", "チャットにお返事をお送りしましたので、お手すきのときにご覧くださいね。"],
+          lines: [`${desk.name}へのお問い合わせありがとうございます。`, "チャットにお返事をお送りしましたので、お手すきのときにご覧くださいね。"],
           url: to.link(`/${desk.slug}`),
           buttonLabel: "チャットを見る",
         }),

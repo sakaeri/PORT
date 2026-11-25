@@ -29,5 +29,5 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
 export async function generateMetadata() {
   const ctx = await getStaffContext();
-  return { title: ctx ? `${ctx.orgDisplayName} 本部` : "中央秘書事務所 本部" };
+  return { title: ctx ? `${ctx.orgDisplayName} 管理` : "PORT 管理" };
 }

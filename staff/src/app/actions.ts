@@ -37,7 +37,7 @@ async function requireContext() {
 // 削除は案件自体の完全削除につながるため）。
 function requireDeletePermission(ctx: { role: string }) {
   if (ctx.role === "dept_leader") {
-    throw new Error("削除はスタッフには許可されていません。本部メンバーまたは秘書にご依頼ください。");
+    throw new Error("削除はスタッフには許可されていません。本部メンバーまたは担当者にご依頼ください。");
   }
 }
 
@@ -799,7 +799,7 @@ async function submitCaseReportInner(
 
   // 確認待ちの報告があるのに出し直すと、報告も添付も二重になる。
   const { data: pending } = await supabase.from("completion_reports").select("id").eq("request_id", requestId).is("sent_at", null).limit(1);
-  if (pending?.length) throw new Error("確認待ちの完了報告があります。秘書・本部の確認をお待ちください。");
+  if (pending?.length) throw new Error("確認待ちの完了報告があります。担当者・本部の確認をお待ちください。");
 
   if (attachments.length > 0) {
     const { error: attError } = await supabase.from("completion_report_attachments").insert(
@@ -821,7 +821,7 @@ async function submitCaseReportInner(
   if (reportError) throw reportError;
 
   if (!canSendDirectly) {
-    await postCaseNotice(supabase, requestId, "完了報告を提出しました（秘書の確認待ち）");
+    await postCaseNotice(supabase, requestId, "完了報告を提出しました（担当者の確認待ち）");
     return;
   }
 
@@ -853,7 +853,7 @@ export async function approveCaseReport(...args: Parameters<typeof approveCaseRe
 
 async function approveCaseReportInner(requestId: string) {
   const ctx = await requireContext();
-  if (ctx.role !== "owner" && ctx.role !== "dept_manager") throw new Error("この操作は本部メンバー・秘書のみ行えます");
+  if (ctx.role !== "owner" && ctx.role !== "dept_manager") throw new Error("この操作は本部メンバー・担当者のみ行えます");
   const supabase = await createClient();
 
   const { data: request } = await supabase.from("requests").select("id, phase, customer_id").eq("id", requestId).eq("org_id", ctx.orgId).maybeSingle();
@@ -1053,7 +1053,7 @@ async function requireHqPrivileged() {
 async function requireManagerOrAbove() {
   const ctx = await requireContext();
   if (ctx.role !== "owner" && ctx.role !== "dept_manager") {
-    throw new Error("この操作は秘書以上のみ行えます");
+    throw new Error("この操作は担当者以上のみ行えます");
   }
   return ctx;
 }
@@ -1101,7 +1101,7 @@ async function ensureManagerDepartment(admin: ReturnType<typeof createServiceRol
     const existing = await departmentIdsOf(admin, profileId);
     if (existing.length > 0) return existing;
   }
-  const { data, error } = await admin.from("departments").insert({ org_id: orgId, name: `秘書：${alias}` }).select("id").single();
+  const { data, error } = await admin.from("departments").insert({ org_id: orgId, name: `担当：${alias}` }).select("id").single();
   if (error || !data) throw error ?? new Error("窓口を作成できませんでした");
   return [data.id as string];
 }
@@ -1339,7 +1339,7 @@ export async function removeMyAvatar() {
 }
 
 // ============================================================
-// 問い合わせ窓口（TeeRA など、中央秘書が一時的に引き受けるお問い合わせの入口）。
+// 問い合わせ窓口（TeeRA など、他社サービスのお問い合わせの入口）。
 // 名前だけで作れて、URL（/teera）は自動でできる。窓口ごとに担当秘書を決めると、
 // その窓口から来たトークはその秘書の担当になる（未設定なら本部）。
 // 止めるときは受付をオフにするだけ（削除はしない）。本部のみ。
@@ -1431,7 +1431,7 @@ export async function setInquiryDeskSecretary(deskId: string, departmentId: stri
   if (!desk) throw new Error("窓口が見つかりません");
   if (departmentId) {
     const { data: dept } = await admin.from("departments").select("id").eq("id", departmentId).eq("org_id", ctx.orgId).maybeSingle();
-    if (!dept) throw new Error("担当秘書が見つかりません");
+    if (!dept) throw new Error("担当者が見つかりません");
   }
   const { error } = await admin.from("inquiry_desks").update({ department_id: departmentId }).eq("id", deskId);
   if (error) throw error;
