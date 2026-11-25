@@ -5,7 +5,7 @@ import type { AppRole, StaffRole } from "@/lib/supabase/types";
 // 作業する役割）。
 export const ROLE_LABEL: Record<StaffRole, string> = {
   owner: "本部メンバー",
-  dept_manager: "秘書",
+  dept_manager: "担当者",
   dept_leader: "スタッフ",
 };
 export const INVITE_ROLES: StaffRole[] = ["dept_manager", "dept_leader"];

@@ -253,7 +253,7 @@ export default function CaseDetail({
 
         {request.phase === "started" && report?.pending && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)" }}>
-            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{canApprove ? "スタッフが提出した完了報告（未送信）" : "完了報告を提出しました。秘書の確認をお待ちください。"}</div>
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{canApprove ? "スタッフが提出した完了報告（未送信）" : "完了報告を提出しました。担当者の確認をお待ちください。"}</div>
             <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{report.summary}</div>
             {report.details.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -530,8 +530,8 @@ function CompletionReportForm({
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {!canSendDirectly && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
-          秘書・本部の確認後に依頼主へ送られます
-          <InfoTooltip text="提出すると秘書・本部メンバーの確認待ちになります。承認されるまで依頼主には送られません。" />
+          担当者・本部の確認後に依頼主へ送られます
+          <InfoTooltip text="提出すると担当者・本部メンバーの確認待ちになります。承認されるまで依頼主には送られません。" />
         </div>
       )}
       <textarea

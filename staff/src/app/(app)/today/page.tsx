@@ -159,7 +159,7 @@ export default async function TodayPage() {
       </section>
 
       <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={sectionHeader}>秘書の確認待ちの完了報告</div>
+        <div style={sectionHeader}>担当者の確認待ちの完了報告</div>
         {pendingReports.length === 0 ? (
           <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ありません。</div>
         ) : (

@@ -9,7 +9,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // customer's data to the org they're actually visiting, even if the same
 // login is also a customer of other orgs.
 //
-// 事業所は中央秘書事務所の1つだけ（org_id_by_domain が既定の事業所を返す）。
+// 事業所は1つだけ（org_id_by_domain が既定の事業所を返す）。
 // 先頭のパス（/teera など）が問い合わせ窓口の合言葉なら、"/" に内部で
 // 書き換えて窓口として表示する。
 // アプリ自身のページ。窓口の合言葉としては使えない。

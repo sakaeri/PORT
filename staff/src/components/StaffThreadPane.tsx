@@ -352,7 +352,7 @@ function StaffEditPanel({
         )}
         {isDeptScoped(role) && (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={editLabel}>担当秘書（複数選択可・未設定も可）</span>
+            <span style={editLabel}>担当者（複数選択可・未設定も可）</span>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 320, maxHeight: 92, overflowY: "auto", paddingRight: 2 }}>
               {editable.departments.map((d) => {
                 const on = departmentIds.includes(d.id);

@@ -99,7 +99,7 @@ export default function HqFeedbackChat({ threadId, orgId, currentUserId }: { thr
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ fontSize: 10.5, color: "var(--color-neutral-600)", lineHeight: 1.6 }}>
-        依頼主から本部への直接のやり取りです（担当秘書には見えません）。
+        依頼主から本部への直接のやり取りです（担当者には見えません）。
       </div>
       <div ref={scrollRef} style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
         {error && <div style={{ fontSize: 12, color: "var(--color-accent-200)" }}>{error}</div>}

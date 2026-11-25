@@ -14,7 +14,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     Promise.all([
       badge,
-      self.registration.showNotification(data.title || "中央秘書事務所", {
+      self.registration.showNotification(data.title || "PORT", {
         body: data.body || "",
         icon: "/icon-192.png",
         badge: "/icon-192.png",
