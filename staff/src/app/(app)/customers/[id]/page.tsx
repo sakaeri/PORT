@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import CustomerThread, { MESSAGE_PAGE_SIZE, type ThreadMessage } from "@/components/CustomerThread";
 
@@ -55,7 +55,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, name, staff_label, member_no, balance, desk_id, referral_source_id, referral_granted_at")
+      .select("id, name, staff_label, member_no, balance, desk_id, referral_source_id, referral_granted_at, profile_id")
       .eq("id", id)
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
@@ -125,6 +125,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     initialMessages = mapMessageRows(rows.slice().reverse());
   }
 
+  // 依頼主のメールアドレス（情報パネルに出す。こちらの通知メールが迷惑メールに入って気づかれないとき、
+  // ふだんのメールから直接連絡できるように）。確認前のアドレス（new_email）でも出す。
+  let customerEmail: string | null = null;
+  if (customer.profile_id) {
+    const { data: u } = await createServiceRoleClient().auth.admin.getUserById(customer.profile_id);
+    customerEmail = u.user?.email || u.user?.new_email || null;
+  }
+
   // このトークのやること（未完了だけ。情報パネルに出す）。
   const todos = thread ? ((await supabase.from("todos").select("id, title, due_date, done_at").eq("thread_id", thread.id).is("done_at", null).order("due_date", { ascending: true })).data ?? []) : [];
 
@@ -145,6 +153,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       menus={menus}
       memos={memos}
       todos={todos}
+      customerEmail={customerEmail}
       ratings={ratings}
       latestRequest={latestRequest}
       canSeeHqFeedback={canSeeHqFeedback}
