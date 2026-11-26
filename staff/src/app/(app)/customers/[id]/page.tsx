@@ -125,6 +125,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     initialMessages = mapMessageRows(rows.slice().reverse());
   }
 
+  // このトークのやること（未完了だけ。情報パネルに出す）。
+  const todos = thread ? ((await supabase.from("todos").select("id, title, due_date, done_at").eq("thread_id", thread.id).is("done_at", null).order("due_date", { ascending: true })).data ?? []) : [];
+
   // 問い合わせ窓口（TeeRA など）のトークなら、その窓口名を出して、残高・見積もりなどは出さない。
   const deskName = customer.desk_id ? ((await supabase.from("inquiry_desks").select("name").eq("id", customer.desk_id).maybeSingle()).data?.name ?? "窓口") : null;
 
@@ -141,6 +144,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       templates={templates}
       menus={menus}
       memos={memos}
+      todos={todos}
       ratings={ratings}
       latestRequest={latestRequest}
       canSeeHqFeedback={canSeeHqFeedback}

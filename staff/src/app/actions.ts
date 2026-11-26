@@ -1129,10 +1129,11 @@ async function cleanupOrphanedDepartments(admin: ReturnType<typeof createService
 export async function createStaffInvite() {
   const ctx = await requireManagerOrAbove();
   const admin = createServiceRoleClient();
-  const departmentIds = ctx.role === "dept_manager" ? await departmentIdsOf(admin, ctx.userId) : [];
+  // 窓口だけの運用にしたので、招待した人は「担当者」（自分の担当窓口のトークを受け持つ）として参加する。
+  // 担当の窓口（department）は参加したときに自動で作る。
   const { data, error } = await admin
     .from("staff_invites")
-    .insert({ org_id: ctx.orgId, role: "dept_leader", department_ids: departmentIds, created_by: ctx.userId })
+    .insert({ org_id: ctx.orgId, role: "dept_manager", department_ids: [], created_by: ctx.userId })
     .select("id")
     .single();
   if (error || !data) throw error ?? new Error("招待リンクを作成できませんでした");
@@ -1203,8 +1204,15 @@ async function acceptStaffInviteInner(inviteId: string, fields: { email: string;
     throw profileErr;
   }
 
-  if (invite.department_ids.length > 0) {
-    await admin.from("staff_departments").insert(invite.department_ids.map((department_id: string) => ({ profile_id: userRes.user.id, department_id })));
+  // 担当者として参加した人には、その人の担当（department）をここで作ってつなぐ。
+  let departmentIds: string[] = invite.department_ids;
+  if (invite.role === "dept_manager") {
+    const alias = fields.displayName.trim() || fields.email.trim();
+    await admin.from("profiles").update({ staff_alias: alias }).eq("id", userRes.user.id);
+    departmentIds = await ensureManagerDepartment(admin, invite.org_id, userRes.user.id, alias, false);
+  }
+  if (departmentIds.length > 0) {
+    await admin.from("staff_departments").insert(departmentIds.map((department_id: string) => ({ profile_id: userRes.user.id, department_id })));
   }
   await admin.from("staff_invites").update({ used_by: userRes.user.id }).eq("id", inviteId);
   // そのままログイン用のメールを送る（失敗しても登録は済んでいるので、次の画面の「もう一度送る」で送り直せる）。
@@ -1506,4 +1514,43 @@ async function savePushSubscriptionInner(sub: { endpoint: string; p256dh: string
   const admin = createServiceRoleClient();
   const { error } = await admin.from("push_subscriptions").upsert({ user_id: ctx.userId, endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, { onConflict: "endpoint" });
   if (error) throw error;
+}
+
+// ============================================================
+// やること（トークから手で入れて、「今日やること」に並べる）
+// ============================================================
+
+export async function addTodo(threadId: string, title: string, dueDate: string) {
+  return toResult("addTodo", async () => {
+    const ctx = await requireContext();
+    const trimmed = title.trim();
+    if (!trimmed) throw new Error("やることを入力してください");
+    if (!isDueDate(dueDate)) throw new Error("日付を選んでください");
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("todos")
+      .insert({ org_id: ctx.orgId, thread_id: threadId, title: trimmed, due_date: dueDate, created_by: ctx.userId })
+      .select("id, title, due_date, done_at")
+      .single();
+    if (error) throw error;
+    return data;
+  });
+}
+
+export async function setTodoDone(id: string, done: boolean) {
+  return toResult("setTodoDone", async () => {
+    await requireContext();
+    const supabase = await createClient();
+    const { error } = await supabase.from("todos").update({ done_at: done ? new Date().toISOString() : null }).eq("id", id);
+    if (error) throw error;
+  });
+}
+
+export async function deleteTodo(id: string) {
+  return toResult("deleteTodo", async () => {
+    await requireContext();
+    const supabase = await createClient();
+    const { error } = await supabase.from("todos").delete().eq("id", id);
+    if (error) throw error;
+  });
 }

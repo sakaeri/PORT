@@ -8,7 +8,8 @@ export const ROLE_LABEL: Record<StaffRole, string> = {
   dept_manager: "担当者",
   dept_leader: "スタッフ",
 };
-export const INVITE_ROLES: StaffRole[] = ["dept_manager", "dept_leader"];
+// 窓口だけの運用にしたので、選べる役職は「本部メンバー」「担当者」の2つ（スタッフは前からの人だけ）。
+export const INVITE_ROLES: StaffRole[] = ["dept_manager"];
 // マネージャーの窓口は昇格時に自動でできるので選択肢に出さない。
 // スタッフの窓口は「どのマネージャーに割り当てられているか」を表す
 // タグ（任意・未設定可）で、ここだけ選べるようにする。

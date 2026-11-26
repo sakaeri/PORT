@@ -47,7 +47,7 @@ import { headingWeight } from "@/lib/style";
 import { useIsMobile } from "@/lib/useIsMobile";
 import InfoTooltip from "@/components/InfoTooltip";
 import InquiryDesksCard from "@/components/InquiryDesksCard";
-import ReferralSourcesCard, { type ReferralSourceWithCustomers } from "@/components/ReferralSourcesCard";
+import type { ReferralSourceWithCustomers } from "@/components/ReferralSourcesCard";
 import type { InquiryDesk } from "@/app/actions";
 import Modal from "@/components/Modal";
 import {
@@ -266,11 +266,9 @@ const smallBtn: React.CSSProperties = {
 
 export default function MenuSettings({
   orgId,
-  initialMenus,
   initialTemplates,
   initialTermsContent,
   initialDesks,
-  initialReferralSources,
   departments,
   canEdit,
 }: {
@@ -285,12 +283,12 @@ export default function MenuSettings({
   // 本部以外のマネージャーには閲覧のみで見せる。返信テンプレは常に編集可。
   canEdit: boolean;
 }) {
-  const [tab, setTab] = useState<TabKey>("menu");
+  const [tab, setTab] = useState<TabKey>("templates");
   const isMobile = useIsMobile();
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 20, maxWidth: 900, width: "100%", margin: "0 auto" }}>
-      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>メニュー管理</div>
+      <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>窓口設定</div>
 
       {isMobile ? (
         <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--color-divider)", paddingBottom: 2 }}>
@@ -352,25 +350,24 @@ export default function MenuSettings({
       )}
 
       {/* タブを切り替えても中身を作り直さない（作り直すと、最初に読み込んだ時点の内容に戻って見えてしまう） */}
-      <div hidden={tab !== "menu"}><MenuListCard orgId={orgId} initialMenus={initialMenus} canEdit={canEdit} /></div>
       <div hidden={tab !== "templates"}><TemplatesCard orgId={orgId} initialTemplates={initialTemplates} canDelete={canEdit} /></div>
       <div hidden={tab !== "terms"}><TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} /></div>
       <div hidden={tab !== "desks"}><InquiryDesksCard initialDesks={initialDesks} departments={departments} canEdit={canEdit} /></div>
-      <div hidden={tab !== "referrals"}><ReferralSourcesCard initialSources={initialReferralSources} canEdit={canEdit} /></div>
     </div>
   );
 }
 
-type TabKey = "menu" | "templates" | "terms" | "desks" | "referrals";
+// 受付メニュー・紹介元は窓口だけの運用では使わないので出さない（データは残っている）。
+type TabKey = "templates" | "desks" | "terms";
 
 const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
-  { key: "menu", label: "受付メニュー", mobileLabel: "メニュー" },
   { key: "templates", label: "返信テンプレ", mobileLabel: "テンプレ" },
-  { key: "terms", label: "利用規約", mobileLabel: "規約" },
   { key: "desks", label: "問い合わせ窓口", mobileLabel: "窓口" },
-  { key: "referrals", label: "紹介元", mobileLabel: "紹介" },
+  { key: "terms", label: "利用規約", mobileLabel: "規約" },
 ];
 
+// 受付メニューの編集。窓口だけの運用にしたので今は画面に出していない（また使うときのために残す）。
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MenuListCard({ orgId, initialMenus, canEdit }: { orgId: string; initialMenus: Menu[]; canEdit: boolean }) {
   const [menus, setMenus] = useState(initialMenus);
   const [openId, setOpenId] = useState<string | null>(null);

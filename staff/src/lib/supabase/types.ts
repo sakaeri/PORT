@@ -535,6 +535,21 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["app_config"]["Row"]>;
         Relationships: [];
       };
+      todos: {
+        Row: {
+          id: string;
+          org_id: string;
+          thread_id: string;
+          title: string;
+          due_date: string;
+          done_at: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["todos"]["Row"]> & { org_id: string; thread_id: string; title: string };
+        Update: Partial<Database["public"]["Tables"]["todos"]["Row"]>;
+        Relationships: [{ foreignKeyName: "todos_thread_id_fkey"; columns: ["thread_id"]; isOneToOne: false; referencedRelation: "threads"; referencedColumns: ["id"] }];
+      };
       work_memos: {
         Row: {
           id: string;
