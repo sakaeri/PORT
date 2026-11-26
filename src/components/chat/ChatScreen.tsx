@@ -347,6 +347,7 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
   return (
     <div style={{ height: "100dvh", display: "flex", flexDirection: "column", background: "var(--color-bg)", fontFamily: "var(--font-body)", color: "var(--color-text)" }}>
       <PushBanner />
+      {ctx.pendingEmail && <SentNotice email={ctx.pendingEmail} deskName={ctx.desk?.name ?? null} threadId={ctx.threadId} />}
       <Header
         brandName={ctx.orgDisplayName}
         activeCount={activeCount}
@@ -452,6 +453,47 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
           isDesk
         />
       )}
+    </div>
+  );
+}
+
+// 入口のフォームから送った直後（メールアドレスの確認前）に出すお知らせ。お返事のお知らせメールが
+// 迷惑メールに入ったり、知らないアドレスとして見落とされたりしないよう、どこから届くかを伝える。
+// × で閉じたらこの端末では出さない。
+function SentNotice({ email, deskName, threadId }: { email: string; deskName: string | null; threadId: string }) {
+  const key = `vid_sent_notice_closed_${threadId}`;
+  // サーバーでの描画と食い違わないよう、最初は出しておき、閉じた記録は描画後に読む。
+  const [closed, setClosed] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from localStorage (outside React), not derived state
+      if (localStorage.getItem(key) === "1") setClosed(true);
+    } catch {
+      /* ignore */
+    }
+  }, [key]);
+  if (closed) return null;
+  return (
+    <div style={{ flex: "none", display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", background: "var(--color-accent-900)", color: "var(--color-accent-100)", fontSize: 12.5, lineHeight: 1.7 }}>
+      <div style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+        送信しました。{deskName ? `${deskName}からの` : ""}お返事は、このチャットと {email} あてのメールでお知らせします。
+        <br />
+        メールは「@port.s-stylegolf.com」から届きます。受信できるよう設定いただくか、届かないときは迷惑メールフォルダもご確認ください。
+      </div>
+      <button
+        onClick={() => {
+          setClosed(true);
+          try {
+            localStorage.setItem(key, "1");
+          } catch {
+            /* ignore */
+          }
+        }}
+        aria-label="閉じる"
+        style={{ flex: "none", padding: 2, cursor: "pointer", fontSize: 16, lineHeight: 1, color: "inherit", background: "transparent", border: "none" }}
+      >
+        ×
+      </button>
     </div>
   );
 }
