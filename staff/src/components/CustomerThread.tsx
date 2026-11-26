@@ -564,6 +564,7 @@ export default function CustomerThread({
   templates: initialTemplates,
   memos,
   todos: initialTodos,
+  customerEmail,
   deskName,
   initialHasMoreOlder,
   canDeleteTemplates,
@@ -582,6 +583,7 @@ export default function CustomerThread({
   menus: MenuOption[];
   memos: WorkMemo[];
   todos: TodoItem[];
+  customerEmail?: string | null;
   ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
   canSeeHqFeedback: boolean;
@@ -1070,6 +1072,7 @@ export default function CustomerThread({
               <X size={18} />
             </button>
           )}
+          {customerEmail && <CustomerEmail email={customerEmail} />}
           {thread && <ThreadTodos todos={todos} setTodos={setTodos} onAdd={() => setShowTodoAdd(true)} />}
           <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
         </div>
@@ -1151,3 +1154,33 @@ function ThreadDepartmentControl({
   );
 }
 
+
+// 依頼主のメールアドレス。こちらの通知メールが迷惑メールに入って気づかれないときに、
+// ふだんのメールから直接連絡できるように出す（タップでメール作成、コピーもできる）。
+function CustomerEmail({ email }: { email: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.05em", color: "var(--color-neutral-400)" }}>メールアドレス</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <a href={`mailto:${email}`} style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--color-accent)", overflowWrap: "anywhere" }}>
+          {email}
+        </a>
+        <button
+          onClick={() => {
+            navigator.clipboard
+              ?.writeText(email)
+              .then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              })
+              .catch(() => {});
+          }}
+          style={{ flex: "none", height: 26, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-neutral-400)", background: "transparent", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}
+        >
+          {copied ? "コピーしました" : "コピー"}
+        </button>
+      </div>
+    </div>
+  );
+}
