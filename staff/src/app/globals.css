@@ -241,3 +241,16 @@ button:disabled {
     font-size: 15px !important;
   }
 }
+
+/* iPhone の日付入力は、何もしないと中身の幅で広がり、ほかの入力欄と幅がそろわない。 */
+input[type="date"].vid-input {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+input[type="date"].vid-input::-webkit-date-and-time-value {
+  text-align: left;
+}

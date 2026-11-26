@@ -64,7 +64,6 @@ import {
   createReportFieldPreset,
   updateReportFieldPreset,
   deleteReportFieldPreset,
-  updateOrgTerms,
 } from "@/app/actions";
 import { errorMessage } from "@/lib/errors";
 
@@ -267,7 +266,6 @@ const smallBtn: React.CSSProperties = {
 export default function MenuSettings({
   orgId,
   initialTemplates,
-  initialTermsContent,
   initialDesks,
   departments,
   canEdit,
@@ -275,7 +273,6 @@ export default function MenuSettings({
   orgId: string;
   initialMenus: Menu[];
   initialTemplates: IntakeForm[];
-  initialTermsContent: string;
   initialDesks: InquiryDesk[];
   initialReferralSources: ReferralSourceWithCustomers[];
   departments: { id: string; name: string }[];
@@ -351,19 +348,17 @@ export default function MenuSettings({
 
       {/* タブを切り替えても中身を作り直さない（作り直すと、最初に読み込んだ時点の内容に戻って見えてしまう） */}
       <div hidden={tab !== "templates"}><TemplatesCard orgId={orgId} initialTemplates={initialTemplates} canDelete={canEdit} /></div>
-      <div hidden={tab !== "terms"}><TermsCard orgId={orgId} initialContent={initialTermsContent} canEdit={canEdit} /></div>
       <div hidden={tab !== "desks"}><InquiryDesksCard initialDesks={initialDesks} departments={departments} canEdit={canEdit} /></div>
     </div>
   );
 }
 
-// 受付メニュー・紹介元は窓口だけの運用では使わないので出さない（データは残っている）。
-type TabKey = "templates" | "desks" | "terms";
+// 受付メニュー・紹介元は窓口だけの運用では使わないので出さない（データは残っている）。利用規約はやめた。
+type TabKey = "templates" | "desks";
 
 const TABS: { key: TabKey; label: string; mobileLabel: string }[] = [
   { key: "templates", label: "返信テンプレ", mobileLabel: "テンプレ" },
   { key: "desks", label: "問い合わせ窓口", mobileLabel: "窓口" },
-  { key: "terms", label: "利用規約", mobileLabel: "規約" },
 ];
 
 // 受付メニューの編集。窓口だけの運用にしたので今は画面に出していない（また使うときのために残す）。
@@ -801,55 +796,6 @@ function TemplatesCard({ orgId, initialTemplates, canDelete }: { orgId: string; 
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function TermsCard({ orgId, initialContent, canEdit }: { orgId: string; initialContent: string; canEdit: boolean }) {
-  const [content, setContent] = useState(initialContent);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
-
-  async function save() {
-    if (saving) return;
-    setSaving(true);
-    setError("");
-    setSaved(false);
-    try {
-      await updateOrgTerms(orgId, content);
-      setSaved(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "保存できませんでした");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div style={listSection}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 15, whiteSpace: "nowrap" }}>利用規約</div>
-        <InfoTooltip text="依頼主が新規登録のときに同意する利用規約の本文です（/terms に表示されます）。ここで直すとすぐに反映されます。法的な内容は専門家に確認することをおすすめします。" />
-      </div>
-      {!canEdit && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>利用規約の編集は本部のみ行えます。</div>}
-      <textarea
-        value={content}
-        onChange={(e) => { setContent(e.target.value); setSaved(false); }}
-        disabled={!canEdit}
-        rows={24}
-        className="vid-input"
-        style={{ ...input, height: "auto", minHeight: 420, padding: "10px 12px", lineHeight: 1.7, resize: "vertical", fontFamily: "var(--font-body)" }}
-      />
-      {canEdit && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={save} disabled={saving} style={{ ...smallBtn, color: "var(--color-accent-100)", background: "var(--color-accent-900)" }}>
-            {saving ? "保存中…" : "保存する"}
-          </button>
-          {saved && <span style={{ fontSize: 12, color: "var(--color-accent-300)" }}>保存しました</span>}
-          {error && <span style={{ fontSize: 12, color: "var(--color-accent-200)" }}>{error}</span>}
-        </div>
-      )}
     </div>
   );
 }
