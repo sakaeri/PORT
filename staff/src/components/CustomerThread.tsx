@@ -572,7 +572,7 @@ export default function CustomerThread({
   customer: { id: string; name: string; staffLabel: string | null; memberNo: string | null; balance: number };
   // 問い合わせ窓口（TeeRA など）のトークのとき、その窓口名。残高・見積もり・評価などは出さない。
   deskName?: string | null;
-  thread: { id: string; archived: boolean; departmentId: string | null } | null;
+  thread: { id: string; archived: boolean; departmentId: string | null; customerLastReadAt: string | null } | null;
   departments: { id: string; name: string }[];
   initialMessages: Message[];
   initialHasMoreOlder?: boolean;
@@ -604,6 +604,8 @@ export default function CustomerThread({
   const [templates, setTemplates] = useState(initialTemplates);
   const [showTemplates, setShowTemplates] = useState(false);
   const [todos, setTodos] = useState(initialTodos);
+  // 依頼主が最後にトーク画面を見た時刻。これより前に送ったこちらのメッセージに「既読」を出す（依頼主側には出さない）。
+  const [customerLastReadAt, setCustomerLastReadAt] = useState(thread?.customerLastReadAt ?? null);
   const [showTodoAdd, setShowTodoAdd] = useState(false);
   const isMobile = useIsMobile();
   const [showInfoPanel, setShowInfoPanel] = useState(false);
@@ -672,6 +674,8 @@ export default function CustomerThread({
       ? await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", thread.id).gte("sent_at", oldestLoadedAt).order("sent_at", { ascending: true })
       : await supabase.from("messages").select(MESSAGE_SELECT).eq("thread_id", thread.id).order("sent_at", { ascending: false }).limit(MESSAGE_PAGE_SIZE);
     if (error) console.error("CustomerThread refresh failed", error);
+    const { data: readRow } = await supabase.from("threads").select("customer_last_read_at").eq("id", thread.id).maybeSingle();
+    if (readRow) setCustomerLastReadAt(readRow.customer_last_read_at);
     if (data) {
       const rows = oldestLoadedAt ? data : data.slice().reverse();
       setMessages(
@@ -950,6 +954,9 @@ export default function CustomerThread({
               )}
               {!m.deleted_at && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {isStaff && !isSystem && customerLastReadAt && new Date(m.sent_at) <= new Date(customerLastReadAt) && (
+                    <span style={{ fontSize: 10, color: "var(--color-neutral-500)" }}>既読</span>
+                  )}
                   <span style={{ fontSize: 10, color: "var(--color-neutral-600)" }}>
                     {new Date(m.sent_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>

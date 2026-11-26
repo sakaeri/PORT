@@ -59,7 +59,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       .eq("id", id)
       .eq("org_id", ctx.orgId)
       .maybeSingle(),
-    supabase.from("threads").select("id, archived_at, department_id").eq("customer_id", id).eq("kind", "customer").maybeSingle(),
+    supabase.from("threads").select("id, archived_at, department_id, customer_last_read_at").eq("customer_id", id).eq("kind", "customer").maybeSingle(),
     supabase.from("intake_forms").select("id, label, note, intake_fields(id, label, kind, required, sort)").eq("org_id", ctx.orgId).order("last_used_at", { ascending: false }).order("sort", { ascending: true }),
     supabase
       .from("menus")
@@ -135,7 +135,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     <CustomerThread
       deskName={deskName}
       customer={{ id: customer.id, name: customer.name, staffLabel: customer.staff_label, memberNo: customer.member_no, balance: customer.balance }}
-      thread={thread ? { id: thread.id, archived: !!thread.archived_at, departmentId: thread.department_id } : null}
+      thread={thread ? { id: thread.id, archived: !!thread.archived_at, departmentId: thread.department_id, customerLastReadAt: thread.customer_last_read_at } : null}
       departments={(departmentRows ?? []).map((d) => ({ id: d.id, name: d.name }))}
       initialMessages={initialMessages}
       initialHasMoreOlder={hasMoreOlder}
