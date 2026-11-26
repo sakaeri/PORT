@@ -245,7 +245,6 @@ async function updateCustomerNameInner(name: string) {
 // ご相談内容を受け取り、ご相談はその場でトークに届ける（秘書がすぐ返信できる）。
 // メールアドレスには確認メールを送る。確認前でも、同じ端末ならそのままトークを見られ、
 // 返信のお知らせメールも届く（本部側の notify が確認待ちのアドレスにも送る）。
-// 利用規約は「送信すると同意したものとみなす」形（画面のボタンの下に表示）。
 export async function submitFirstInquiry(name: string, email: string, body: string) {
   return toResult("submitFirstInquiry", () => submitFirstInquiryInner(name, email, body));
 }
@@ -283,9 +282,9 @@ async function submitFirstInquiryInner(name: string, email: string, body: string
     throw emailErr;
   }
 
-  // 名前と規約への同意は、メールアドレスが受け付けられてから保存する。先に保存すると、
+  // 名前は、メールアドレスが受け付けられてから保存する。先に保存すると、
   // 登録済みのアドレスで弾かれたときに、名前だけ付いた仮の依頼主が本部の一覧に残ってしまう。
-  await supabase.from("customers").update({ name: trimmedName, terms_accepted_at: new Date().toISOString() }).eq("id", ctx.customerId);
+  await supabase.from("customers").update({ name: trimmedName }).eq("id", ctx.customerId);
   await sendMessageInner(trimmedBody, []);
 }
 
