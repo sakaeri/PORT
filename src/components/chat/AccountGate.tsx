@@ -32,7 +32,10 @@ const heading: React.CSSProperties = { fontFamily: "var(--font-heading)", fontWe
 export default function AccountGate({ orgDisplayName, isDesk, initialError }: { orgDisplayName: string; isDesk?: boolean; initialError?: string }) {
   const router = useRouter();
   const loginOnly = !isDesk;
-  const [mode, setMode] = useState<"new" | "existing">(loginOnly ? "existing" : "new");
+  // 窓口はお問い合わせフォームだけ（ふつうのお問い合わせフォームと同じ見た目にして構えさせない。
+  // 前に送ったことがある人は、同じアドレスで送ると届くメールや、お返事のメールのボタンから自分のトークに入れる）。
+  // トップ（窓口ではない）はログインだけ。
+  const mode: "new" | "existing" = loginOnly ? "existing" : "new";
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -219,13 +222,6 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
                     >
                       {sending ? "送信中…" : "送信する"}
                     </button>
-                    <div style={{ fontSize: 11, lineHeight: 1.6, textAlign: "center", color: "var(--color-neutral-500)" }}>
-                      送信すると
-                      <a href="/terms" target="_blank" rel="noreferrer" style={{ color: "var(--color-accent)" }}>
-                        利用規約
-                      </a>
-                      に同意したものとみなします。
-                    </div>
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -250,18 +246,6 @@ export default function AccountGate({ orgDisplayName, isDesk, initialError }: { 
             )}
         </div>
 
-        {/* 相談フォームとは別物に見えるよう、ログインはカードの外に置く。 */}
-        {!sentTo && !loginOnly && (
-          <button
-            onClick={() => {
-              setMode(mode === "new" ? "existing" : "new");
-              setError("");
-            }}
-            style={{ width: "100%", height: 40, marginTop: 4, cursor: "pointer", fontSize: 13, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent-800)", borderRadius: "var(--radius-md)" }}
-          >
-            {mode === "new" ? "ご利用中の方はこちら（ログイン）" : "お問い合わせに戻る"}
-          </button>
-        )}
       </div>
     </main>
   );
