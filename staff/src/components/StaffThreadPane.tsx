@@ -334,8 +334,12 @@ function StaffEditPanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 180px" }}>
           <span style={editLabel}>役職</span>
           <select value={role} onChange={(e) => setRole(e.target.value as StaffRole)} className="vid-input" style={editInput}>
-            {/* 本部以外（秘書）が選べるのは「スタッフ」だけ（ほかを選んでも保存できないため出さない）。 */}
-            {(editable.canPromoteToOwner ? (["owner", ...INVITE_ROLES] as StaffRole[]) : (["dept_leader"] as StaffRole[])).map((r) => (
+            {/* 役職は「本部メンバー」「担当者」の2つ。前からの「スタッフ」の人だけ、今の役職も選択肢に残す。
+                本部以外（担当者）が選べるのは「スタッフ」だけ（ほかを選んでも保存できないため出さない）。 */}
+            {(editable.canPromoteToOwner
+              ? ([...(["owner", ...INVITE_ROLES] as StaffRole[]), ...(editable.role === "dept_leader" ? (["dept_leader"] as StaffRole[]) : [])])
+              : (["dept_leader"] as StaffRole[])
+            ).map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABEL[r]}
               </option>

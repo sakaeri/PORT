@@ -4,7 +4,7 @@ import PushBanner from "@/components/PushPrompt";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, ChatsCircle, ChartBar, UsersThree, GearSix, Sun, MoonStars, SignOut, List, X, PencilSimple, ListChecks } from "@phosphor-icons/react";
+import { Users, UsersThree, GearSix, Sun, MoonStars, SignOut, List, X, PencilSimple, ListChecks } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { headingWeight } from "@/lib/style";
@@ -14,17 +14,14 @@ import Avatar, { avatarInitial } from "@/components/Avatar";
 import { signOutStaff } from "@/lib/signOutStaff";
 import type { StaffContext } from "@/lib/data";
 
-// dept_leader（表示名「スタッフ」）は依頼主とは直接やり取りしない役割なので、
-// 依頼主一覧・売上実績・メニュー管理は隠す。案件トークと、本部との連絡用の
-// スタッフ画面はそのまま使える。
+// お問い合わせ窓口だけの運用なので、案件トーク・売上実績は出さない（ページ自体は残っている）。
+// dept_leader（旧「スタッフ」）は依頼主とやり取りしない役割だったので、依頼主一覧は隠したまま。
 const NAV = [
   { href: "/today", label: "今日やること", icon: ListChecks },
   { href: "/customers", label: "依頼主", icon: Users, hideWhenStaff: true },
-  { href: "/cases", label: "案件トーク", icon: ChatsCircle },
   { href: "/staff", label: "スタッフ", icon: UsersThree },
-  // 売上・実績とメニュー管理は本部（オーナー）だけ。秘書・スタッフには出さない。
-  { href: "/stats", label: "売上・実績", icon: ChartBar, ownerOnly: true },
-  { href: "/menu", label: "メニュー管理", icon: GearSix, ownerOnly: true },
+  // 窓口設定は本部（オーナー）だけ。
+  { href: "/menu", label: "窓口設定", icon: GearSix, ownerOnly: true },
 ];
 
 export default function Shell({ ctx, children }: { ctx: StaffContext; children: React.ReactNode }) {
@@ -58,37 +55,27 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
     // pathname included so navigating away from a thread (which marks it read) re-checks the count
   }, [ctx.orgId, pathname]);
 
-  // 「案件トーク」ナビの赤丸：未着手（支払い済み・未着手）／着手後で報告の
-  // 目安時間まで残り15分以内（経過済みも含む）、のいずれかに当たる案件の件数。
-  // is_office()のRLS（case_visible）に任せているので、マネージャーは自分の
-  // 窓口、スタッフは自分の担当案件だけの件数になる。
+  // 「今日やること」ナビの赤丸：今日まで（期限切れを含む）の、まだ終わっていないやることの数。
+  // RLS に任せているので、担当者は自分の担当窓口のトークの分だけになる。
   const [attentionCount, setAttentionCount] = useState(0);
   useEffect(() => {
     const supabase = createClient(ctx.orgId);
     let cancelled = false;
     async function refreshAttention() {
-      const soon = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-      const { count } = await supabase
-        .from("requests")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", ctx.orgId)
-        .or(`phase.eq.preparing,and(phase.eq.started,due_at.lte.${soon})`);
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      const { count } = await supabase.from("todos").select("id", { count: "exact", head: true }).eq("org_id", ctx.orgId).is("done_at", null).lte("due_date", today);
       if (!cancelled) setAttentionCount(count ?? 0);
     }
     void refreshAttention();
-    const channel = supabase
-      .channel(`attention-${ctx.orgId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "requests", filter: `org_id=eq.${ctx.orgId}` }, refreshAttention)
-      .subscribe();
     const interval = setInterval(refreshAttention, 60000);
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [ctx.orgId]);
+    // pathname included so completing a todo and moving on re-checks the count
+  }, [ctx.orgId, pathname]);
 
-  // ホーム画面のアイコンの数字は、ナビの赤丸（未読の依頼主＋気にかける案件）の合計にそろえる。
+  // ホーム画面のアイコンの数字は、ナビの赤丸（未読の依頼主＋今日までのやること）の合計にそろえる。
   useEffect(() => {
     const total = unreadCount + attentionCount;
     const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
@@ -149,7 +136,7 @@ export default function Shell({ ctx, children }: { ctx: StaffContext; children: 
       {navItems.map((n) => {
         const active = pathname === n.href || pathname.startsWith(n.href + "/");
         const Icon = n.icon;
-        const badgeCount = n.href === "/customers" ? unreadCount : n.href === "/cases" ? attentionCount : 0;
+        const badgeCount = n.href === "/customers" ? unreadCount : n.href === "/today" ? attentionCount : 0;
         return (
           <Link
             key={n.href}

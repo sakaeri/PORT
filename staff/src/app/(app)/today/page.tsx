@@ -3,20 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getStaffContext } from "@/lib/data";
 import { headingWeight } from "@/lib/style";
 import PrintButton from "@/components/PrintButton";
-
-function yen(n: number): string {
-  return "¥" + Math.round(n).toLocaleString("ja-JP");
-}
-
-// JSTでの「明日0時」（UTCのタイムスタンプ比較用）。日本にはサマータイムが
-// 無いので固定オフセット（+9時間）でよい。
-function jstTomorrowStartISO(): string {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-  const year = Number(parts.find((p) => p.type === "year")!.value);
-  const month = Number(parts.find((p) => p.type === "month")!.value);
-  const day = Number(parts.find((p) => p.type === "day")!.value);
-  return new Date(Date.UTC(year, month - 1, day + 1) - 9 * 60 * 60 * 1000).toISOString();
-}
+import TodayTodoList, { type TodayTodo } from "@/components/TodayTodoList";
+import { jstTodayDate } from "@/lib/due-date";
 
 function jstTodayLabel(): string {
   const parts = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "long", day: "numeric", weekday: "short" }).formatToParts(new Date());
@@ -29,8 +17,8 @@ function fmtTime(iso: string): string {
 
 const card: React.CSSProperties = {
   display: "flex",
-  flexDirection: "column",
-  gap: 4,
+  alignItems: "center",
+  gap: 8,
   padding: "10px 14px",
   borderRadius: "var(--radius-md)",
   background: "var(--color-surface)",
@@ -49,182 +37,48 @@ const sectionHeader: React.CSSProperties = {
   borderRadius: "var(--radius-md)",
 };
 
+type CustomerRef = { id: string; name: string; staff_label: string | null };
+function one<T>(v: T | T[] | null | undefined): T | null {
+  return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+}
+
+// 今日やること：返信待ちのトーク（最後のメッセージが依頼主から）と、トークから手で入れた「やること」。
+// 見える範囲は RLS に任せる（担当者は自分の担当窓口のトークだけ）。
 export default async function TodayPage() {
   const ctx = await getStaffContext();
   if (!ctx) return null;
-  // スタッフ（dept_leader）は依頼主とは直接やり取りしない役割なので、
-  // 自分に割り当てられた案件だけの「今日やること」を出す。
-  if (ctx.role === "dept_leader") return <StaffToday orgId={ctx.orgId} />;
-
   const supabase = await createClient();
-  const tomorrowStart = jstTomorrowStartISO();
+  const today = jstTodayDate();
 
-  const [{ data: dueRows }, { data: customerThreads }, { data: myDepartmentRows }, { data: pendingReportRows }, { data: quotedRows }] = await Promise.all([
+  const [{ data: summaries }, { data: threads }, { data: todoRows }] = await Promise.all([
+    supabase.rpc("customer_thread_summaries", { p_org_id: ctx.orgId }),
+    supabase.from("threads").select("id, last_msg_at, customers(id, name, staff_label)").eq("org_id", ctx.orgId).eq("kind", "customer"),
     supabase
-      .from("requests")
-      .select("id, title, due_at, customer_id, customers(name, staff_label)")
+      .from("todos")
+      .select("id, title, due_date, done_at, threads(customers(id, name, staff_label))")
       .eq("org_id", ctx.orgId)
-      .eq("phase", "started")
-      .not("due_at", "is", null)
-      .lt("due_at", tomorrowStart)
-      .order("due_at", { ascending: true }),
-    supabase.from("threads").select("customer_id, department_id").eq("org_id", ctx.orgId).eq("kind", "customer"),
-    ctx.role === "dept_manager" ? supabase.from("staff_departments").select("department_id").eq("profile_id", ctx.userId) : Promise.resolve({ data: [] as { department_id: string }[] }),
-    supabase
-      .from("completion_reports")
-      .select("request_id, submitted_at, requests!inner(id, title, customer_id, customers(name, staff_label), org_id)")
-      .is("sent_at", null)
-      .eq("requests.org_id", ctx.orgId),
-    supabase
-      .from("requests")
-      .select("id, title, amount, quoted_at, customer_id, customers(name, staff_label)")
-      .eq("org_id", ctx.orgId)
-      .eq("phase", "quoted")
-      // 有効期限が切れた立替の見積もりは、もう返事を待っても確定されないので出さない。
-      .or(`quote_expires_at.is.null,quote_expires_at.gt.${nowIso()}`)
-      .order("quoted_at", { ascending: true }),
+      .is("done_at", null)
+      .order("due_date", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
 
-  const viewerRole = ctx.role;
-  const departmentIdByCustomer = new Map((customerThreads ?? []).map((t) => [t.customer_id, t.department_id]));
-  const myDepartmentIds = new Set((myDepartmentRows ?? []).map((d) => d.department_id));
-  function visibleToViewer(customerId: string): boolean {
-    if (viewerRole !== "dept_manager") return true;
-    const deptId = departmentIdByCustomer.get(customerId);
-    return !!deptId && myDepartmentIds.has(deptId);
-  }
-  function customerNameOf(c: { name: string; staff_label: string | null } | { name: string; staff_label: string | null }[] | null): string {
-    const row = Array.isArray(c) ? c[0] : c;
-    return row?.staff_label ?? row?.name ?? "—";
-  }
-
-  const dueList = (dueRows ?? []).filter((r) => visibleToViewer(r.customer_id));
-
-  // 期限の案件に、スタッフ（担当者）が割り当てられていればその名前を添える。
-  const dueIds = dueList.map((r) => r.id);
-  const { data: caseStaffRows } =
-    dueIds.length > 0
-      ? await supabase.from("case_staff").select("request_id, profiles!case_staff_profile_id_fkey(display_name, staff_alias)").in("request_id", dueIds)
-      : { data: [] as { request_id: string; profiles: { display_name: string; staff_alias: string | null } | { display_name: string; staff_alias: string | null }[] | null }[] };
-  const staffNamesByRequestId = new Map<string, string>();
-  for (const row of caseStaffRows ?? []) {
-    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-    if (!profile) continue;
-    const name = profile.staff_alias ?? profile.display_name;
-    const existing = staffNamesByRequestId.get(row.request_id);
-    staffNamesByRequestId.set(row.request_id, existing ? `${existing}・${name}` : name);
-  }
-
-  const pendingReports = (pendingReportRows ?? [])
-    .map((r) => {
-      const req = Array.isArray(r.requests) ? r.requests[0] : r.requests;
-      return req ? { requestId: req.id, title: req.title, customerId: req.customer_id, customerName: customerNameOf(req.customers), submittedAt: r.submitted_at } : null;
+  const threadById = new Map((threads ?? []).map((t) => [t.id, { lastMsgAt: t.last_msg_at as string | null, customer: one(t.customers as CustomerRef | CustomerRef[] | null) }]));
+  // 返信待ち：最後のメッセージが依頼主から（読んだかどうかに関係なく、まだ返していないもの）。待っている時間が長い順。
+  const waiting = (summaries ?? [])
+    .filter((s) => !s.archived && s.last_message_sender_role === "client")
+    .map((s) => {
+      const t = threadById.get(s.thread_id);
+      return t?.customer ? { customerId: t.customer.id, name: t.customer.staff_label ?? t.customer.name, lastMsgAt: t.lastMsgAt, unread: s.unread } : null;
     })
     .filter((r): r is NonNullable<typeof r> => r !== null)
-    .filter((r) => visibleToViewer(r.customerId));
+    .sort((a, b) => (a.lastMsgAt ?? "").localeCompare(b.lastMsgAt ?? ""));
 
-  const quotedList = (quotedRows ?? []).filter((r) => visibleToViewer(r.customer_id));
-
-  return (
-    <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 700, width: "100%", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "var(--font-heading)", fontWeight: headingWeight, fontSize: 22 }}>今日やること</div>
-          <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>{jstTodayLabel()}</div>
-        </div>
-        <PrintButton />
-      </div>
-
-      <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={sectionHeader}>今日が期限の案件（期限超過含む）</div>
-        {dueList.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ありません。</div>
-        ) : (
-          dueList.map((r) => (
-            <Link key={r.id} href={`/cases/${r.id}`} style={card}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="print-checkbox">☐</span>
-                <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{customerNameOf(r.customers)}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
-                <span style={{ flex: "none", fontSize: 11.5, color: r.due_at! < new Date().toISOString() ? "var(--color-accent-200)" : "var(--color-neutral-500)" }}>
-                  期限 {fmtTime(r.due_at!)}
-                </span>
-              </div>
-              {staffNamesByRequestId.get(r.id) && (
-                <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>担当：{staffNamesByRequestId.get(r.id)}</div>
-              )}
-            </Link>
-          ))
-        )}
-      </section>
-
-      <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={sectionHeader}>担当者の確認待ちの完了報告</div>
-        {pendingReports.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ありません。</div>
-        ) : (
-          pendingReports.map((r) => (
-            <Link key={r.requestId} href={`/cases/${r.requestId}`} style={card}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="print-checkbox">☐</span>
-                <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{r.customerName}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
-                <span style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>提出 {fmtTime(r.submittedAt)}</span>
-              </div>
-            </Link>
-          ))
-        )}
-      </section>
-
-      <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={sectionHeader}>返信待ちの見積もり</div>
-        {quotedList.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ありません。</div>
-        ) : (
-          quotedList.map((r) => (
-            <Link key={r.id} href={`/cases/${r.id}`} style={card}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span className="print-checkbox">☐</span>
-                <span style={{ flex: "none", fontSize: 12, color: "var(--color-neutral-500)" }}>{customerNameOf(r.customers)}</span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
-                {viewerRole === "owner" && <span style={{ flex: "none", fontSize: 13, fontFamily: "var(--font-heading)" }}>{yen(r.amount)}</span>}
-              </div>
-              {r.quoted_at && <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>送信 {fmtTime(r.quoted_at)}</div>}
-            </Link>
-          ))
-        )}
-      </section>
-    </div>
-  );
-}
-
-// スタッフ用の「今日やること」。案件の閲覧範囲はRLS（case_visible）で
-// 自分に割り当てられた案件だけに絞られるので、ここでは段階ごとに並べるだけ。
-async function StaffToday({ orgId }: { orgId: string }) {
-  const supabase = await createClient();
-  const tomorrowStart = jstTomorrowStartISO();
-  const [{ data: rows }, { data: reportRows }] = await Promise.all([
-    supabase
-      .from("requests")
-      .select("id, title, phase, due_at")
-      .eq("org_id", orgId)
-      .in("phase", ["preparing", "started"])
-      .order("due_at", { ascending: true, nullsFirst: false }),
-    supabase.from("completion_reports").select("request_id").is("sent_at", null),
-  ]);
-  const reported = new Set((reportRows ?? []).map((r) => r.request_id));
-  const all = rows ?? [];
-  const due = all.filter((r) => r.phase === "started" && r.due_at && r.due_at < tomorrowStart && !reported.has(r.id));
-  const dueIds = new Set(due.map((r) => r.id));
-  const waiting = all.filter((r) => r.phase === "preparing");
-  const working = all.filter((r) => r.phase === "started" && !dueIds.has(r.id));
-  const now = new Date().toISOString();
-
-  const sections: { title: string; items: typeof all }[] = [
-    { title: "今日が期限の案件（期限超過含む）", items: due },
-    { title: "着手待ちの案件", items: waiting },
-    { title: "対応中の案件", items: working },
-  ];
+  const todos: TodayTodo[] = (todoRows ?? []).map((r) => {
+    const customer = one(one(r.threads as { customers: CustomerRef | CustomerRef[] | null } | { customers: CustomerRef | CustomerRef[] | null }[] | null)?.customers);
+    return { id: r.id, title: r.title, due_date: r.due_date, done_at: r.done_at, customerId: customer?.id ?? null, customerName: customer ? (customer.staff_label ?? customer.name) : "" };
+  });
+  const dueTodos = todos.filter((t) => t.due_date <= today);
+  const laterTodos = todos.filter((t) => t.due_date > today);
 
   return (
     <div style={{ padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: 16, maxWidth: 700, width: "100%", margin: "0 auto" }}>
@@ -235,31 +89,34 @@ async function StaffToday({ orgId }: { orgId: string }) {
         </div>
         <PrintButton />
       </div>
-      {sections.map((sec) => (
-        <section key={sec.title} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={sectionHeader}>{sec.title}</div>
-          {sec.items.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ありません。</div>
-          ) : (
-            sec.items.map((r) => (
-              <Link key={r.id} href={`/cases/${r.id}`} style={card}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="print-checkbox">☐</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</span>
-                  {reported.has(r.id) && <span style={{ flex: "none", fontSize: 11, color: "var(--color-neutral-500)" }}>報告済み・確認待ち</span>}
-                  {r.due_at && (
-                    <span style={{ flex: "none", fontSize: 11.5, color: r.due_at < now ? "var(--color-accent-200)" : "var(--color-neutral-500)" }}>期限 {fmtTime(r.due_at)}</span>
-                  )}
-                </div>
-              </Link>
-            ))
-          )}
+
+      <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={sectionHeader}>返信待ちのトーク</div>
+        {waiting.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>ありません。</div>
+        ) : (
+          waiting.map((w) => (
+            <Link key={w.customerId} href={`/customers/${w.customerId}`} style={card}>
+              <span className="print-checkbox">☐</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.name}</span>
+              {w.unread && <span style={{ flex: "none", width: 8, height: 8, borderRadius: "50%", background: "var(--color-accent)" }} aria-label="未読" />}
+              {w.lastMsgAt && <span style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)" }}>{fmtTime(w.lastMsgAt)}</span>}
+            </Link>
+          ))
+        )}
+      </section>
+
+      <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={sectionHeader}>やること（今日まで）</div>
+        <TodayTodoList initialTodos={dueTodos} emptyText="ありません。トークの入力欄の横のボタンから追加できます。" />
+      </section>
+
+      {laterTodos.length > 0 && (
+        <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={sectionHeader}>これからのやること</div>
+          <TodayTodoList initialTodos={laterTodos} emptyText="" />
         </section>
-      ))}
+      )}
     </div>
   );
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }

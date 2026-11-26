@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, Paperclip, Trash, ChatCircleText, Star, SidebarSimple, X, CaretLeft, ChatText, ListChecks, Plus, PencilSimple, Receipt } from "@phosphor-icons/react";
+import { ArrowLeft, PaperPlaneTilt, Paperclip, Trash, ChatCircleText, SidebarSimple, X, CaretLeft, ChatText, ListChecks, Plus, PencilSimple, ListPlus } from "@phosphor-icons/react";
 import { headingWeight } from "@/lib/style";
 import { errorMessage, unwrap } from "@/lib/errors";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -23,16 +23,14 @@ import {
   addIntakeField,
   updateIntakeField,
   deleteIntakeField,
-  grantReferralCredit,
 } from "@/app/actions";
 import WorkMemos, { type WorkMemo } from "@/components/WorkMemos";
-import HqFeedbackChat from "@/components/HqFeedbackChat";
+import { ThreadTodos, TodoAddDialog, type TodoItem } from "@/components/ThreadTodos";
 import Avatar, { avatarInitial } from "@/components/Avatar";
-import QuoteDialog, { type MenuOption } from "@/components/QuoteDialog";
+import type { MenuOption } from "@/components/QuoteDialog";
 import TextComposer from "@/components/TextComposer";
 import AttachmentList from "@/components/AttachmentList";
 import Modal from "@/components/Modal";
-import InfoTooltip from "@/components/InfoTooltip";
 import { PHASE_LABEL } from "@/lib/stage";
 import type { AppRole, RequestPhase } from "@/lib/supabase/types";
 
@@ -564,18 +562,12 @@ export default function CustomerThread({
   currentUserId,
   orgId,
   templates: initialTemplates,
-  menus,
   memos,
-  ratings,
-  latestRequest,
+  todos: initialTodos,
   deskName,
   initialHasMoreOlder,
-  canSeeHqFeedback,
   canDeleteTemplates,
   viewerIsOwner,
-  hqFeedbackThreadId,
-  hqFeedbackUnread,
-  referral,
 }: {
   customer: { id: string; name: string; staffLabel: string | null; memberNo: string | null; balance: number };
   // 問い合わせ窓口（TeeRA など）のトークのとき、その窓口名。残高・見積もり・評価などは出さない。
@@ -589,6 +581,7 @@ export default function CustomerThread({
   templates: TemplateInfo[];
   menus: MenuOption[];
   memos: WorkMemo[];
+  todos: TodoItem[];
   ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] };
   latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
   canSeeHqFeedback: boolean;
@@ -610,8 +603,8 @@ export default function CustomerThread({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [templates, setTemplates] = useState(initialTemplates);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [showQuote, setShowQuote] = useState(false);
-  const router = useRouter();
+  const [todos, setTodos] = useState(initialTodos);
+  const [showTodoAdd, setShowTodoAdd] = useState(false);
   const isMobile = useIsMobile();
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [oldestLoadedAt, setOldestLoadedAt] = useState<string | null>(initialMessages[0]?.sent_at ?? null);
@@ -620,7 +613,6 @@ export default function CustomerThread({
   const scrollRef = useRef<HTMLDivElement>(null);
   const skipAutoScrollRef = useRef(false);
   const isNearBottomRef = useRef(true);
-  const [balance, setBalance] = useState(customer.balance);
 
   const [staffLabel, setStaffLabel] = useState(customer.staffLabel);
   const [labelOpen, setLabelOpen] = useState(false);
@@ -907,15 +899,6 @@ export default function CustomerThread({
         </div>
       )}
 
-      {!deskName && (
-      <div style={{ padding: "14px 20px 0", display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>残高</span>
-          <span style={{ fontFamily: "var(--font-heading)", fontSize: 14 }}>¥{balance.toLocaleString("ja-JP")}</span>
-        </div>
-      </div>
-      )}
-
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
         {!thread && <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>まだやり取りがありません。</div>}
         {hasMoreOlder && (
@@ -1031,14 +1014,14 @@ export default function CustomerThread({
           }
           leftButton={
             <>
-              {thread && !deskName && (
+              {thread && (
                 <button
-                  onClick={() => setShowQuote(true)}
-                  aria-label="見積もりを作る"
-                  title="見積もりを作る"
+                  onClick={() => setShowTodoAdd(true)}
+                  aria-label="やることに追加"
+                  title="やることに追加"
                   style={{ flex: "none", width: 40, height: 40, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)" }}
                 >
-                  <Receipt size={16} />
+                  <ListPlus size={16} />
                 </button>
               )}
               <button
@@ -1080,30 +1063,12 @@ export default function CustomerThread({
               <X size={18} />
             </button>
           )}
-          {!deskName && <RatingsSummary ratings={ratings} />}
+          {thread && <ThreadTodos todos={todos} setTodos={setTodos} onAdd={() => setShowTodoAdd(true)} />}
           <WorkMemos customerId={customer.id} currentUserId={currentUserId} initialMemos={memos} />
-          {referral && <ReferralSection customerId={customer.id} referral={referral} onBalanceChange={setBalance} />}
-          {canSeeHqFeedback && !deskName && (
-            <HqFeedbackSection threadId={hqFeedbackThreadId} unread={hqFeedbackUnread} orgId={orgId} currentUserId={currentUserId} />
-          )}
-          {!deskName && <CaseSummarySection thread={thread} latestRequest={latestRequest} onOpenQuote={() => setShowQuote(true)} />}
         </div>
       </>
     )}
-    {showQuote && thread && (
-      <QuoteDialog
-        threadId={thread.id}
-        customerId={customer.id}
-        menus={menus}
-        onClose={() => setShowQuote(false)}
-        onCreated={() => {
-          // 送ったあともこの依頼主とのトークに残る（見積もりカードがトークに入る）。
-          setShowQuote(false);
-          void refresh();
-          router.refresh();
-        }}
-      />
-    )}
+    {showTodoAdd && thread && <TodoAddDialog threadId={thread.id} onClose={() => setShowTodoAdd(false)} onAdded={(t) => setTodos((prev) => [...prev, t])} />}
     </div>
   );
 }
@@ -1113,183 +1078,6 @@ type ReferralInfo = {
   sources: { id: string; name: string }[];
   canGrant: boolean;
 };
-
-// 「〇〇の紹介です」と言われたら、紹介元を選んで 5,000円分の紹介特典を付ける（1人1回）。
-function ReferralSection({ customerId, referral, onBalanceChange }: { customerId: string; referral: ReferralInfo; onBalanceChange: (balance: number) => void }) {
-  const router = useRouter();
-  const [sourceName, setSourceName] = useState(referral.sourceName);
-  const [selected, setSelected] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function grant() {
-    if (busy || !selected) return;
-    const name = referral.sources.find((s) => s.id === selected)?.name ?? "";
-    if (!window.confirm(`「${name}」の紹介として、5,000円分を残高に入れます。よろしいですか？`)) return;
-    setBusy(true);
-    setError("");
-    try {
-      const { data } = unwrap(await grantReferralCredit(customerId, selected));
-      onBalanceChange(data!);
-      setSourceName(name);
-      setSelected("");
-      // 横の欄を閉じて開き直したときに、付ける前の状態（選ぶ欄）に戻って見えないよう、画面の情報も取り直す。
-      router.refresh();
-    } catch (e) {
-      setError(errorMessage(e, "付けられませんでした"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (sourceName === null && !referral.canGrant) return null;
-  // 紹介元をまだ1つも登録していないときも欄は出し、登録先をⓘで案内する（欄ごと消えると分かりにくいため）。
-  const noSources = sourceName === null && referral.sources.length === 0;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 11.5, color: "var(--color-neutral-400)" }}>紹介元{noSources && "（未登録）"}</span>
-        <InfoTooltip
-          text={
-            noSources
-              ? "メニュー管理の「紹介元」で登録すると、ここで選べるようになります。トークで「〇〇の紹介です」と言われたら選ぶと、5,000円分が残高に入ります（1人1回・有効期限なし）。"
-              : "トークで「〇〇の紹介です」と言われたら選びます。選ぶと5,000円分が残高に入ります（1人1回・有効期限なし）。紹介元はメニュー管理の「紹介元」で登録します。"
-          }
-        />
-      </div>
-      {noSources ? null : sourceName !== null ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
-          <span style={{ flex: 1, minWidth: 0 }}>{sourceName || "（削除された紹介元）"}・特典済み</span>
-        </div>
-      ) : (
-        <div style={{ display: "flex", gap: 6 }}>
-          <select value={selected} onChange={(e) => setSelected(e.target.value)} className="vid-input" style={{ flex: 1, minWidth: 0, height: 30, padding: "0 8px", fontSize: 12, color: "var(--color-text)", background: "var(--color-bg)", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-md)" }}>
-            <option value="">選ぶ</option>
-            {referral.sources.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <button onClick={grant} disabled={busy || !selected} style={{ flex: "none", height: 30, padding: "0 10px", cursor: "pointer", fontSize: 11.5, color: "var(--color-accent-100)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-md)", opacity: busy || !selected ? 0.6 : 1 }}>
-            特典を付ける
-          </button>
-        </div>
-      )}
-      {error && <div style={{ fontSize: 11, color: "var(--color-accent-200)" }}>{error}</div>}
-    </div>
-  );
-}
-
-function RatingsSummary({ ratings }: { ratings: { average: number | null; count: number; items: { stars: number | null; comment: string | null }[] } }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        disabled={ratings.count === 0}
-        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: ratings.count === 0 ? "default" : "pointer", padding: 0 }}
-      >
-        依頼主の評価{ratings.count > 0 ? `（平均★${ratings.average?.toFixed(1)}・${ratings.count}件）` : "（まだありません）"}
-      </button>
-      {open && ratings.items.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
-          {ratings.items.map((r, i) => (
-            <div key={i} style={{ fontSize: 12 }}>
-              <div style={{ display: "flex", gap: 2 }}>
-                {Array.from({ length: 5 }).map((_, j) => (
-                  <Star key={j} size={12} weight={r.stars != null && j < r.stars ? "fill" : "regular"} color="var(--color-accent-300)" />
-                ))}
-              </div>
-              {r.comment && <div style={{ marginTop: 2 }}>{r.comment}</div>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// 依頼主→本部の直接のご意見・ご要望（担当秘書には見えない）。以前は専用の
-// ナビ画面にまとめて一覧していたが、担当秘書を切り替える際にこの依頼主の
-// ものかどうか分かりにくかったため、この依頼主の詳細画面に埋め込む形にした。
-function HqFeedbackSection({
-  threadId,
-  unread,
-  orgId,
-  currentUserId,
-}: {
-  threadId: string | null;
-  unread: boolean;
-  orgId: string;
-  currentUserId: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        disabled={!threadId}
-        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-400)", background: "transparent", border: "none", cursor: threadId ? "pointer" : "default", padding: 0 }}
-      >
-        ご意見・ご要望{!threadId && "（まだありません）"}
-        {unread && (
-          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-bg)", background: "var(--color-accent-200)", borderRadius: "var(--radius-sm)", padding: "1.5px 6px" }}>
-            未読
-          </span>
-        )}
-      </button>
-      {open && threadId && (
-        <div style={{ padding: 10, borderRadius: "var(--radius-md)", background: "var(--color-surface)", border: "1px solid var(--color-divider)" }}>
-          <HqFeedbackChat threadId={threadId} orgId={orgId} currentUserId={currentUserId} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CaseSummarySection({
-  thread,
-  latestRequest,
-  onOpenQuote,
-}: {
-  thread: { id: string; archived: boolean } | null;
-  latestRequest: { id: string; title: string; amount: number; phase: RequestPhase } | null;
-  onOpenQuote: () => void;
-}) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ flex: 1, fontSize: 11.5, color: "var(--color-neutral-400)" }}>このトークの依頼</span>
-        {thread && (
-          <button
-            onClick={onOpenQuote}
-            style={{ flex: "none", height: 24, padding: "0 10px", cursor: "pointer", fontSize: 11, color: "var(--color-accent)", background: "transparent", border: "1px solid var(--color-accent)", borderRadius: "var(--radius-sm)" }}
-          >
-            見積もり
-          </button>
-        )}
-      </div>
-      {latestRequest ? (
-        <Link
-          href={`/cases/${latestRequest.id}`}
-          style={{ display: "flex", flexDirection: "column", gap: 4, padding: 10, borderRadius: "var(--radius-md)", border: "1px solid var(--color-divider)", background: "var(--color-surface)", textDecoration: "none", color: "inherit" }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{latestRequest.title}</span>
-            <span style={{ flex: "none", fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--color-divider)", color: "var(--color-neutral-400)" }}>{PHASE_LABEL[latestRequest.phase]}</span>
-          </div>
-          <div style={{ fontSize: 14, fontFamily: "var(--font-heading)", fontWeight: 600 }}>¥{latestRequest.amount.toLocaleString("ja-JP")}</div>
-        </Link>
-      ) : (
-        <div style={{ fontSize: 12, color: "var(--color-neutral-500)", lineHeight: 1.6 }}>
-          まだ依頼はありません。
-        </div>
-      )}
-    </div>
-  );
-}
 
 // 話の内容が別の窓口の担当になったときに、受付側でその場で切り替える
 // ためのコントロール。人間秘書の担当交代と同じ発想で、依頼主から見える

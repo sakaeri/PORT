@@ -359,7 +359,8 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
         onOpenMyPage={() => setShowMyPage(true)}
         customerName={ctx.customerName}
         avatarUrl={avatarUrl}
-        chatOnly={!!ctx.desk}
+        // 窓口だけの運用にしたので、進捗状況・報告書一覧は出さない（トークだけ）。
+        chatOnly
       />
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "var(--space-6) var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
@@ -447,7 +448,8 @@ export default function ChatScreen({ ctx, initialMessages, initialBundles, initi
           balance={ctx.balance}
           autoRecharge={ctx.autoRecharge}
           initialChargeOpen={openMyPageWithCharge}
-          isDesk={!!ctx.desk}
+          // 残高・チャージ・本部とのやり取りも出さない。
+          isDesk
         />
       )}
     </div>
